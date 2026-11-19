@@ -1,0 +1,141 @@
+/* ===== Onboarding ===== */
+.ob-wrap { width: 100%; display: flex; justify-content: center; }
+.ob-card {
+  width: min(560px, 100%); padding: 28px 32px 24px; border-radius: var(--radius-lg); box-shadow: var(--shadow);
+  display: flex; flex-direction: column; min-height: 560px;
+}
+.ob-card.ob-wide { width: min(860px, 100%); }
+.ob-top { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+.ob-dots { display: flex; gap: 6px; }
+.ob-dot { width: 8px; height: 8px; border-radius: 99px; background: var(--border); transition: width .25s, background .25s; }
+.ob-dot.past { background: #c5c6f2; }
+.ob-dot.on { width: 24px; background: var(--primary); }
+.ob-step-n { font-size: 12px; color: var(--text-3); font-weight: 600; }
+.ob-skip { margin-left: auto; font-size: 13px; color: var(--text-3); font-weight: 600; }
+.ob-skip:hover { color: var(--text); }
+.ob-body { flex: 1; animation: ob-in .28s ease-out; }
+@keyframes ob-in { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
+.ob-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--border); }
+.ob-foot .btn-primary { min-width: 140px; }
+
+.ob-eyebrow { font-size: 12.5px; font-weight: 700; color: var(--primary); letter-spacing: 0.01em; }
+.ob-h2 { font-size: 21px; font-weight: 800; letter-spacing: -0.02em; margin-top: 6px; }
+.ob-sub { color: var(--text-2); font-size: 14px; margin-top: 6px; }
+.ob-mt { margin-top: 24px; }
+.ob-mt-sm { margin-top: 8px; }
+.ob-name { margin-top: 12px; font-size: 16px; padding: 12px 14px; }
+
+/* 1. 환영 */
+.ob-hero { text-align: left; }
+.ob-hero-mark {
+  width: 48px; height: 48px; border-radius: 14px; background: var(--primary); color: #fff; font-weight: 800; font-size: 22px;
+  display: grid; place-items: center; margin-bottom: 20px; box-shadow: 0 8px 20px rgba(75, 79, 214, 0.25);
+}
+.ob-title { font-size: 34px; font-weight: 850; letter-spacing: -0.03em; line-height: 1.25; margin-top: 8px; }
+.ob-lead { color: var(--text-2); margin-top: 14px; font-size: 15px; line-height: 1.7; }
+.ob-values { list-style: none; padding: 0; margin: 26px 0 0; display: flex; flex-direction: column; gap: 10px; }
+.ob-values li { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); }
+.ob-values b { font-size: 14.5px; }
+.ob-values p { color: var(--text-2); font-size: 13.5px; margin-top: 2px; }
+.ob-v-ico { width: 30px; height: 30px; border-radius: 9px; background: var(--primary-soft); color: var(--primary); display: grid; place-items: center; flex-shrink: 0; font-weight: 700; }
+
+/* 2. 유형 */
+.ob-types { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.ob-type {
+  display: flex; align-items: center; gap: 14px; text-align: left; padding: 14px 16px; border-radius: var(--radius);
+  border: 1.5px solid var(--border); background: var(--surface); cursor: pointer; transition: border-color .12s, background .12s;
+}
+.ob-type:hover { border-color: var(--border-strong); }
+.ob-type.on { border-color: var(--primary); background: var(--primary-soft); }
+.ob-type-ico { font-size: 22px; width: 40px; height: 40px; display: grid; place-items: center; background: var(--surface-2); border-radius: 10px; flex-shrink: 0; }
+.ob-type.on .ob-type-ico { background: var(--surface); }
+.ob-type-body { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.ob-type-body b { font-size: 15px; }
+.ob-type-body span { font-size: 13px; color: var(--text-2); }
+.ob-radio { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--border-strong); flex-shrink: 0; }
+.ob-type.on .ob-radio { border: 5px solid var(--primary); }
+
+/* 3. 직무 / 공용 칩 */
+.ob-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.ob-chip, .ob-seed {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; font-size: 14px; font-weight: 600;
+  border: 1.5px solid var(--border); background: var(--surface); cursor: pointer; color: var(--text-2); transition: all .12s;
+}
+.ob-chip:hover, .ob-seed:hover { border-color: var(--border-strong); color: var(--text); }
+.ob-chip.on, .ob-seed.on { border-color: var(--primary); background: var(--primary-soft); color: var(--primary-ink); }
+
+/* 4. 리듬 */
+.ob-rhythm { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 32px; margin-top: 20px; align-items: start; }
+.ob-seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 3px; gap: 2px; }
+.ob-seg button { border: 0; background: transparent; padding: 7px 14px; border-radius: 8px; font-weight: 600; font-size: 14px; color: var(--text-2); cursor: pointer; }
+.ob-seg button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
+.ob-days { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.ob-day { width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid var(--border); background: var(--surface); font-weight: 700; font-size: 13px; color: var(--text-3); cursor: pointer; }
+.ob-day.on { border-color: var(--primary); background: var(--primary); color: #fff; }
+.ob-times { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.ob-time {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 9px 12px; border-radius: 10px;
+  border: 1.5px solid var(--border); background: var(--surface); cursor: pointer; text-align: left;
+}
+.ob-time b { font-size: 15px; font-variant-numeric: tabular-nums; }
+.ob-time span { font-size: 11.5px; color: var(--text-3); }
+.ob-time.on { border-color: var(--accent); background: var(--accent-soft); }
+.ob-time.on span { color: #b25d15; }
+.ob-channels { display: flex; flex-wrap: wrap; gap: 8px; }
+.ob-channel {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 10px; border: 1.5px solid var(--border);
+  background: var(--surface); font-weight: 600; font-size: 14px; cursor: pointer; color: var(--text-2);
+}
+.ob-check { width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid var(--border-strong); font-size: 10px; display: grid; place-items: center; color: transparent; margin-left: 2px; }
+.ob-channel.on { border-color: var(--primary); color: var(--text); }
+.ob-channel.on .ob-check { background: var(--primary); border-color: var(--primary); color: #fff; }
+.ob-sentence { display: flex; align-items: center; gap: 10px; margin-top: 22px; padding: 12px 14px; background: var(--primary-soft); color: var(--primary-ink); border-radius: var(--radius); font-weight: 600; font-size: 14px; }
+.ob-sentence .ai-dot { flex-shrink: 0; }
+
+/* 잠금화면 목업 */
+.ob-phone {
+  position: relative; width: 260px; height: 480px; border-radius: 38px; padding: 46px 12px 16px; overflow: hidden;
+  background: linear-gradient(160deg, #3b3f8f 0%, #6b5ea8 45%, #e59a6b 100%); border: 8px solid #1f1d1a;
+  box-shadow: var(--shadow-lg); color: #fff; display: flex; flex-direction: column; align-items: center;
+}
+.ob-phone-notch { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 84px; height: 22px; background: #1f1d1a; border-radius: 12px; }
+.ob-phone-date { font-size: 13px; font-weight: 600; opacity: .85; }
+.ob-phone-time { font-size: 56px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.ob-phone-notifs { margin-top: 22px; width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.ob-notif {
+  background: rgba(255, 255, 255, 0.82); backdrop-filter: blur(12px); color: var(--text); border-radius: 16px; padding: 10px 12px;
+  font-size: 12px; animation: ob-drop .45s cubic-bezier(.2, .9, .3, 1.2);
+}
+.ob-notif + .ob-notif { animation-delay: .08s; }
+@keyframes ob-drop { from { opacity: 0; transform: translateY(-14px) scale(.97); } to { opacity: 1; transform: none; } }
+.ob-notif-head { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-2); font-weight: 600; }
+.ob-notif-head > span:last-child { margin-left: auto; color: var(--text-3); font-weight: 500; }
+.ob-notif-app { width: 18px; height: 18px; border-radius: 5px; background: var(--primary); color: #fff; display: grid; place-items: center; font-size: 10px; font-weight: 800; }
+.ob-app-kakao { background: #fee500; color: #3a1d1d; }
+.ob-app-mail { background: #5b8def; }
+.ob-notif-title { font-weight: 700; margin-top: 4px; font-size: 12.5px; }
+.ob-notif-body { color: var(--text-2); margin-top: 1px; line-height: 1.45; }
+.ob-notif-off { text-align: center; color: var(--text-3); }
+.ob-phone-bar { margin-top: auto; width: 96px; height: 4px; border-radius: 4px; background: rgba(255, 255, 255, 0.8); }
+
+/* 5. 씨앗 */
+.ob-seeds { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.ob-firstq { display: flex; gap: 10px; margin-top: 18px; padding: 14px; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--border); animation: fade .25s; }
+.ob-firstq .ai-dot { flex-shrink: 0; }
+.ob-firstq-label { font-size: 11.5px; font-weight: 700; color: var(--primary); }
+.ob-firstq p { font-size: 14.5px; font-weight: 600; margin-top: 2px; }
+
+@media (max-width: 760px) {
+  .ob-rhythm { grid-template-columns: 1fr; }
+  .ob-phone { margin: 0 auto; }
+}
+@media (max-width: 600px) {
+  .fullscreen:has(.ob-wrap) { padding: 12px 10px; }
+  .ob-card { padding: 20px 18px 18px; min-height: calc(100vh - 24px); }
+  .ob-title { font-size: 28px; }
+  .ob-h2 { font-size: 19px; }
+  .ob-foot { position: sticky; bottom: 0; background: var(--surface); margin: 20px -18px -18px; padding: 14px 18px; }
+  .ob-foot .btn-primary { flex: 1; }
+  .ob-phone { width: 230px; height: 420px; }
+  .ob-phone-time { font-size: 48px; }
+}
