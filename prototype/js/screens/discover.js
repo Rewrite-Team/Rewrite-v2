@@ -94,7 +94,7 @@
         const activeCat = opts.cat || '';
         const list = P.map((p, i) => ({ p, i })).filter((x) => !activeCat || x.p.theme === activeCat);
         const user = App.store.state.user;
-        const drafts = App.store.list().filter((e) => e.status === 'draft' && e.completeness < 100).slice(0, 3);
+        const drafts = App.store.list().filter((e) => e.status === 'draft');
         const recallCards = list.length
           ? list.map(({ p, i }) => `
             <button class="dc-seed" data-seed="${i}">
@@ -133,19 +133,7 @@
               </form>
             </div>
 
-            ${drafts.length ? `
-            <div class="dc-continue">
-              <div class="section-title">작성 중인 카드 이어서 채우기</div>
-              <div class="dc-continue-list">
-                ${drafts.map((e) => { const g = App.ai.gapQuestion(e); return `
-                  <button class="card dc-cont" data-exp="${esc(e.id)}">
-                    <div class="dc-cont-top"><span class="tag tag-draft">작성중</span><span class="subtle">${esc(e.category)}</span><span class="dc-cont-pct">${e.completeness}%</span></div>
-                    <div class="dc-cont-title">${esc(e.title)}</div>
-                    ${g ? `<div class="dc-cont-q"><span class="ai-dot">R</span>${esc(g.text)}</div>` : ''}
-                    ${App.ui.progress(e.completeness)}
-                  </button>`; }).join('')}
-              </div>
-            </div>` : ''}
+            ${drafts.length ? `<a class="dc-to-vault" href="#/vault">작성 중인 카드 ${drafts.length}개는 <b>경험 보관함</b>에서 이어서 채울 수 있어요 →</a>` : ''}
           </div>`;
         S.picker = { cat: activeCat, onboarding: !!opts.onboarding };
         const input = root.querySelector('#dc-free-input');
@@ -733,6 +721,8 @@
         else { App.ui.toast('카드를 찾을 수 없어요. 새 경험부터 떠올려 볼까요?'); showPicker(); }
       } else if (params.seed != null && params.seed !== '' && params.seed !== 'onboarding' && window.SEED.recallPrompts[Number(params.seed)]) {
         startChat({ type: 'seed', index: Number(params.seed) });
+      } else if (params.free && params.free.trim()) {
+        startChat({ type: 'free', text: params.free.trim().slice(0, 80), cat: params.cat || '' });
       } else if (params.kw) {
         const k = App.keywords.get(params.kw);
         startChat({ type: 'custom', cat: params.cat || '일상', text: `#${k.name} 역량이 드러났던 순간을 찾아볼게요. ${k.desc ? '"' + k.desc + '"' : ''} — 아주 작은 일이라도 비슷한 장면이 떠오르나요?` });

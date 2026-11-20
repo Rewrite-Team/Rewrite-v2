@@ -141,6 +141,42 @@
     return { q: params.q || '', kws, category: params.category || '', status: params.status || '', sort: 'updated', view: loadView() };
   }
 
+
+  // 집중 발굴 입구: 새 경험 찾기(질문 고르기·한 줄로 시작) + 작성 중 카드 이어서 채우기
+  function discoverHTML() {
+    const P = window.SEED.recallPrompts || [];
+    const start = new Date().getDate() % Math.max(P.length, 1);
+    const seeds = [0, 1, 2].map((k) => (start + k) % P.length).filter((v, i, a) => P[v] && a.indexOf(v) === i);
+    const drafts = App.store.list().filter((e) => e.status === 'draft').sort((a, b) => a.completeness - b.completeness).slice(0, 3);
+    return `<section class="vt-dc">
+      <div class="card vt-dc-new">
+        <div class="vt-dc-head">
+          <div class="ai-badge"><span class="ai-dot">R</span>집중 발굴</div>
+          <h2>AI와 새 경험 찾기</h2>
+          <p>질문 하나에 답하다 보면 경험이 카드로 정리돼요. 떠오르는 질문을 골라 보세요.</p>
+        </div>
+        <div class="vt-dc-seeds">
+          ${seeds.map((i) => `<a class="vt-dc-seed" href="#/discover?seed=${i}"><span class="vt-dc-theme">${esc(P[i].theme)}</span><span class="vt-dc-text">${esc(P[i].text)}</span><span class="vt-dc-go" aria-hidden="true">→</span></a>`).join('')}
+        </div>
+        <form class="vt-dc-free" data-vt-free>
+          <input class="input" data-vt-free-input maxlength="80" placeholder="이미 생각난 경험이 있다면 한 줄로 적어 주세요" autocomplete="off" />
+          <button class="btn btn-primary" type="submit">AI와 정리하기</button>
+        </form>
+        <a class="vt-dc-more" href="#/discover">다른 질문 더 보기 →</a>
+      </div>
+      ${drafts.length ? `<div class="vt-dc-cont">
+        <div class="vt-dc-cont-head"><b>작성 중인 카드 이어서 채우기</b><span class="subtle">덜 채워진 순서예요</span></div>
+        <div class="vt-dc-cont-list">${drafts.map((e) => { const g = App.ai.gapQuestion(e); return `
+          <a class="card vt-dc-c" href="#/discover?exp=${esc(e.id)}">
+            <div class="vt-dc-c-top"><span class="tag tag-draft">작성중</span><span class="subtle">${esc(e.category)}</span><span class="vt-dc-pct">${e.completeness}%</span></div>
+            <div class="vt-dc-c-title">${esc(e.title)}</div>
+            ${g ? `<div class="vt-dc-q"><span class="ai-dot">R</span>${esc(g.text)}</div>` : ''}
+            ${App.ui.progress(e.completeness)}
+          </a>`; }).join('')}</div>
+      </div>` : ''}
+    </section>`;
+  }
+
   App.screens.vault = {
     title: '경험 보관함',
     render(params) {
@@ -148,9 +184,11 @@
       const total = App.store.list().length;
       return `<div class="page vt-page">
         <div class="page-head vt-pagehead">
-          <div><h1>경험 보관함</h1><p>지금까지 쌓인 경험 ${total}개 · 키워드로 찾아서 바로 꺼내 쓰세요</p></div>
-          <a class="btn btn-primary" href="#/card/new">＋ 새 경험 카드</a>
+          <div><h1>경험 보관함</h1><p>새 경험을 찾고, 쌓인 경험 ${total}개를 키워드로 꺼내 쓰세요</p></div>
+          <a class="btn" href="#/card/new">＋ 직접 작성</a>
         </div>
+        ${discoverHTML()}
+        <div class="vt-list-head"><h2>내 경험 카드 <span class="subtle">${total}</span></h2></div>
         ${toolbarHTML(st)}
         <div class="vt-results" data-vt-results>${resultsHTML(st)}</div>
       </div>`;
@@ -159,6 +197,13 @@
       const st = initState(params);
       const $ = (s) => root.querySelector(s);
       const resultsEl = $('[data-vt-results]');
+      const freeForm = $('[data-vt-free]');
+      if (freeForm) freeForm.addEventListener('submit', (ev) => {
+        ev.preventDefault();
+        const inp = $('[data-vt-free-input]'); const v = inp.value.trim();
+        if (!v) { inp.focus(); App.ui.toast('어떤 경험인지 한 줄만 적어 주세요'); return; }
+        App.navigate('#/discover?free=' + encodeURIComponent(v));
+      });
       let qTimer = null;
 
       function syncUrl() {

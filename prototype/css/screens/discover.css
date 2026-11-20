@@ -36,14 +36,6 @@
 .dc-free-row { display: flex; gap: 8px; margin-top: 6px; }
 .dc-free-row .input { flex: 1; }
 
-.dc-continue-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
-.dc-cont { text-align: left; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; transition: box-shadow .15s, border-color .15s; }
-.dc-cont:hover { box-shadow: var(--shadow); border-color: var(--border-strong); }
-.dc-cont-top { display: flex; align-items: center; gap: 6px; }
-.dc-cont-pct { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--primary); }
-.dc-cont-title { font-weight: 700; font-size: 14.5px; }
-.dc-cont-q { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--text-2); background: var(--surface-2); border-radius: var(--radius-sm); padding: 8px 10px; }
-.dc-cont-q .ai-dot { width: 18px; height: 18px; font-size: 10px; border-radius: 6px; flex-shrink: 0; margin-top: 1px; }
 
 /* ---------- Chat layout ---------- */
 .dc-layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; align-items: start; }
@@ -265,3 +257,5 @@
 .dc-edit { align-self: flex-end; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 12.5px; color: var(--text-3); margin-top: -4px; }
 .dc-edit-btn { border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-2); border-radius: 99px; padding: 2px 10px; font: inherit; font-size: 12px; cursor: pointer; }
 .dc-edit-btn:hover { border-color: var(--primary); color: var(--primary); }
+.dc-to-vault { align-self: flex-start; font-size: 13.5px; color: var(--text-2); text-decoration: none; }
+.dc-to-vault:hover { color: var(--primary); }
