@@ -45,6 +45,7 @@
 
   function render() {
     if (cleanup) { try { cleanup(); } catch (e) {} cleanup = null; }
+    App.store.syncCheckins(); // 체크인 주기가 돌아온 프로젝트 → 오늘의 질문함에 체크인 질문
     const { name, params } = App.matchRoute(location.hash);
     const screen = App.screens[name];
     const root = document.getElementById('app');

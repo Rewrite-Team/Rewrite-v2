@@ -206,3 +206,6 @@
   display: grid; place-items: center; font-size: 12px; font-weight: 800; color: #fff; }
 .pj-log.is-picked .pj-log-check { background: var(--primary); border-color: var(--primary); }
 .pj-log.is-picking:not(:last-child)::before { left: 47px; }
+.pj-ck-sync { display: inline-block; font-size: 12px; font-weight: 600; color: #b5651d; background: var(--accent-soft); padding: 4px 10px; border-radius: 99px; text-decoration: none; margin: 2px 0 12px; }
+.pj-ck-sync:hover { filter: brightness(.97); }
+.pj-ck-sync.is-quiet { color: var(--text-3); background: transparent; padding-left: 0; font-weight: 500; }

@@ -37,11 +37,13 @@
   /* ---------- 프로젝트 파생 데이터 ---------- */
   const sortedLogs = (e) => (e.logs || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const lastLog = (e) => sortedLogs(e)[0] || null;
+  // 체크인 일정은 store 와 공유 (오늘의 질문함과 같은 기준)
   function nextCheckin(e) {
-    const [days, label] = CADENCE[App.store.state.settings.projectCheckin] || CADENCE.every2days;
-    const last = lastLog(e);
+    const [, label] = CADENCE[App.store.state.settings.projectCheckin] || CADENCE.every2days;
+    const { dueDate, last } = App.store.checkinDue(e);
+    if (App.store.openCheckin(e.id)) return { due: true, text: last ? '오늘 체크인할 차례예요' : '첫 체크인을 남겨 주세요', label };
     if (!last) return { due: true, text: '첫 체크인을 남겨 주세요', label };
-    const next = toDate(last.date); next.setDate(next.getDate() + days);
+    const next = toDate(dueDate);
     const diff = daysBetween(todayD(), next);
     if (diff <= 0) return { due: true, text: '오늘 체크인할 차례예요', label };
     return { due: false, text: diff === 1 ? '내일 체크인' : `${diff}일 뒤 체크인 (${next.getMonth() + 1}/${next.getDate()})`, label };
@@ -190,6 +192,9 @@
     return best;
   }
   function currentQ(e) {
+    // 체크인할 때가 됐으면 오늘의 질문함에 도착한 바로 그 질문을 보여 준다
+    const oq = App.store.openCheckin(e.id);
+    if (oq) { ui.type[e.id] = oq.checkinType || ui.type[e.id] || 'milestone'; return { type: oq.checkinType, text: oq.checkinText || oq.text, inbox: oq }; }
     const Q = window.SEED.projectCheckins;
     if (ui.qIndex[e.id] == null) ui.qIndex[e.id] = pickInitialQuestion(e);
     const q = Q[ui.qIndex[e.id] % Q.length];
@@ -205,11 +210,14 @@
 
   function checkinCard(e) {
     const q = currentQ(e); const sel = ui.type[e.id];
-    return `<div class="card pj-checkin">
-      <div class="pj-checkin-head"><span class="ai-badge"><span class="ai-dot">R</span>오늘의 체크인</span>
+    const { dueDate } = App.store.checkinDue(e);
+    return `<div class="card pj-checkin ${q.inbox ? 'is-due' : ''}">
+      <div class="pj-checkin-head"><span class="ai-badge"><span class="ai-dot">R</span>${q.inbox ? '오늘의 체크인' : '체크인 남기기'}</span>
         <button class="btn btn-ghost btn-sm" data-pj="next-q">↻ 다른 질문</button></div>
       <div class="pj-q">${esc(q.text)}</div>
       <div class="pj-q-why">${esc(whyQuestion(e, q))}</div>
+      ${q.inbox ? '<a class="pj-ck-sync" href="#/daily">✉ 오늘의 질문함에도 같은 질문이 도착했어요 · 어디서 답해도 함께 완료돼요</a>'
+        : `<div class="pj-ck-sync is-quiet">다음 체크인 질문은 ${esc(md(dueDate))}에 드릴게요. 지금 자유롭게 남겨도 좋아요.</div>`}
       <div class="pj-types" role="radiogroup" aria-label="기록 유형">
         ${TYPE_ORDER.map((t) => `<button class="pj-type ${sel === t ? 'on' : ''}" data-type="${t}" data-pj-type="${t}" role="radio" aria-checked="${sel === t}">
           <span class="pj-type-ico">${TYPES[t].ico}</span>${TYPES[t].label}</button>`).join('')}
@@ -486,10 +494,11 @@
         if (typeBtn) {
           const t = typeBtn.getAttribute('data-pj-type');
           ui.type[id] = t;
-          // 유형을 바꾸면 그 유형에 맞는 질문으로
+          // 유형을 바꾸면 그 유형에 맞는 질문으로 (오늘의 질문함의 질문도 함께)
           const qi = window.SEED.projectCheckins.findIndex((q) => q.type === t);
           const draft = (root.querySelector('#pj-ta') || {}).value || '';
-          if (qi >= 0) ui.qIndex[id] = qi;
+          const oq = App.store.openCheckin(id);
+          if (qi >= 0) { if (oq) App.store.changeCheckin(oq.id, qi); else ui.qIndex[id] = qi; }
           rerenderLocal(); const ta = root.querySelector('#pj-ta'); if (ta) { ta.value = draft; ta.focus(); }
           return;
         }
@@ -499,16 +508,21 @@
         if (!e) return;
         if (act === 'next-q') {
           const Q = window.SEED.projectCheckins;
-          ui.qIndex[id] = ((ui.qIndex[id] || 0) + 1) % Q.length; ui.type[id] = Q[ui.qIndex[id]].type;
+          const oq = App.store.openCheckin(id);
+          if (oq) App.store.changeCheckin(oq.id, ((oq.bankIndex != null ? oq.bankIndex : Q.findIndex((x) => x.type === oq.checkinType)) + 1) % Q.length);
+          else { ui.qIndex[id] = ((ui.qIndex[id] || 0) + 1) % Q.length; ui.type[id] = Q[ui.qIndex[id]].type; }
           const draft = (root.querySelector('#pj-ta') || {}).value || '';
           rerenderLocal(); const ta = root.querySelector('#pj-ta'); if (ta) ta.value = draft;
         } else if (act === 'save') {
           const ta = root.querySelector('#pj-ta'); const text = (ta.value || '').trim();
           if (!text) { App.ui.toast('한 줄만 적어 주세요. 짧아도 괜찮아요'); ta.focus(); return; }
           const kws = kwSelected(ckState(id));
-          App.store.addLog(id, { type: ui.type[id] || 'milestone', text, keywords: kws });
+          const oq = App.store.openCheckin(id);
+          // 오늘의 질문함에 온 체크인이면 그 질문에 답한 것으로 처리 (질문함에서도 답변 완료)
+          if (oq) App.store.answer(oq.id, text, { type: ui.type[id] || oq.checkinType, keywords: kws });
+          else App.store.addLog(id, { type: ui.type[id] || 'milestone', text, keywords: kws });
           delete ui.ck[id];
-          App.ui.toast(kws.length ? `기록했어요 · ${kws.map((k) => '#' + k).join(' ')}` : '기록했어요. 과정이 하나 더 쌓였어요');
+          App.ui.toast(oq ? '체크인 완료! 오늘의 질문함에서도 답변 완료로 바뀌었어요' : kws.length ? `기록했어요 · ${kws.map((k) => '#' + k).join(' ')}` : '기록했어요. 과정이 하나 더 쌓였어요');
           const Q = window.SEED.projectCheckins;
           ui.qIndex[id] = ((ui.qIndex[id] || 0) + 1) % Q.length; ui.type[id] = Q[ui.qIndex[id]].type;
           rerenderLocal();

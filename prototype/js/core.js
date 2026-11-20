@@ -23,6 +23,13 @@ window.App = window.App || {};
   function persist() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ } }
   function emit() { persist(); listeners.forEach((fn) => fn(state)); }
   const today = () => new Date().toISOString().slice(0, 10);
+  // 체크인 일정은 로컬 날짜 기준
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const fmtDay = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  const localDay = () => fmtDay(new Date());
+  const parseDay = (s) => { const [y, m, d] = String(s).split('-').map(Number); return new Date(y || 1970, (m || 1) - 1, d || 1); };
+  const CHECKIN_DAYS = { daily: 1, every2days: 2, weekly: 7 };
+  const projectShort = (t) => { const m = String(t || '').match(/「[^」]+」/); if (m) return m[0]; const parts = String(t || '').split(' — '); return `「${parts[parts.length - 1]}」`; };
   const uid = (p) => p + Math.random().toString(36).slice(2, 8);
 
   App.store = {
@@ -93,18 +100,67 @@ window.App = window.App || {};
     // 오늘의 질문 인박스
     inbox() { return state.inbox.slice(); },
     pending() { return state.inbox.filter((q) => q.status === 'pending'); },
-    answer(qid, text) {
+    // opts (프로젝트 체크인일 때): { type, keywords } — 트래커에서 답하면 사용자가 고른 유형·키워드를 그대로 쓴다
+    answer(qid, text, opts = {}) {
       const q = state.inbox.find((x) => x.id === qid); if (!q) return;
-      q.status = 'answered'; q.answer = text;
+      q.status = 'answered'; q.answer = text; q.answeredAt = localDay();
       if (q.targetProjectId && this.getProject(q.targetProjectId)) {
         // 프로젝트 질문의 답변은 그 프로젝트의 체크인 로그로 쌓인다
-        const t = q.type === 'project' ? (/결정|선택/.test(q.text) ? 'decision' : /문제|이슈|에러/.test(q.text) ? 'issue' : /팀원|의견|협업/.test(q.text) ? 'collab' : 'milestone') : 'milestone';
+        const t = opts.type || q.checkinType || (/결정|선택/.test(q.text) ? 'decision' : /문제|이슈|에러/.test(q.text) ? 'issue' : /팀원|의견|협업/.test(q.text) ? 'collab' : 'milestone');
         const p = this.getProject(q.targetProjectId);
-        p.logs.push({ id: uid('l'), date: today(), type: t, text, keywords: App.ai.extractKeywords(text), fromQuestion: q.text }); p.updatedAt = today();
+        p.logs.push({ id: uid('l'), date: localDay(), type: t, text, keywords: opts.keywords || App.ai.extractKeywords(text), fromQuestion: q.checkinText || q.text }); p.updatedAt = localDay();
       } else if (q.targetExpId) this.addQA(q.targetExpId, q.text, text);
       state.streak = (state.streak || 0) + 1; emit();
     },
     setQuestionStatus(qid, status) { const q = state.inbox.find((x) => x.id === qid); if (q) { q.status = status; emit(); } },
+    /* ---- 프로젝트 체크인: 트래커와 오늘의 질문이 같은 질문 하나를 함께 쓴다 ----
+       진행 중 프로젝트가 체크인 주기(settings.projectCheckin)를 넘기면 체크인 질문 1개를 인박스에 넣고,
+       트래커의 "오늘의 체크인"도 그 질문을 보여 준다. 어디서 답하든 같은 질문이 답변 완료가 된다. */
+    checkinDays() { return CHECKIN_DAYS[state.settings.projectCheckin] || 2; },
+    // { due, dueDate('YYYY-MM-DD'), last } — 마지막 기록 + 주기 = 다음 체크인 날
+    checkinDue(p) {
+      const last = (p.logs || []).map((l) => l.date).sort().pop() || null;
+      const base = last || (p.createdAt || localDay());
+      const d = parseDay(base); if (last) d.setDate(d.getDate() + this.checkinDays());
+      const dueDate = fmtDay(d);
+      return { due: p.status === 'ongoing' && dueDate <= localDay(), dueDate, last };
+    },
+    // 아직 답하지 않은(대기·나중에) 이 프로젝트의 체크인 질문
+    openCheckin(projectId) { return state.inbox.find((q) => q.checkin && q.targetProjectId === projectId && (q.status === 'pending' || q.status === 'later')) || null; },
+    syncCheckins() {
+      let added = false;
+      state.projects.forEach((p) => {
+        if (p.status !== 'ongoing') return;
+        const open = this.openCheckin(p.id);
+        const { due, dueDate } = this.checkinDue(p);
+        if (!due) {
+          // 그 사이 트래커에서 기록해 체크인할 때가 아니게 됐으면 대기 중 질문은 정리
+          if (open && open.status === 'pending' && (open.askedAt || '').slice(0, 10) < dueDate) { open.status = 'answered'; open.answer = open.answer || '(트래커에서 직접 기록했어요)'; added = true; }
+          return;
+        }
+        if (open) return;
+        // 이번 주기에 이미 물어봤으면(건너뛰기 포함) 다시 묻지 않는다
+        if (state.inbox.some((q) => q.checkin && q.targetProjectId === p.id && (q.askedAt || '').slice(0, 10) >= dueDate)) return;
+        const bank = window.SEED.projectCheckins; const cnt = {};
+        (p.logs || []).forEach((l) => { cnt[l.type] = (cnt[l.type] || 0) + 1; });
+        let bi = 0; bank.forEach((b, i) => { if ((cnt[b.type] || 0) < (cnt[bank[bi].type] || 0)) bi = i; });
+        state.inbox.unshift(this.checkinQuestion(p, bi, { id: uid('q'), status: 'pending', askedAt: localDay() + ' ' + (state.settings.times && state.settings.times[0] || '12:30') }));
+        added = true;
+      });
+      if (added) emit();
+    },
+    checkinQuestion(p, bankIndex, base = {}) {
+      const b = window.SEED.projectCheckins[bankIndex % window.SEED.projectCheckins.length];
+      return Object.assign(base, {
+        type: 'project', checkin: true, targetProjectId: p.id, targetExpId: null, checkinType: b.type, checkinText: b.text, bankIndex,
+        text: `${projectShort(p.title)} ${b.text}`, hint: '한두 줄이면 충분해요. 답변은 프로젝트 타임라인에 기록돼요.',
+      });
+    },
+    // 트래커에서 "다른 질문"·유형 변경 → 인박스 질문도 같이 바뀐다
+    changeCheckin(qid, bankIndex) {
+      const q = state.inbox.find((x) => x.id === qid); const p = q && this.getProject(q.targetProjectId); if (!p) return;
+      this.checkinQuestion(p, bankIndex, q); emit();
+    },
     pushQuestion(q) { state.inbox.unshift(Object.assign({ id: uid('q'), status: 'pending', askedAt: today() + ' ' + new Date().toTimeString().slice(0, 5) }, q)); emit(); },
 
     // 지원 기업 (기업 + 직무 단위로 역량 맵·자소서·면접 준비를 따로 관리)

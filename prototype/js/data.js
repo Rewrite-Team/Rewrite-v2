@@ -207,7 +207,7 @@ window.SEED = (function () {
 
   // 서비스가 먼저 보내는 "오늘의 질문" 인박스
   const inbox = [
-    { id: 'q1', text: '이번 주 「모여봄」 프로젝트에서 팀원과 의견이 갈렸던 순간이 있었나요?', type: 'project', targetExpId: null, targetProjectId: 'p1', hint: '작은 의견 차이도 좋아요. 변수명, 일정, 기술 선택 같은 것도요.', status: 'pending', askedAt: '2026-11-19 12:30' },
+    { id: 'q1', text: '「모여봄」 이번 주에 팀원과 의견이 갈렸던 순간이 있었나요?', type: 'project', targetExpId: null, targetProjectId: 'p1', checkin: true, checkinType: 'collab', checkinText: '이번 주에 팀원과 의견이 갈렸던 순간이 있었나요?', hint: '작은 의견 차이도 좋아요. 변수명, 일정, 기술 선택 같은 것도요.', status: 'pending', askedAt: '2026-11-19 12:30' },
     { id: 'q2', text: '편의점 야간 알바에서 재고 누락이 생겼을 때, 처음에 어떻게 대응했어요?', type: 'deepen', targetExpId: 'e7', hint: '누구에게 알렸는지, 무엇을 먼저 확인했는지 떠올려 보세요.', status: 'pending', askedAt: '2026-11-18 21:30' },
     { id: 'q3', text: '최근 한 달 동안 "이건 내가 처음 해본 거다" 싶은 일이 있었나요?', type: 'recall', targetExpId: null, hint: '공부, 운동, 요리, 여행 계획… 뭐든 괜찮아요.', status: 'pending', askedAt: '2026-11-18 12:30' },
     { id: 'q4', text: '알고리즘 스터디에서 그만두려던 팀원을 붙잡은 적이 있나요?', type: 'deepen', targetExpId: 'e3', hint: '', status: 'answered', askedAt: '2026-11-17 21:30', answer: '한 명이 너무 어렵다고 나가려 해서, 쉬운 문제 트랙을 따로 만들어 줬어요.' },
