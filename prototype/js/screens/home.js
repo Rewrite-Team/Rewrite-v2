@@ -4,6 +4,11 @@
   const TYPE_LABEL = { project: '프로젝트 체크인', deepen: '경험 깊이 파기', recall: '기억 떠올리기' };
   const STAGE_LABEL = { situation: '상황', task: '과제', action: '행동', result: '결과', insight: '배운 점' };
   let recallIdx = 0;
+  // 답변 캘린더 상태 (화면을 떠났다 와도 유지)
+  let calMonth = null; // 'YYYY-MM' — null이면 이번 달
+  let calSel = null;   // 'YYYY-MM-DD' — null이면 오늘
+  const WEEK = ['월', '화', '수', '목', '금', '토', '일'];
+  const STATUS_CHIP = { answered: ['답변함', 'is-answered'], skipped: ['건너뜀', 'is-skipped'], later: ['나중에', 'is-later'], pending: ['아직 안 답함', 'is-pending'] };
 
   function daysAgo(dateStr) {
     if (!dateStr) return null;
@@ -64,6 +69,114 @@
           <a class="btn btn-primary" href="#/daily">답하러 가기 →</a>
         </div>
       </div>
+    </section>`;
+  }
+
+  /* ---------- 답변 캘린더 ---------- */
+  function dayStatus(qs) {
+    if (!qs || !qs.length) return 'empty';
+    const n = qs.filter((q) => q.status === 'answered').length;
+    return n === qs.length ? 'all' : n > 0 ? 'part' : 'none';
+  }
+  function truncate(t, n) { t = String(t || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n) + '…' : t; }
+
+  function calDetail(day, qs) {
+    const d = App.store.parseDay(day);
+    const label = `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEK[(d.getDay() + 6) % 7]})`;
+    const isToday = day === App.store.localDay();
+    if (!qs.length) {
+      return `<div class="home-cal-detail">
+        <div class="home-cal-detail-head"><b>${esc(label)}${isToday ? ' · 오늘' : ''}</b></div>
+        <p class="home-cal-empty">이 날은 도착한 질문이 없었어요</p>
+      </div>`;
+    }
+    const answered = qs.filter((q) => q.status === 'answered').length;
+    return `<div class="home-cal-detail">
+      <div class="home-cal-detail-head"><b>${esc(label)}${isToday ? ' · 오늘' : ''}</b><span class="subtle">질문 ${qs.length}개 · 답변 ${answered}개</span></div>
+      <ul class="home-cal-list">${qs.map((q) => {
+        const chip = STATUS_CHIP[q.status] || STATUS_CHIP.pending;
+        const target = App.store.questionTarget(q);
+        const open = q.status === 'pending' || q.status === 'later';
+        return `<li class="home-cal-item">
+          <div class="home-cal-item-top">
+            <span class="home-cal-type">${esc(TYPE_LABEL[q.type] || '질문')}</span>
+            <span class="home-cal-chip ${chip[1]}">${esc(chip[0])}</span>
+          </div>
+          <p class="home-cal-q">${esc(q.text)}</p>
+          ${q.status === 'answered' && q.answer ? `<p class="home-cal-ans">“${esc(truncate(q.answer, 80))}”</p>` : ''}
+          ${target || open ? `<div class="home-cal-links">
+            ${target ? `<a class="home-cal-link" href="${esc(target.href)}">${esc(target.place)} · ${esc(truncate(target.title, 28))} →</a>` : ''}
+            ${open ? `<a class="home-cal-link home-cal-go" href="#/daily">답하러 가기 →</a>` : ''}
+          </div>` : ''}
+        </li>`;
+      }).join('')}</ul>
+    </div>`;
+  }
+
+  function calendarBlock() {
+    const S = App.store;
+    const todayStr = S.localDay();
+    const thisMonth = todayStr.slice(0, 7);
+    const month = calMonth || thisMonth;
+    const sel = calSel || todayStr;
+    const [y, m] = month.split('-').map(Number);
+    const first = new Date(y, m - 1, 1);
+    const daysIn = new Date(y, m, 0).getDate();
+    const lead = (first.getDay() + 6) % 7; // 월요일 시작
+    const hist = S.dayHistory();
+    const streakDays = S.streakDays();
+    const streakSet = new Set(streakDays);
+    const streak = streakDays.length;
+    const answeredToday = S.answeredDays().has(todayStr);
+
+    const cells = [];
+    for (let i = 0; i < lead; i++) cells.push('<span class="home-cal-cell is-blank" aria-hidden="true"></span>');
+    for (let dd = 1; dd <= daysIn; dd++) {
+      const day = `${month}-${String(dd).padStart(2, '0')}`;
+      const col = (lead + dd - 1) % 7;
+      const qs = hist[day] || [];
+      const st = dayStatus(qs);
+      const future = day > todayStr;
+      const cls = ['home-cal-cell', 'st-' + st];
+      if (future) cls.push('is-future');
+      if (day === todayStr) cls.push('is-today');
+      if (day === sel) cls.push('is-sel');
+      if (streakSet.has(day)) {
+        cls.push('is-streak');
+        const prev = S.fmtDay(new Date(y, m - 1, dd - 1));
+        const next = S.fmtDay(new Date(y, m - 1, dd + 1));
+        if (!streakSet.has(prev) || col === 0 || dd === 1) cls.push('band-start');
+        if (!streakSet.has(next) || col === 6 || dd === daysIn) cls.push('band-end');
+      }
+      const answered = qs.filter((q) => q.status === 'answered').length;
+      const title = qs.length ? `질문 ${qs.length}개 중 ${answered}개 답변` : '질문 없음';
+      cells.push(future
+        ? `<span class="${cls.join(' ')}" aria-disabled="true"><span class="home-cal-num">${dd}</span><span class="home-cal-mark"></span></span>`
+        : `<button type="button" class="${cls.join(' ')}" data-home-act="cal-day" data-day="${day}" title="${esc(title)}" aria-pressed="${day === sel}" aria-label="${m}월 ${dd}일, ${esc(title)}"><span class="home-cal-num">${dd}</span><span class="home-cal-mark"></span></button>`);
+    }
+
+    const pill = streak > 0
+      ? `<span class="home-cal-streak">🔥 ${streak}일 연속</span>${answeredToday ? '' : `<span class="home-cal-nudge">오늘 답하면 ${streak + 1}일째예요</span>`}`
+      : `<span class="home-cal-nudge">오늘 답하면 연속 기록이 시작돼요</span>`;
+
+    return `<section class="card home-cal" aria-label="답변 캘린더">
+      <div class="home-cal-head">
+        <div class="home-cal-title"><b>답변 캘린더</b>${pill}</div>
+        <div class="home-cal-nav">
+          <button type="button" class="home-cal-arrow" data-home-act="cal-prev" aria-label="이전 달">‹</button>
+          <span class="home-cal-month">${y}년 ${m}월</span>
+          <button type="button" class="home-cal-arrow" data-home-act="cal-next" aria-label="다음 달" ${month >= thisMonth ? 'disabled' : ''}>›</button>
+        </div>
+      </div>
+      <div class="home-cal-grid home-cal-week">${WEEK.map((w, i) => `<span class="${i >= 5 ? 'is-weekend' : ''}">${w}</span>`).join('')}</div>
+      <div class="home-cal-grid home-cal-days">${cells.join('')}</div>
+      <div class="home-cal-legend">
+        <span><i class="home-cal-dot st-all"></i>모두 답함</span>
+        <span><i class="home-cal-dot st-part"></i>일부 답함</span>
+        <span><i class="home-cal-dot st-none"></i>답하지 못함</span>
+        <span><i class="home-cal-band"></i>연속 기록</span>
+      </div>
+      ${calDetail(sel, hist[sel] || [])}
     </section>`;
   }
 
@@ -193,13 +306,13 @@
             <h1 class="home-hello-title">오늘도 경험 하나, 가볍게 꺼내 볼까요?</h1>
             <div class="home-hello-meta">
               <span class="home-chip">🎯 ${esc(u.targetJob || '목표 직무 미설정')}</span>
-              <span class="home-chip home-chip-streak">🔥 연속 답변 <b>${st.streak || 0}일</b></span>
             </div>
           </div>
         </header>
         <div class="home-grid">
           <div class="home-col">
             ${todayCard()}
+            ${calendarBlock()}
             <section>
               <div class="section-title">작성 중인 경험 이어가기<a class="more" href="#/vault">보관함 →</a></div>
               ${draftsBlock()}
@@ -226,11 +339,28 @@
         el.outerHTML = recallBlock();
       }
 
+      function swapCal() {
+        const el = root.querySelector('.home-cal');
+        if (el) el.outerHTML = calendarBlock();
+      }
+
       function onClick(ev) {
         const btn = ev.target.closest('[data-home-act]');
         if (!btn) return;
         const act = btn.getAttribute('data-home-act');
         if (act === 'recall-next') { recallIdx++; swapRecall(); restartTimer(); return; }
+        if (act === 'cal-prev' || act === 'cal-next') {
+          const [y, m] = (calMonth || App.store.localDay().slice(0, 7)).split('-').map(Number);
+          const d = new Date(y, m - 1 + (act === 'cal-next' ? 1 : -1), 1);
+          const next = App.store.fmtDay(d).slice(0, 7);
+          if (next > App.store.localDay().slice(0, 7)) return;
+          calMonth = next;
+          // 다른 달로 가면 그 달에서 질문이 있었던 마지막 날을 선택 (이번 달이면 오늘)
+          if (next === App.store.localDay().slice(0, 7)) calSel = null;
+          else { const days = Object.keys(App.store.dayHistory()).filter((k) => k.startsWith(next)).sort(); calSel = days.length ? days[days.length - 1] : next + '-01'; }
+          swapCal(); return;
+        }
+        if (act === 'cal-day') { calSel = btn.getAttribute('data-day'); swapCal(); return; }
       }
       root.addEventListener('click', onClick);
 

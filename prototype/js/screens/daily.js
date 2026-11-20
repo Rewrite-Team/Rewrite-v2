@@ -139,7 +139,7 @@
               </div>
               <div class="dy-stat">
                 <span class="dy-stat-label">연속 기록</span>
-                <b>🔥 ${App.store.state.streak || 0}일</b>
+                <b>🔥 ${App.store.streak()}일</b>
               </div>
               <a class="dy-rhythm" href="#/settings"><span>${esc(rhythmLabel())}</span><span class="dy-rhythm-cta">리듬 바꾸기 →</span></a>
             </div>
@@ -250,7 +250,7 @@
               <span class="dy-fb-burst" aria-hidden="true">🎉</span>
               <div>
                 <h3>좋아요, 기록해 뒀어요!</h3>
-                <div class="dy-fb-streak">🔥 ${App.store.state.streak || 0}일 연속 기록 중</div>
+                <div class="dy-fb-streak">🔥 ${App.store.streak()}일 연속 기록 중</div>
               </div>
             </div>
             <div class="dy-fb-q">${esc(q ? q.text : '')}</div>

@@ -1,7 +1,7 @@
 /* App core: store, router, ui helpers, mock AI. 모든 화면이 이 API만 사용한다. */
 window.App = window.App || {};
 (function (App) {
-  const LS_KEY = 'rewrite-proto-v3'; // v2: 프로젝트와 경험 카드 분리 (1 프로젝트 : N 카드), v3: 완료 프로젝트 예시 추가
+  const LS_KEY = 'rewrite-proto-v4'; // v2: 프로젝트와 경험 카드 분리 (1 프로젝트 : N 카드), v3: 완료 프로젝트 예시 추가, v4: 지난 질문 기록 시드 + 연속 기록을 답변 날짜에서 계산
   const clone = (o) => JSON.parse(JSON.stringify(o));
 
   /* ---------------- Store ---------------- */
@@ -11,7 +11,7 @@ window.App = window.App || {};
       if (raw) return JSON.parse(raw);
     } catch (e) { /* ignore */ }
     const s = clone(window.SEED);
-    return { user: s.user, settings: s.settings, projects: s.projects, experiences: s.experiences, inbox: s.inbox, applications: s.applications, streak: 6 };
+    return { user: s.user, settings: s.settings, projects: s.projects, experiences: s.experiences, inbox: s.inbox, applications: s.applications };
   }
   let state = load();
   // 이전 버전 저장 데이터에는 지원 기업이 없을 수 있음
@@ -34,6 +34,8 @@ window.App = window.App || {};
 
   App.store = {
     get state() { return state; },
+    // 로컬 날짜 도우미
+    localDay, fmtDay, parseDay,
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     reset() { try { localStorage.removeItem(LS_KEY); } catch (e) {} state = load(); emit(); },
 
@@ -110,8 +112,32 @@ window.App = window.App || {};
         const p = this.getProject(q.targetProjectId);
         p.logs.push({ id: uid('l'), date: localDay(), type: t, text, keywords: opts.keywords || App.ai.extractKeywords(text), fromQuestion: q.checkinText || q.text }); p.updatedAt = localDay();
       } else if (q.targetExpId) this.addQA(q.targetExpId, q.text, text);
-      state.streak = (state.streak || 0) + 1; emit();
+      emit();
     },
+    // 질문이 답변된 날 (로컬 'YYYY-MM-DD')
+    answerDay(q) { return (q && (q.answeredAt || (q.askedAt || '').slice(0, 10))) || ''; },
+    // 'YYYY-MM-DD' → 그날 도착한 질문 목록 (askedAt 기준, 도착 시각 순)
+    dayHistory() {
+      const map = {};
+      state.inbox.forEach((q) => { const d = (q.askedAt || '').slice(0, 10); if (!d) return; (map[d] = map[d] || []).push(q); });
+      Object.keys(map).forEach((d) => map[d].sort((a, b) => (a.askedAt || '').localeCompare(b.askedAt || '')));
+      return map;
+    },
+    // 답변이 1개 이상 있는 날 집합
+    answeredDays() {
+      const set = new Set();
+      state.inbox.forEach((q) => { if (q.status === 'answered') { const d = this.answerDay(q); if (d) set.add(d); } });
+      return set;
+    },
+    // 현재 연속 기록에 포함된 날들 (최근 → 과거). 오늘 아직 답이 없으면 어제부터 센다 (기록은 아직 살아 있음)
+    streakDays() {
+      const set = this.answeredDays(); const out = [];
+      const d = new Date(); d.setHours(0, 0, 0, 0);
+      if (!set.has(fmtDay(d))) d.setDate(d.getDate() - 1);
+      while (set.has(fmtDay(d))) { out.push(fmtDay(d)); d.setDate(d.getDate() - 1); }
+      return out;
+    },
+    streak() { return this.streakDays().length; },
     setQuestionStatus(qid, status) { const q = state.inbox.find((x) => x.id === qid); if (q) { q.status = status; emit(); } },
     /* ---- 프로젝트 체크인: 트래커와 오늘의 질문이 같은 질문 하나를 함께 쓴다 ----
        진행 중 프로젝트가 체크인 주기(settings.projectCheckin)를 넘기면 체크인 질문 1개를 인박스에 넣고,
@@ -139,8 +165,9 @@ window.App = window.App || {};
           return;
         }
         if (open) return;
-        // 이번 주기에 이미 물어봤으면(건너뛰기 포함) 다시 묻지 않는다
-        if (state.inbox.some((q) => q.checkin && q.targetProjectId === p.id && (q.askedAt || '').slice(0, 10) >= dueDate)) return;
+        // 최근 한 주기 안에 이미 물어봤으면(건너뛰기 포함) 다시 묻지 않는다
+        const since = parseDay(localDay()); since.setDate(since.getDate() - this.checkinDays() + 1);
+        if (state.inbox.some((q) => q.checkin && q.targetProjectId === p.id && (q.askedAt || '').slice(0, 10) >= fmtDay(since))) return;
         const bank = window.SEED.projectCheckins; const cnt = {};
         (p.logs || []).forEach((l) => { cnt[l.type] = (cnt[l.type] || 0) + 1; });
         let bi = 0; bank.forEach((b, i) => { if ((cnt[b.type] || 0) < (cnt[bank[bi].type] || 0)) bi = i; });
