@@ -68,12 +68,6 @@
   const prettyLink = (u) => String(u).replace(/^https?:\/\//, '').replace(/\/$/, '');
 
   /* ---------- 목록 ---------- */
-  function typeBar(e) {
-    const c = typeCounts(e); const total = (e.logs || []).length;
-    if (!total) return '<div class="pj-typebar pj-typebar-empty"></div>';
-    return `<div class="pj-typebar" title="로그 유형 분포">${TYPE_ORDER.filter((t) => c[t]).map((t) =>
-      `<span data-type="${t}" style="flex:${c[t]}"></span>`).join('')}</div>`;
-  }
   function projectCard(e) {
     const last = lastLog(e); const nx = nextCheckin(e);
     return `<div class="card pj-card" data-href="#/projects/${esc(e.id)}">
@@ -81,7 +75,6 @@
         ${e.status === 'ongoing' ? `<span class="pj-due ${nx.due ? 'is-due' : ''}">${nx.due ? '● ' : ''}${esc(nx.text)}</span>` : ''}</div>
       <div class="pj-card-title">${esc(e.title)}</div>
       <div class="pj-card-role">${esc(e.role || '역할 미입력')}</div>
-      ${typeBar(e)}
       <div class="pj-card-stats">
         <div><b>${(e.logs || []).length}</b><span>기록</span></div>
         <div><b>${App.store.cardsOf(e.id).length}</b><span>경험 카드</span></div>

@@ -27,8 +27,6 @@
 .pj-due.is-due { color: var(--accent); }
 .pj-card-title { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; }
 .pj-card-role { color: var(--text-2); font-size: 13.5px; margin-top: -4px; }
-.pj-typebar { display: flex; gap: 2px; height: 6px; border-radius: 99px; overflow: hidden; background: #eeebe5; }
-.pj-typebar span { background: var(--pj-c); }
 .pj-card-stats { display: flex; gap: 22px; padding: 2px 0; }
 .pj-card-stats div { display: flex; flex-direction: column; }
 .pj-card-stats b { font-size: 15px; font-weight: 700; }

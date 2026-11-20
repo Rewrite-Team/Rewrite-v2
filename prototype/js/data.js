@@ -64,6 +64,21 @@ window.SEED = (function () {
       ],
       createdAt: '2026-10-21', updatedAt: '2026-11-04',
     },
+    {
+      id: 'p3', title: '캡스톤 디자인 「빈강의실」 — 강의실 예약 웹앱',
+      period: { start: '2025-03', end: '2025-06' }, status: 'done',
+      role: '백엔드 + 팀장, 3인 팀', summary: '학과 캡스톤으로 3인 팀이 빈 강의실을 찾아 예약하는 웹앱을 만들어 학과 공식 서비스로 시범 운영했다.',
+      links: ['https://github.com/example/empty-classroom'],
+      logs: [
+        { id: 'l8', date: '2025-03-10', type: 'milestone', text: '팀 결성. 내가 팀장 겸 백엔드. 학생들이 빈 강의실을 찾으려고 건물을 돌아다니는 문제에서 출발.', keywords: ['리더십'] },
+        { id: 'l9', date: '2025-03-24', type: 'decision', text: '학과 시간표 API가 없어서 PDF 시간표를 파싱하기로 결정. 수작업 입력 대비 학기마다 재사용 가능.', keywords: ['의사결정', '문제해결'] },
+        { id: 'l10', date: '2025-04-14', type: 'issue', text: '같은 강의실·시간에 예약이 두 건 들어가는 중복 예약 발생 → DB 유니크 제약 + 낙관적 락으로 막음.', keywords: ['문제해결', '꼼꼼함'] },
+        { id: 'l11', date: '2025-04-28', type: 'collab', text: '중간발표 앞두고 팀원 한 명이 일정이 밀려 의견이 갈림 → 기능을 "검색·예약·취소" 3개로 줄이자고 조율.', keywords: ['갈등조정', '협업'] },
+        { id: 'l12', date: '2025-05-19', type: 'learning', text: '실사용자 5명 테스트에서 "예약 취소가 어디 있는지 모르겠다"는 피드백. 기능보다 사용자가 찾을 수 있는지가 먼저라는 걸 배움.', keywords: ['고객지향'] },
+        { id: 'l13', date: '2025-06-13', type: 'milestone', text: '최종 발표 우수상. 학과 사무실에서 2주간 시범 운영, 예약 120건.', keywords: [] },
+      ],
+      createdAt: '2025-03-10', updatedAt: '2025-06-13',
+    },
   ];
 
   const experiences = [
@@ -99,6 +114,21 @@ window.SEED = (function () {
       keywords: ['협업', '주도성', '커뮤니케이션'], jobs: ['백엔드 개발자'],
       links: [], qa: [],
       completeness: 60, createdAt: '2026-10-15', updatedAt: '2026-10-15',
+    },
+    {
+      id: 'e9', title: '「빈강의실」 중복 예약 버그 해결', category: '프로젝트',
+      period: { start: '2025-04', end: '2025-06' }, status: 'done', projectId: 'p3', sourceLogIds: ['l10', 'l13'],
+      role: '백엔드 + 팀장', summary: '같은 강의실·시간에 예약이 두 건 들어가는 문제를 DB 제약과 낙관적 락으로 막아, 시범 운영 동안 중복 예약 0건을 지켰다.',
+      star: {
+        situation: '캡스톤 「빈강의실」 테스트 중 같은 강의실·시간에 예약이 두 건 들어가는 중복 예약이 발생함.',
+        task: '백엔드 담당으로 시범 운영 전에 동시 예약 문제를 확실히 막아야 했음.',
+        action: '요청이 동시에 들어올 때 조회 후 저장 사이에 틈이 생기는 것을 재현 테스트로 확인. 강의실·시간 조합에 DB 유니크 제약을 걸고, 엔티티에 버전 필드를 둬 낙관적 락으로 충돌 시 사용자에게 다시 선택하도록 안내함.',
+        result: '학과 시범 운영 2주 동안 예약 120건, 중복 예약 0건.',
+      },
+      insights: '동시성 문제는 코드만 봐서는 안 보이고, 재현 테스트를 먼저 만들어야 잡힌다.',
+      keywords: ['문제해결', '꼼꼼함'], jobs: ['백엔드 개발자'],
+      links: ['https://github.com/example/empty-classroom'], qa: [],
+      completeness: 100, createdAt: '2025-06-20', updatedAt: '2025-06-20',
     },
     {
       id: 'e2', title: '카페 아르바이트 — 주문 대기 줄 줄이기', category: '아르바이트',

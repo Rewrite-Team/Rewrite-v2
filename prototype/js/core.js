@@ -1,7 +1,7 @@
 /* App core: store, router, ui helpers, mock AI. 모든 화면이 이 API만 사용한다. */
 window.App = window.App || {};
 (function (App) {
-  const LS_KEY = 'rewrite-proto-v2'; // v2: 프로젝트와 경험 카드 분리 (1 프로젝트 : N 카드)
+  const LS_KEY = 'rewrite-proto-v3'; // v2: 프로젝트와 경험 카드 분리 (1 프로젝트 : N 카드), v3: 완료 프로젝트 예시 추가
   const clone = (o) => JSON.parse(JSON.stringify(o));
 
   /* ---------------- Store ---------------- */
