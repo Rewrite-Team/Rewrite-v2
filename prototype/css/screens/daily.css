@@ -50,10 +50,56 @@
 .dy-asked { font-size: 12.5px; color: var(--text-3); }
 .dy-count { margin-left: auto; font-size: 12.5px; color: var(--text-3); }
 .dy-count b { color: var(--text); }
-.dy-dots { display: flex; gap: 4px; margin-top: -4px; }
-.dy-dots i { flex: 1; max-width: 48px; height: 4px; border-radius: 4px; background: var(--border); transition: background .2s; }
-.dy-dots i.is-past { background: #c9caf3; }
-.dy-dots i.is-on { background: var(--text); }
+/* ---------- 질문 이동 (왔다갔다) ---------- */
+.dy-stage-wrap { display: flex; flex-direction: column; gap: 10px; }
+.dy-nav { display: flex; align-items: center; gap: 12px; }
+.dy-nav-btn {
+  width: 36px; height: 36px; flex-shrink: 0; border-radius: 50%; border: 1px solid var(--border-strong); background: var(--surface);
+  font-size: 20px; line-height: 1; color: var(--text-2); cursor: pointer; display: grid; place-items: center; padding-bottom: 2px;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.dy-nav-btn:hover:not([disabled]) { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
+.dy-nav-btn[disabled] { opacity: .35; cursor: default; }
+.dy-nav-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+.dy-nav-count { font-size: 13px; color: var(--text-3); text-align: center; }
+.dy-nav-count b { color: var(--text); }
+.dy-nav-left { margin-left: 6px; }
+.dy-dots { display: flex; gap: 5px; justify-content: center; }
+.dy-dot { flex: 1; max-width: 56px; height: 6px; border: 0; padding: 0; border-radius: 6px; background: var(--border); cursor: pointer; transition: background .2s, transform .15s; position: relative; }
+.dy-dot::after { content: ""; position: absolute; inset: -8px 0; } /* 클릭 영역 확장 */
+.dy-dot:hover { transform: scaleY(1.5); }
+.dy-dot.is-answered { background: #9ed3b8; }
+.dy-dot.is-skipped, .dy-dot.is-later { background: #e6d9bf; }
+.dy-dot.is-on { background: var(--text); }
+
+.dy-queue { padding: 16px 18px; }
+.dy-queue-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.dy-queue-head b { font-size: 14.5px; }
+.dy-queue-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.dy-qrow {
+  width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; border: 1px solid transparent; background: transparent;
+  padding: 9px 10px; border-radius: 10px; cursor: pointer; font-size: 14px; color: var(--text);
+}
+.dy-qrow:hover { background: var(--surface-2); }
+.dy-qrow.is-on { background: var(--primary-soft); border-color: #d9daf7; }
+.dy-qrow-n { width: 20px; height: 20px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--border); font-size: 11.5px; font-weight: 700; color: var(--text-3); display: grid; place-items: center; flex-shrink: 0; }
+.dy-qrow.is-on .dy-qrow-n { background: var(--primary); color: #fff; border-color: var(--primary); }
+.dy-qrow-ico { flex-shrink: 0; }
+.dy-qrow-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dy-qrow.is-answered .dy-qrow-text, .dy-qrow.is-skipped .dy-qrow-text, .dy-qrow.is-later .dy-qrow-text { color: var(--text-3); }
+.dy-qrow-st { flex-shrink: 0; font-size: 12px; font-weight: 600; color: var(--text-3); }
+.dy-qrow.is-answered .dy-qrow-st { color: var(--success); }
+.dy-qrow.is-on .dy-qrow-st { color: var(--primary); }
+.dy-qrow-draft { flex-shrink: 0; font-size: 11px; font-weight: 700; color: var(--warn); background: var(--warn-soft); padding: 1px 6px; border-radius: 5px; }
+
+.dy-answered::before { background: var(--success); }
+.dy-done-tag { margin-left: auto; font-size: 12.5px; font-weight: 700; color: var(--success); }
+.dy-revisit { font-size: 13px; color: #8a6a08; background: var(--warn-soft); border-radius: 8px; padding: 7px 11px; align-self: flex-start; }
+
+.dy-slide-in-back { animation: dy-in-back .32s cubic-bezier(.2, .8, .2, 1); }
+.dy-slide-out-back { animation: dy-out-back .22s ease-in forwards; }
+@keyframes dy-in-back { from { opacity: 0; transform: translateX(-28px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes dy-out-back { to { opacity: 0; transform: translateX(28px) scale(.985); } }
 
 .dy-target {
   align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; padding: 5px 10px; border-radius: 8px;

@@ -69,7 +69,11 @@
         <div id="dy-head"></div>
         <div class="dy-grid">
           <div class="dy-main">
-            <div class="dy-stage" id="dy-stage"></div>
+            <div class="dy-stage-wrap">
+              <div id="dy-nav"></div>
+              <div class="dy-stage" id="dy-stage"></div>
+            </div>
+            <div id="dy-queue"></div>
             <div id="dy-history"></div>
           </div>
           <aside class="dy-aside">
@@ -95,7 +99,26 @@
         done: [],       // 이번 방문에서 답한 것
         tab: 'answered',
         leaving: false,
+        drafts: {},     // 질문별 작성 중 답변 (왔다갔다 해도 유지)
+        dir: 'fwd',     // 슬라이드 방향
       };
+      const STATUS_LABEL = { pending: '대기', answered: '답변함', skipped: '건너뜀', later: '나중에' };
+      const statusOf = (id) => { const q = getQ(id); return q ? q.status : 'pending'; };
+      // from 이후의 첫 대기 질문 → 없으면 앞쪽 대기 질문 → 없으면 끝(완료 화면)
+      function nextOpen(from) {
+        for (let i = from + 1; i < S.queue.length; i++) if (statusOf(S.queue[i]) === 'pending') return i;
+        for (let i = 0; i <= from && i < S.queue.length; i++) if (statusOf(S.queue[i]) === 'pending') return i;
+        return S.queue.length;
+      }
+      const openCount = () => S.queue.filter((id) => statusOf(id) === 'pending').length;
+      function saveDraft() { const ta = root.querySelector('#dy-answer'); const q = current(); if (ta && q) S.drafts[q.id] = ta.value; }
+      function go(i) {
+        i = Math.max(0, Math.min(S.queue.length, i));
+        if (i === S.pos && !S.feedback) return;
+        saveDraft();
+        const dir = i < S.pos ? 'back' : 'fwd';
+        transition(() => { S.feedback = null; S.pos = i; }, dir);
+      }
       const getQ = (id) => App.store.inbox().find((q) => q.id === id) || null;
       const current = () => (S.pos < S.queue.length ? getQ(S.queue[S.pos]) : null);
 
@@ -125,25 +148,83 @@
 
       /* ---------- main stage ---------- */
       function dots() {
-        return `<div class="dy-dots">${S.queue.map((_, i) => `<i class="${i < S.pos ? 'is-past' : i === S.pos ? 'is-on' : ''}"></i>`).join('')}</div>`;
+        return `<div class="dy-dots">${S.queue.map((id, i) => {
+          const q = getQ(id); const st = statusOf(id);
+          return `<button type="button" class="dy-dot is-${st} ${i === S.pos ? 'is-on' : ''}" data-dy-jump="${i}" title="${i + 1}. ${esc(q ? q.text : '')}" aria-label="${i + 1}번째 질문 (${STATUS_LABEL[st]})"></button>`;
+        }).join('')}</div>`;
+      }
+
+      function renderNav() {
+        const el = root.querySelector('#dy-nav'); if (!el) return;
+        const n = S.queue.length;
+        if (!n) { el.innerHTML = ''; return; }
+        const atEnd = S.pos >= n;
+        const left = openCount();
+        el.innerHTML = `<div class="dy-nav">
+          <button type="button" class="dy-nav-btn" data-dy-go="prev" ${S.pos <= 0 ? 'disabled' : ''} aria-label="이전 질문">‹</button>
+          <div class="dy-nav-mid">
+            <div class="dy-nav-count">${atEnd ? '모든 질문을 확인했어요' : `${n}개 중 <b>${S.pos + 1}</b>번째`}<span class="dy-nav-left">${left ? `· 남은 질문 ${left}개` : '· 모두 답했어요'}</span></div>
+            ${n > 1 ? dots() : ''}
+          </div>
+          <button type="button" class="dy-nav-btn" data-dy-go="next" ${S.pos >= n - 1 ? 'disabled' : ''} aria-label="다음 질문">›</button>
+        </div>`;
+      }
+
+      function renderQueue() {
+        const el = root.querySelector('#dy-queue'); if (!el) return;
+        if (S.queue.length < 2) { el.innerHTML = ''; return; }
+        el.innerHTML = `<div class="card dy-queue">
+          <div class="dy-queue-head"><b>도착한 질문 미리 보기</b><span class="subtle">끌리는 질문부터 골라 답해도 돼요 · ← → 키로 이동</span></div>
+          <ol class="dy-queue-list">${S.queue.map((id, i) => {
+            const q = getQ(id); if (!q) return '';
+            const st = statusOf(id); const t = typeInfo(q.type); const hasDraft = st === 'pending' && (S.drafts[id] || '').trim();
+            return `<li><button type="button" class="dy-qrow is-${st} ${i === S.pos ? 'is-on' : ''}" data-dy-jump="${i}">
+              <span class="dy-qrow-n">${i + 1}</span>
+              <span class="dy-qrow-ico" title="${esc(t.label)}">${t.ico}</span>
+              <span class="dy-qrow-text">${esc(q.text)}</span>
+              ${hasDraft ? '<span class="dy-qrow-draft">작성 중</span>' : ''}
+              <span class="dy-qrow-st">${i === S.pos ? '보는 중' : STATUS_LABEL[st]}</span>
+            </button></li>`;
+          }).join('')}</ol>
+        </div>`;
+      }
+
+      function answeredCard(q) {
+        const t = typeInfo(q.type);
+        const exp = App.store.questionTarget(q);
+        const nx = nextOpen(S.pos);
+        return `
+          <div class="dy-qcard dy-answered dy-slide-in" data-type="${esc(q.type)}">
+            <div class="dy-qtop">
+              <span class="dy-type" data-type="${esc(q.type)}">${t.ico} ${t.label}</span>
+              <span class="dy-asked">${esc(askedLabel(q.askedAt))} 도착</span>
+              <span class="dy-done-tag">✓ 답변 완료</span>
+            </div>
+            <h2 class="dy-qtext">${esc(q.text)}</h2>
+            <blockquote class="dy-quote">${esc(q.answer || '')}</blockquote>
+            ${exp ? `<a class="dy-target" href="${esc(exp.href)}"><span class="dy-target-ico">📎</span><span>「${esc(exp.title)}」</span><span class="dy-target-sub">${esc(exp.place)}에 쌓였어요</span></a>` : ''}
+            <div class="dy-qfoot">
+              <div class="dy-qfoot-left"><button class="btn btn-ghost btn-sm" data-reask="${esc(q.id)}" type="button">다시 답하기</button></div>
+              <button class="btn btn-primary" data-dy="next" type="button">${nx >= S.queue.length ? '마치기' : '남은 질문 보기 →'}</button>
+            </div>
+          </div>`;
       }
 
       function questionCard(q) {
         const t = typeInfo(q.type);
-        const exp = q.targetExpId ? App.store.get(q.targetExpId) : null;
+        const exp = App.store.questionTarget(q);
         return `
           <div class="dy-qcard dy-slide-in" data-type="${esc(q.type)}">
             <div class="dy-qtop">
               <span class="dy-type" data-type="${esc(q.type)}">${t.ico} ${t.label}</span>
               <span class="dy-asked">${esc(askedLabel(q.askedAt))} 도착</span>
-              <span class="dy-count">${S.queue.length}개 중 <b>${S.pos + 1}</b>번째</span>
             </div>
-            ${S.queue.length > 1 ? dots() : ''}
-            ${exp ? `<a class="dy-target" href="#/card/${esc(exp.id)}"><span class="dy-target-ico">📎</span><span>「${esc(exp.title)}」</span><span class="dy-target-sub">카드에 쌓여요</span></a>` : ''}
+            ${q.status === 'skipped' || q.status === 'later' ? `<div class="dy-revisit">${q.status === 'skipped' ? '건너뛴' : '나중에로 미뤄 둔'} 질문이에요. 지금 답해도 괜찮아요.</div>` : ''}
+            ${exp ? `<a class="dy-target" href="${esc(exp.href)}"><span class="dy-target-ico">📎</span><span>「${esc(exp.title)}」</span><span class="dy-target-sub">${esc(exp.place)}에 쌓여요</span></a>` : ''}
             <h2 class="dy-qtext">${esc(q.text)}</h2>
             ${q.hint ? `<div class="dy-hint"><span>💡</span><span>${esc(q.hint)}</span></div>` : ''}
             <div class="dy-answer-wrap">
-              <textarea class="dy-answer" id="dy-answer" rows="3" maxlength="400" placeholder="한두 줄이면 충분해요"></textarea>
+              <textarea class="dy-answer" id="dy-answer" rows="3" maxlength="400" placeholder="한두 줄이면 충분해요">${esc(S.drafts[q.id] || '')}</textarea>
               <span class="dy-kbd">Enter 보내기 · Shift+Enter 줄바꿈</span>
             </div>
             <div class="dy-qfoot">
@@ -151,7 +232,7 @@
                 <button class="btn btn-ghost btn-sm" data-dy="skip" type="button">건너뛰기</button>
                 <button class="btn btn-ghost btn-sm" data-dy="later" type="button">나중에</button>
               </div>
-              <button class="btn btn-primary dy-submit" data-dy="answer" type="button" disabled>답변하기</button>
+              <button class="btn btn-primary dy-submit" data-dy="answer" type="button" ${(S.drafts[q.id] || '').trim() ? '' : 'disabled'}>답변하기</button>
             </div>
           </div>`;
       }
@@ -160,7 +241,8 @@
         const f = S.feedback;
         const q = getQ(f.qid);
         const exp = f.expId ? App.store.get(f.expId) : null;
-        const isLast = S.pos + 1 >= S.queue.length;
+        const proj = f.projectId ? App.store.getProject(f.projectId) : null;
+        const isLast = nextOpen(S.pos) >= S.queue.length;
         const merged = exp && !f.created;
         return `
           <div class="dy-qcard dy-feedback dy-slide-in">
@@ -174,7 +256,15 @@
             <div class="dy-fb-q">${esc(q ? q.text : '')}</div>
             <blockquote class="dy-quote">${esc(f.text)}</blockquote>
 
-            ${merged ? `
+            ${proj ? `
+              <div class="dy-merge">
+                <div class="dy-merge-label">↳ 프로젝트 체크인 로그에 쌓였어요</div>
+                <a class="dy-merge-card" href="#/projects/${esc(proj.id)}">
+                  <div class="dy-merge-title">${esc(proj.title)}</div>
+                  <div class="dy-merge-meta"><span>기록 ${proj.logs.length}개</span><span>경험 카드 ${App.store.cardsOf(proj.id).length}장</span></div>
+                </a>
+                <p class="subtle" style="margin-top:8px">나중에 타임라인에서 이 기록을 골라 경험 카드로 만들 수 있어요.</p>
+              </div>` : merged ? `
               <div class="dy-merge">
                 <div class="dy-merge-label">↳ 이 카드에 쌓였어요</div>
                 <a class="dy-merge-card" href="#/card/${esc(exp.id)}">
@@ -202,9 +292,9 @@
             </div>
 
             <div class="dy-fb-actions">
-              <button class="btn btn-primary" data-dy="deeper" type="button">이 이야기 더 해볼래요 →</button>
+              ${proj ? `<a class="btn btn-primary" href="#/projects/${esc(proj.id)}">프로젝트 타임라인 보기 →</a>` : '<button class="btn btn-primary" data-dy="deeper" type="button">이 이야기 더 해볼래요 →</button>'}
               <button class="btn" data-dy="next" type="button">${isLast ? '마치기' : '다음 질문'}</button>
-              ${!exp ? '<button class="btn btn-ghost btn-sm" data-dy="save-seed" type="button">카드로만 저장해 둘게요</button>' : ''}
+              ${!exp && !proj ? '<button class="btn btn-ghost btn-sm" data-dy="save-seed" type="button">카드로만 저장해 둘게요</button>' : ''}
             </div>
           </div>`;
       }
@@ -233,13 +323,17 @@
         const el = root.querySelector('#dy-stage');
         const q = current();
         if (S.feedback) el.innerHTML = feedbackCard();
+        else if (q && q.status === 'answered') el.innerHTML = answeredCard(q);
         else if (q) el.innerHTML = questionCard(q);
         else el.innerHTML = emptyCard();
+        if (S.dir === 'back') { const c = el.querySelector('.dy-slide-in'); if (c) { c.classList.remove('dy-slide-in'); c.classList.add('dy-slide-in-back'); } }
         S.leaving = false;
+        renderNav(); renderQueue();
         const ta = el.querySelector('#dy-answer');
         if (ta) {
           const btn = el.querySelector('[data-dy="answer"]');
           ta.addEventListener('input', () => {
+            if (q) S.drafts[q.id] = ta.value;
             btn.disabled = !ta.value.trim();
             ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 220) + 'px';
           });
@@ -250,11 +344,11 @@
         renderPhone();
       }
 
-      function transition(fn) {
+      function transition(fn, dir = 'fwd') {
         if (S.leaving) return;
         const card = root.querySelector('#dy-stage .dy-qcard');
-        S.leaving = true;
-        if (card) { card.classList.remove('dy-slide-in'); card.classList.add('dy-slide-out'); }
+        S.leaving = true; S.dir = dir;
+        if (card) { card.classList.remove('dy-slide-in', 'dy-slide-in-back'); card.classList.add(dir === 'back' ? 'dy-slide-out-back' : 'dy-slide-out'); }
         later(() => { fn(); renderStage(); renderHistory(); }, 220);
       }
 
@@ -265,6 +359,7 @@
         const text = (ta && ta.value.trim()) || '';
         if (!text) { if (ta) ta.focus(); return; }
         App.store.answer(q.id, text);
+        delete S.drafts[q.id];
         const kws = App.ai.extractKeywords(text);
         let added = [];
         const exp = q.targetExpId ? App.store.get(q.targetExpId) : null;
@@ -272,7 +367,8 @@
           added = kws.filter((k) => !exp.keywords.includes(k));
           if (added.length) App.store.update(exp.id, { keywords: exp.keywords.concat(added) });
         }
-        S.feedback = { qid: q.id, text, kws, added, expId: exp ? exp.id : null, created: false };
+        const proj = q.targetProjectId ? App.store.getProject(q.targetProjectId) : null;
+        S.feedback = { qid: q.id, text, kws, added, expId: exp ? exp.id : null, projectId: proj ? proj.id : null, created: false };
         S.done.push({ qid: q.id, kws });
         transition(() => {});
         renderHead();
@@ -291,7 +387,7 @@
         return e.id;
       }
 
-      function goNext() { transition(() => { S.feedback = null; S.pos++; }); }
+      function goNext() { saveDraft(); const to = nextOpen(S.pos); transition(() => { S.feedback = null; S.pos = to; }, to < S.pos ? 'back' : 'fwd'); }
 
       function pushDemo() {
         const P = window.SEED.recallPrompts;
@@ -303,12 +399,13 @@
         S.queue.push(id);
         App.ui.pushToast('오늘의 질문이 도착했어요', p.text, null);
         if (!S.feedback && S.pos === S.queue.length - 1) transition(() => {});
-        else { const c = root.querySelector('.dy-count'); if (c) c.innerHTML = `${S.queue.length}개 중 <b>${S.pos + 1}</b>번째`; const dd = root.querySelector('.dy-dots'); if (dd) dd.outerHTML = dots(); }
+        else { renderNav(); renderQueue(); }
       }
 
       function reask(id) {
         App.store.setQuestionStatus(id, 'pending');
-        if (S.feedback) { S.feedback = null; S.pos++; }
+        saveDraft();
+        if (S.feedback) { S.feedback = null; }
         const old = S.queue.indexOf(id);
         if (old !== -1) { S.queue.splice(old, 1); if (old < S.pos) S.pos--; }
         S.queue.splice(S.pos, 0, id);
@@ -379,13 +476,13 @@
             </div>
             ${items.length ? `<ul class="dy-hist-list">${items.map((q) => {
               const t = typeInfo(q.type);
-              const exp = q.targetExpId ? App.store.get(q.targetExpId) : null;
+              const exp = App.store.questionTarget(q);
               return `<li class="dy-hist-item">
                 <div class="dy-hist-meta"><span class="dy-type dy-type-sm" data-type="${esc(q.type)}">${t.ico} ${t.label}</span><span>${esc(askedLabel(q.askedAt))}</span></div>
                 <div class="dy-hist-q">${esc(q.text)}</div>
                 ${q.status === 'answered' && q.answer ? `<div class="dy-hist-a">${esc(q.answer)}</div>` : ''}
                 <div class="dy-hist-foot">
-                  ${exp ? `<a class="dy-hist-exp" href="#/card/${esc(exp.id)}">📎 ${esc(exp.title)}</a>` : ''}
+                  ${exp ? `<a class="dy-hist-exp" href="${esc(exp.href)}">📎 ${esc(exp.title)}</a>` : ''}
                   ${q.status !== 'answered' ? `<button class="btn btn-sm" data-reask="${esc(q.id)}" type="button">다시 답하기</button>` : ''}
                 </div>
               </li>`;
@@ -398,6 +495,10 @@
         const t = ev.target;
         const tab = t.closest('[data-tab]');
         if (tab) { S.tab = tab.dataset.tab; renderHistory(); return; }
+        const jump = t.closest('[data-dy-jump]');
+        if (jump) { go(Number(jump.dataset.dyJump)); if (jump.classList.contains('dy-qrow')) root.querySelector('#dy-stage').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+        const nav = t.closest('[data-dy-go]');
+        if (nav && !nav.disabled) { go(S.pos + (nav.dataset.dyGo === 'prev' ? -1 : 1)); return; }
         const re = t.closest('[data-reask]');
         if (re) { reask(re.dataset.reask); return; }
         const a = t.closest('[data-dy]');
@@ -408,11 +509,11 @@
         else if (act === 'skip' && q) {
           App.store.setQuestionStatus(q.id, 'skipped');
           App.ui.toast('건너뛰었어요. 비슷한 질문은 덜 보내 볼게요');
-          transition(() => { S.pos++; });
+          saveDraft(); { const to = nextOpen(S.pos); transition(() => { S.pos = to; }, to < S.pos ? 'back' : 'fwd'); }
         } else if (act === 'later' && q) {
           App.store.setQuestionStatus(q.id, 'later');
           App.ui.toast(`${nextTime().label}에 다시 물어볼게요`);
-          transition(() => { S.pos++; });
+          saveDraft(); { const to = nextOpen(S.pos); transition(() => { S.pos = to; }, to < S.pos ? 'back' : 'fwd'); }
         } else if (act === 'next') goNext();
         else if (act === 'deeper') {
           const id = createSeed();
@@ -424,6 +525,15 @@
         } else if (act === 'more') pushDemo();
       }
       root.addEventListener('click', onClick);
+      const onKey = (ev) => {
+        if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+        const tag = (ev.target.tagName || '').toLowerCase();
+        if (tag === 'textarea' || tag === 'input' || tag === 'select' || ev.target.isContentEditable) return;
+        if (document.querySelector('#modal-root .modal')) return;
+        if (ev.key === 'ArrowLeft' && S.pos > 0) { ev.preventDefault(); go(S.pos - 1); }
+        else if (ev.key === 'ArrowRight' && S.pos < S.queue.length - 1) { ev.preventDefault(); go(S.pos + 1); }
+      };
+      document.addEventListener('keydown', onKey);
 
       renderHead();
       renderStage();
@@ -435,6 +545,7 @@
         alive = false;
         timers.forEach(clearTimeout); timers.clear();
         root.removeEventListener('click', onClick);
+        document.removeEventListener('keydown', onKey);
       };
     },
   };

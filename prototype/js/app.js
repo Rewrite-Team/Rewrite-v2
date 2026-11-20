@@ -8,21 +8,33 @@
     { href: '#/projects', name: 'projects', ico: '▤', label: '프로젝트 트래커' },
     { group: '경험 관리' },
     { href: '#/vault', name: 'vault', ico: '▦', label: '경험 보관함' },
-    { href: '#/competency', name: 'competency', ico: '◎', label: '역량 맵' },
     { group: '커리어 활용' },
-    { href: '#/match', name: 'match', ico: '⇄', label: '자소서·면접 매칭', beta: true },
+    { href: '#/apply', name: 'apply', ico: '◎', label: '지원 기업', apps: true },
   ];
-  const MOBILE = [['#/home', 'home', '⌂', '홈'], ['#/daily', 'daily', '✉', '질문'], ['#/discover', 'discover', '✦', '발굴'], ['#/vault', 'vault', '▦', '보관함'], ['#/competency', 'competency', '◎', '역량']];
+  const MOBILE = [['#/home', 'home', '⌂', '홈'], ['#/daily', 'daily', '✉', '질문'], ['#/discover', 'discover', '✦', '발굴'], ['#/vault', 'vault', '▦', '보관함'], ['#/apply', 'apply', '◎', '지원']];
+  const APP_STATUS_TONE = { preparing: '#4b4fd6', applied: '#f2994a', passed: '#2f9e6b', failed: '#b9b3a8' };
+
+  // 지원 기업 하위 메뉴 (기업마다 하나씩)
+  function appSubnav(params) {
+    const apps = App.store.activeApps();
+    if (!apps.length) return '';
+    return `<div class="nav-sub">${apps.map((a) => `<a class="nav-sub-item ${params && params.id === a.id ? 'active' : ''}" href="#/apply/${a.id}" title="${App.ui.esc(a.company + ' · ' + a.job)}">
+      <span class="nav-sub-dot" style="background:${APP_STATUS_TONE[a.status] || '#ccc'}"></span><span class="nav-sub-name">${App.ui.esc(a.company)}</span><span class="nav-sub-job">${App.ui.esc(a.job.replace(/\s*\(.*\)$/, ''))}</span></a>`).join('')}</div>`;
+  }
+
+  // 메뉴에 없는 화면 → 어느 메뉴 탭에 속하는지 (사이드바 강조 + 상단 경로 표시)
+  const NAV_PARENT = { card: 'vault' };
 
   let cleanup = null;
 
-  function sidebar(active) {
+  function sidebar(active, params) {
     const u = App.store.state.user;
     return `<aside class="sidebar">
       <a class="brand" href="#/home"><div class="brand-mark">R</div><div><div class="brand-name">Rewrite</div><div class="brand-sub">경험을 다시 쓰다</div></div></a>
       ${NAV.map((n) => n.group ? `<div class="nav-group-label">${n.group}</div>` : `
         <a class="nav-item ${active === n.name ? 'active' : ''}" href="${n.href}"><span class="ico">${n.ico}</span>${n.label}
-        ${n.badge && n.badge() ? `<span class="badge-count">${n.badge()}</span>` : ''}${n.beta ? '<span class="beta">BETA</span>' : ''}</a>`).join('')}
+        ${n.badge && n.badge() ? `<span class="badge-count">${n.badge()}</span>` : ''}${n.beta ? '<span class="beta">BETA</span>' : ''}</a>
+        ${n.apps ? appSubnav(active === 'apply' ? params : null) : ''}`).join('')}
       <div class="sidebar-foot">
         <div class="avatar">${App.ui.esc(u.name.slice(0, 1))}</div>
         <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px">${App.ui.esc(u.name)}</div><div class="subtle" style="font-size:12px">${App.ui.esc(u.targetJob)} 준비중</div></div>
@@ -42,14 +54,19 @@
       root.innerHTML = `<div class="fullscreen">${body}</div>`;
     } else {
       const title = typeof screen.title === 'function' ? screen.title(params) : (screen.title || '');
-      root.innerHTML = `<div class="shell">${sidebar(name)}<main class="main">
-        <div class="topbar"><div class="topbar-title">${App.ui.esc(title)}</div>
+      const navName = NAV_PARENT[name] || name;
+      const parent = NAV_PARENT[name] ? NAV.find((n) => n.name === NAV_PARENT[name]) : null;
+      // 화면이 crumb(params) → [{label, href}] 를 주면 그걸 사용, 아니면 NAV_PARENT
+      const crumbs = screen.crumb ? (screen.crumb(params) || []) : parent ? [{ label: parent.label, href: parent.href }] : [];
+      const crumb = crumbs.map((c) => `<a class="topbar-crumb" href="${c.href}">${App.ui.esc(c.label)}</a><span class="topbar-sep">›</span>`).join('');
+      root.innerHTML = `<div class="shell">${sidebar(navName, params)}<main class="main">
+        <div class="topbar"><div class="topbar-title">${crumb}${App.ui.esc(title)}</div>
           <div class="topbar-actions">
             <a class="btn btn-sm" href="#/card/new">＋ 경험 직접 추가</a>
             <a class="btn btn-sm btn-primary" href="#/discover">✦ 경험 발굴 시작</a>
           </div></div>
         <div id="screen">${body}</div></main>
-        <nav class="mobile-nav">${MOBILE.map(([h, n, i, l]) => `<a href="${h}" class="${name === n ? 'active' : ''}"><span class="ico">${i}</span>${l}</a>`).join('')}</nav>
+        <nav class="mobile-nav">${MOBILE.map(([h, n, i, l]) => `<a href="${h}" class="${navName === n ? 'active' : ''}"><span class="ico">${i}</span>${l}</a>`).join('')}</nav>
       </div>`;
     }
     const mountRoot = root.querySelector('#screen') || root.querySelector('.fullscreen');

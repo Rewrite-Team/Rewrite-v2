@@ -56,11 +56,14 @@
     (e.logs || []).forEach((l) => { m[l.type] = (m[l.type] || 0) + 1; });
     return m;
   }
-  const topKeywords = (e, n) => {
-    const set = []; e.keywords.forEach((k) => set.push(k));
-    logKeywordCounts(e).forEach(([k]) => { if (!set.includes(k)) set.push(k); });
-    return set.slice(0, n);
-  };
+  const topKeywords = (e, n) => logKeywordCounts(e).map(([k]) => k).slice(0, n);
+  // 로그 id → 그 로그로 만든 카드들
+  function cardsByLog(p) {
+    const m = {};
+    App.store.cardsOf(p.id).forEach((c) => (c.sourceLogIds || []).forEach((lid) => { (m[lid] = m[lid] || []).push(c); }));
+    return m;
+  }
+  const shortName = (t) => { const m = String(t || '').match(/「[^」]+」/); return m ? m[0] : String(t || '').split(' — ')[0]; };
   const ghLink = (e) => (e.links || []).find((l) => /github/i.test(l)) || (e.links || [])[0] || '';
   const prettyLink = (u) => String(u).replace(/^https?:\/\//, '').replace(/\/$/, '');
 
@@ -81,6 +84,7 @@
       ${typeBar(e)}
       <div class="pj-card-stats">
         <div><b>${(e.logs || []).length}</b><span>기록</span></div>
+        <div><b>${App.store.cardsOf(e.id).length}</b><span>경험 카드</span></div>
         <div><b>${last ? esc(md(last.date)) : '—'}</b><span>마지막 체크인${last ? ` · ${ago(last.date)}` : ''}</span></div>
       </div>
       <div class="exp-card-kws">${topKeywords(e, 4).map((k) => App.ui.keywordChip(k)).join('') || '<span class="subtle">체크인을 남기면 역량 키워드가 생겨요</span>'}</div>
@@ -120,7 +124,7 @@
       title: '새 프로젝트 시작하기',
       confirmText: '트래킹 시작',
       body: `<div class="pj-form">
-        <p class="pj-form-intro">프로젝트를 경험 카드로 만들고, 진행하는 동안 체크인 질문을 보내 드릴게요.</p>
+        <p class="pj-form-intro">진행하는 동안 체크인 질문을 보내 드릴게요. 쌓인 기록에서 에피소드를 골라 경험 카드를 여러 장 만들 수 있어요.</p>
         <label class="label" for="pj-f-title">프로젝트 이름 <span class="pj-req">*</span></label>
         <input class="input" id="pj-f-title" placeholder="예) 팀 프로젝트 「모여봄」" maxlength="60" />
         <label class="label" for="pj-f-role">내 역할</label>
@@ -136,10 +140,9 @@
         const title = v('pj-f-title');
         if (!title) { App.ui.toast('프로젝트 이름을 알려 주세요'); root.querySelector('#pj-f-title').focus(); return false; }
         const role = v('pj-f-role'); const gh = v('pj-f-gh');
-        const exp = App.store.create({
-          isProject: true, status: 'ongoing', category: '프로젝트', title, role,
+        const exp = App.store.createProject({
+          status: 'ongoing', title, role,
           period: { start: v('pj-f-start') || month, end: '' }, links: gh ? [gh] : [],
-          summary: '', jobs: [App.store.state.user.targetJob].filter(Boolean),
         });
         App.store.addLog(exp.id, { type: 'milestone', text: `프로젝트 시작!${role ? ' 역할: ' + role : ''}` });
         App.ui.toast('프로젝트 트래킹을 시작했어요');
@@ -152,7 +155,39 @@
 
   /* ---------- 상세 ---------- */
   // 화면 상태 (프로젝트별 질문 인덱스)
-  const ui = { qIndex: {}, type: {} };
+  const ui = { qIndex: {}, type: {}, ck: {}, edit: null, pick: null }; // pick: { pid, ids: [] } — 카드로 만들 로그 고르는 중
+
+  /* ---------- 역량 키워드 편집기 (체크인·로그 수정 공용) ----------
+     selected = 직접 고른 것(manual) ∪ (AI 추천(suggested) − 사용자가 뺀 것(rejected))
+     AI 추천은 자동으로 선택되지만, 빼면 다시 자동으로 들어오지 않는다. */
+  const uniq = (a) => [...new Set(a)];
+  const kwNew = (manual = [], suggested = []) => ({
+    manual: manual.slice(), suggested: suggested.slice(), rejected: suggested.filter((k) => !manual.includes(k)), open: false,
+  });
+  const kwSelected = (st) => uniq(st.manual.concat(st.suggested.filter((k) => !st.rejected.includes(k))));
+  function kwAdd(st, k) { k = String(k || '').replace(/^#/, '').trim(); if (!k) return; st.rejected = st.rejected.filter((x) => x !== k); if (!st.manual.includes(k)) st.manual.push(k); }
+  function kwRemove(st, k) { st.manual = st.manual.filter((x) => x !== k); if (st.suggested.includes(k) && !st.rejected.includes(k)) st.rejected.push(k); }
+  function kwEditor(st, scope) {
+    const sel = kwSelected(st);
+    const dismissed = st.suggested.filter((k) => st.rejected.includes(k) && !sel.includes(k));
+    const others = App.keywords.all().map((k) => k.name).filter((k) => !sel.includes(k));
+    const isAi = (k) => st.suggested.includes(k) && !st.manual.includes(k);
+    return `<div class="pj-kwed" data-kw-scope="${scope}">
+      <div class="pj-kwed-row">
+        <span class="pj-kwed-label">역량 키워드</span>
+        ${sel.map((k) => `<span class="kw pj-kwed-chip" data-tone="${App.keywords.tone(k)}">#${esc(k)}${isAi(k) ? '<span class="pj-kwed-ai" title="AI가 찾은 키워드">AI</span>' : ''}<button type="button" class="pj-kwed-x" data-kwact="remove" data-k="${esc(k)}" aria-label="#${esc(k)} 빼기">×</button></span>`).join('')}
+        ${dismissed.map((k) => `<button type="button" class="pj-kwed-sug" data-kwact="add" data-k="${esc(k)}" title="다시 넣기">＋ #${esc(k)}</button>`).join('')}
+        <button type="button" class="pj-kwed-add ${st.open ? 'on' : ''}" data-kwact="picker">${st.open ? '닫기' : '＋ 직접 고르기'}</button>
+      </div>
+      ${!sel.length && !dismissed.length && !st.open ? '<div class="pj-kwed-hint">쓰는 동안 AI가 역량을 찾아 넣어 드려요. 마음에 안 들면 ×로 빼고, 직접 고를 수도 있어요.</div>' : ''}
+      ${sel.length && st.suggested.length ? '<div class="pj-kwed-hint">AI 표시는 자동으로 찾은 키워드예요. 아니다 싶으면 ×로 빼 주세요.</div>' : ''}
+      ${st.open ? `<div class="pj-kwed-picker">
+        ${others.map((k) => `<button type="button" class="pj-kwed-opt" data-tone="${App.keywords.tone(k)}" data-kwact="add" data-k="${esc(k)}" title="${esc(App.keywords.get(k).desc)}">#${esc(k)}</button>`).join('')}
+        <input class="input pj-kwed-input" data-kw-input placeholder="목록에 없으면 입력 후 Enter" maxlength="12" />
+      </div>` : ''}
+    </div>`;
+  }
+  const ckState = (id) => (ui.ck[id] = ui.ck[id] || kwNew());
 
   function pickInitialQuestion(e) {
     // AI가 가장 덜 기록된 유형의 질문부터 골라요
@@ -187,13 +222,16 @@
           <span class="pj-type-ico">${TYPES[t].ico}</span>${TYPES[t].label}</button>`).join('')}
       </div>
       <textarea class="textarea pj-ta" id="pj-ta" rows="3" maxlength="400" placeholder="한두 줄이면 충분해요. 예) JWT와 세션 중 고민하다가 모바일 확장 때문에 JWT로 결정했어요."></textarea>
-      <div class="pj-checkin-foot"><span class="subtle" id="pj-kw-preview">쓰는 동안 역량 키워드를 찾아 드려요</span>
+      <div id="pj-ck-kw">${kwEditor(ckState(e.id), 'ck')}</div>
+      <div class="pj-checkin-foot"><span class="subtle">⌘/Ctrl + Enter로 바로 기록</span>
         <button class="btn btn-primary" data-pj="save">기록하기</button></div>
     </div>`;
   }
 
   function timeline(e) {
     const logs = sortedLogs(e);
+    const used = cardsByLog(e);
+    const picking = ui.pick && ui.pick.pid === e.id;
     if (!logs.length) return '<div class="card empty"><div class="big">✎</div>아직 기록이 없어요. 첫 체크인을 남겨 볼까요?</div>';
     const groups = [];
     logs.forEach((l) => {
@@ -207,10 +245,16 @@
       return `<div class="pj-week"><div class="pj-week-head"><b>${label}</b><span>${range}</span><span class="pj-week-n">${g.items.length}개</span></div>
         ${g.items.map((l) => {
           const t = TYPES[l.type] || TYPES.milestone;
-          return `<div class="pj-log" data-type="${esc(l.type)}">
+          if (ui.edit && ui.edit.logId === l.id) return logEditor(l);
+          const on = picking && ui.pick.ids.includes(l.id);
+          const cards = used[l.id] || [];
+          return `<div class="pj-log ${picking ? 'is-picking' : ''} ${on ? 'is-picked' : ''}" data-type="${esc(l.type)}" ${picking ? `data-pj-pick="${esc(l.id)}"` : ''}>
+            ${picking ? `<span class="pj-log-check" aria-hidden="true">${on ? '✓' : ''}</span>` : ''}
             <div class="pj-log-ico">${t.ico}</div>
             <div class="pj-log-body">
-              <div class="pj-log-meta"><span class="pj-log-type">${t.label}</span><span>${esc(md(l.date))}</span></div>
+              <div class="pj-log-meta"><span class="pj-log-type">${t.label}</span><span>${esc(md(l.date))}</span>
+                ${cards.map((c) => `<a class="pj-log-card" href="#/card/${esc(c.id)}" title="${esc(c.title)}">▣ 카드</a>`).join('')}
+                ${picking ? '' : `<span class="pj-log-acts"><button type="button" data-pj-log="edit" data-id="${esc(l.id)}">수정</button><button type="button" data-pj-log="del" data-id="${esc(l.id)}">삭제</button></span>`}</div>
               <div class="pj-log-text">${esc(l.text)}</div>
               ${(l.keywords || []).length ? `<div class="exp-card-kws">${l.keywords.map((k) => App.ui.keywordChip(k)).join('')}</div>` : ''}
             </div></div>`;
@@ -218,33 +262,52 @@
     }).join('')}</div>`;
   }
 
+  function logEditor(l) {
+    const ed = ui.edit; const t = TYPES[ed.type] || TYPES.milestone;
+    return `<div class="pj-log is-editing" data-type="${esc(ed.type)}">
+      <div class="pj-log-ico">${t.ico}</div>
+      <div class="pj-log-body">
+        <div class="pj-log-meta"><span class="pj-log-type">기록 수정</span></div>
+        <div class="pj-types pj-types-sm">${TYPE_ORDER.map((x) => `<button type="button" class="pj-type ${ed.type === x ? 'on' : ''}" data-type="${x}" data-pj-etype="${x}"><span class="pj-type-ico">${TYPES[x].ico}</span>${TYPES[x].label}</button>`).join('')}</div>
+        <textarea class="textarea pj-ta" id="pj-edit-ta" rows="3" maxlength="400">${esc(ed.text)}</textarea>
+        <div id="pj-ed-kw">${kwEditor(ed.kw, 'ed')}</div>
+        <div class="pj-log-edit-foot">
+          <label class="subtle">날짜 <input type="date" class="input pj-date" id="pj-edit-date" value="${esc(ed.date)}" /></label>
+          <span style="flex:1"></span>
+          <button type="button" class="btn btn-sm" data-pj-log="cancel">취소</button>
+          <button type="button" class="btn btn-sm btn-primary" data-pj-log="save">저장</button>
+        </div>
+      </div></div>`;
+  }
+
   function sidePanel(e) {
     const kc = logKeywordCounts(e); const max = kc.length ? kc[0][1] : 1;
     const c = typeCounts(e);
     const missing = TYPE_ORDER.filter((t) => !c[t] && t !== 'milestone');
-    const notOnCard = kc.map(([k]) => k).filter((k) => !e.keywords.includes(k));
+    const cards = App.store.cardsOf(e.id);
+    const used = cardsByLog(e);
+    const unused = (e.logs || []).filter((l) => !used[l.id] && l.type !== 'milestone');
+    const cardKws = new Set(cards.flatMap((x) => x.keywords));
+    const notOnCard = kc.map(([k]) => k).filter((k) => !cardKws.has(k));
     return `<aside class="pj-side">
+      <div class="card card-pad pj-cards-box">
+        <div class="section-title">이 프로젝트에서 나온 경험 카드 <span class="subtle">${cards.length}</span></div>
+        ${cards.length ? `<div class="pj-cards">${cards.map((x) => `<a class="pj-cardlink" href="#/card/${esc(x.id)}">
+            <div class="pj-cardlink-top">${App.ui.statusTag(x.status)}<span class="pj-cardlink-pct">${x.completeness}%</span></div>
+            <div class="pj-cardlink-title">${esc(x.title)}</div>
+            <div class="exp-card-kws">${x.keywords.slice(0, 3).map((k) => App.ui.keywordChip(k)).join('')}</div></a>`).join('')}</div>`
+          : '<p class="subtle">아직 없어요. 한 프로젝트에서도 에피소드마다 카드를 따로 만들면 자소서·면접에서 골라 쓰기 좋아요.</p>'}
+        ${unused.length ? `<p class="pj-side-hint"><span class="ai-dot">R</span>아직 카드로 만들지 않은 기록이 ${unused.length}개 있어요${notOnCard.length ? ` · ${notOnCard.slice(0, 3).map((k) => '#' + esc(k)).join(' ')} 에피소드가 비어 있어요` : ''}.</p>` : ''}
+        <button class="btn btn-primary pj-full" data-pj="pick" ${(e.logs || []).length ? '' : 'disabled'}>✦ 기록 골라 경험 카드 만들기</button>
+      </div>
       <div class="card card-pad">
         <div class="section-title">이 프로젝트에서 드러난 역량</div>
         ${kc.length ? `<div class="pj-comp">${kc.slice(0, 6).map(([k, n]) => `<div class="pj-comp-row">
-            ${App.ui.keywordChip(k)}<div class="pj-comp-bar" data-tone="${App.keywords.tone(k)}"><span style="width:${Math.round((n / max) * 100)}%"></span></div><span class="pj-comp-n">${n}</span></div>`).join('')}</div>
-          ${notOnCard.length ? `<div class="pj-side-note">카드에 아직 없는 역량: ${notOnCard.map((k) => '#' + esc(k)).join(' ')}
-            <button class="btn btn-sm" data-pj="add-kws">카드에 추가</button></div>` : ''}`
+            ${App.ui.keywordChip(k)}<div class="pj-comp-bar" data-tone="${App.keywords.tone(k)}"><span style="width:${Math.round((n / max) * 100)}%"></span></div><span class="pj-comp-n">${n}</span></div>`).join('')}</div>`
           : '<p class="subtle">체크인을 남기면 로그에서 역량 키워드를 찾아 보여 드려요.</p>'}
         <div class="divider"></div>
         <div class="pj-types-sum">${TYPE_ORDER.map((t) => `<div data-type="${t}"><span class="pj-dot"></span>${TYPES[t].label}<b>${c[t] || 0}</b></div>`).join('')}</div>
         ${missing.length ? `<p class="pj-side-hint"><span class="ai-dot">R</span>‘${TYPES[missing[0]].label}’ 기록이 아직 없어요. 면접에서 자주 묻는 부분이라 다음 체크인에서 여쭤볼게요.</p>` : ''}
-      </div>
-      <div class="card card-pad pj-star-box">
-        <div class="section-title">STAR로 정리하기</div>
-        <p class="subtle">쌓인 로그를 상황·과제·행동·결과로 묶어 카드 초안을 만들어 드려요.</p>
-        <div class="pj-star-map">
-          <div><b>A</b> 행동 ← 의사결정·이슈·협업</div>
-          <div><b>R</b> 결과 ← 마일스톤</div>
-          <div><b>+</b> 배운 점 ← 배움</div>
-        </div>
-        <button class="btn btn-primary pj-full" data-pj="star" ${(e.logs || []).length ? '' : 'disabled'}>✦ STAR 초안 만들기</button>
-        <div class="pj-complete"><span>카드 완성도</span><b>${e.completeness}%</b></div>${App.ui.progress(e.completeness)}
       </div>
       ${e.status === 'done' ? `<div class="card card-pad pj-done-box"><b>마무리한 프로젝트예요</b>
           <p class="subtle">다시 진행해야 한다면 언제든 이어서 기록할 수 있어요.</p>
@@ -253,9 +316,19 @@
     </aside>`;
   }
 
+  function pickBar(e) {
+    if (!ui.pick || ui.pick.pid !== e.id) return '';
+    const n = ui.pick.ids.length;
+    return `<div class="card pj-pickbar">
+      <div><b>카드로 만들 기록을 골라 주세요</b><span class="subtle">한 에피소드(하나의 문제·결정·협업)에 해당하는 기록만 묶을수록 STAR가 선명해져요.</span></div>
+      <div class="pj-pickbar-acts"><button class="btn btn-sm" data-pj="pick-cancel">취소</button>
+        <button class="btn btn-sm btn-primary" data-pj="make-card" ${n ? '' : 'disabled'}>${n ? `${n}개로 카드 만들기` : '기록을 골라 주세요'}</button></div>
+    </div>`;
+  }
+
   function renderDetail(id) {
-    const e = App.store.get(id);
-    if (!e || !e.isProject) {
+    const e = App.store.getProject(id);
+    if (!e) {
       return `<div class="page"><div class="card empty"><div class="big">▤</div>프로젝트를 찾을 수 없어요.
         <div style="margin-top:14px"><a class="btn" href="#/projects">← 프로젝트 목록으로</a></div></div></div>`;
     }
@@ -272,13 +345,13 @@
         <div class="pj-hero-side">
           ${gh ? `<a class="pj-source" href="${esc(gh)}" target="_blank" rel="noopener noreferrer"><span class="pj-source-k">결과물</span><span class="pj-source-v">${esc(prettyLink(gh))} ↗</span></a>`
             : '<button class="pj-source pj-source-add" data-pj="add-link"><span class="pj-source-k">결과물</span><span class="pj-source-v">＋ GitHub 링크 연결</span></button>'}
-          <a class="btn" href="#/card/${esc(e.id)}">카드 보기</a>
         </div>
       </div>
       <div class="pj-layout">
         <div class="pj-main">
-          ${e.status !== 'done' ? checkinCard(e) : ''}
+          ${e.status !== 'done' && !(ui.pick && ui.pick.pid === e.id) ? checkinCard(e) : ''}
           <div class="section-title pj-tl-title">과정 타임라인 <span class="subtle">${(e.logs || []).length}개 기록</span></div>
+          ${pickBar(e)}
           ${timeline(e)}
         </div>
         ${sidePanel(e)}
@@ -286,57 +359,66 @@
     </div>`;
   }
 
-  /* ---------- STAR 초안 ---------- */
+  /* ---------- 고른 로그 → 경험 카드 초안 ---------- */
   const sentence = (t) => { const s = String(t || '').trim(); return s && !/[.!?。]$/.test(s) ? s + '.' : s; };
-  function draftStar(e) {
-    const logs = (e.logs || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  function draftFromLogs(p, ids) {
+    const logs = (p.logs || []).filter((l) => ids.includes(l.id)).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     const of = (...ts) => logs.filter((l) => ts.includes(l.type));
+    const acts = of('decision', 'issue', 'collab');
+    const main = acts[0] || logs[0];
+    const numeric = logs.filter((l) => /\d/.test(l.text) && /→|->|개선|단축|줄|초/.test(l.text));
     const ms = of('milestone');
-    const first = ms[0];
-    const acts = of('decision', 'issue', 'collab').slice(-4);
-    const resultLogs = ms.length > 1 ? ms.slice(1) : [];
-    const numeric = of('issue', 'decision').filter((l) => /\d/.test(l.text) && /→|->|개선|단축|줄/.test(l.text));
-    const s = e.star || {};
-    const draft = {
-      situation: s.situation || sentence(e.summary || (first ? first.text : `${e.title} 프로젝트를 진행함`)),
-      task: s.task || sentence(e.role ? `${e.role} 역할을 맡음` : ''),
-      action: acts.length ? acts.map((l) => sentence(l.text)).join(' ') : (s.action || ''),
-      result: (resultLogs.length || numeric.length)
-        ? [...numeric.map((l) => sentence(l.text.split(/[.。]/).filter((x) => /\d/.test(x)).pop() || l.text)), ...resultLogs.map((l) => sentence(l.text))].join(' ')
-        : (s.result || ''),
-    };
     const learn = of('learning');
-    const insights = learn.length ? learn.map((l) => sentence(l.text)).join(' ') : (e.insights || '');
-    const src = { situation: s.situation ? '기존 카드' : (e.summary ? '카드 요약' : '첫 마일스톤'), task: s.task ? '기존 카드' : '내 역할',
-      action: acts.length ? `로그 ${acts.length}개` : '기존 카드', result: (resultLogs.length + numeric.length) ? `로그 ${resultLogs.length + numeric.length}개` : '기존 카드',
-      insights: learn.length ? `배움 로그 ${learn.length}개` : '기존 카드' };
-    const newKws = logKeywordCounts(e).map(([k]) => k).filter((k) => !e.keywords.includes(k)).slice(0, Math.max(0, 6 - e.keywords.length));
-    return { draft, insights, src, newKws };
+    const name = shortName(p.title);
+    // 로그 한 줄을 상황(앞) / 행동(뒤)으로 나눠 보기: 화살표가 있으면 화살표 기준, 없으면 첫 문장 기준
+    const split = (t) => {
+      const str = String(t).trim();
+      const arrow = str.split(/\s*(?:→|->)\s*/);
+      if (arrow.length > 1) return [arrow[0], arrow.slice(1).join(' ')];
+      const sens = str.split(/(?<=[.。!?])\s+/);
+      return sens.length > 1 ? [sens[0], sens.slice(1).join(' ')] : [str, ''];
+    };
+    const strip = (t) => String(t).replace(/[.。]$/, '');
+    const star = {
+      situation: sentence(`${name} 프로젝트 진행 중, ${strip(split(main.text)[0])}`),
+      task: '',
+      action: acts.map((l) => sentence(split(l.text)[1] || l.text)).join(' '),
+      result: [...numeric.map((l) => sentence(l.text.split(/[.。]/).filter((x) => /\d/.test(x)).pop() || l.text)), ...ms.map((l) => sentence(l.text))].join(' '),
+    };
+    const kwc = {}; logs.forEach((l) => (l.keywords || []).forEach((k) => { kwc[k] = (kwc[k] || 0) + 1; }));
+    const keywords = Object.entries(kwc).sort((a, b) => b[1] - a[1]).map(([k]) => k).slice(0, 4);
+    const head = strip(split(main.text)[0]).slice(0, 28);
+    const months = logs.map((l) => (l.date || '').slice(0, 7)).filter(Boolean);
+    return {
+      title: `${name} ${head}`, star, insights: learn.map((l) => sentence(l.text)).join(' '), keywords, logs,
+      period: { start: months[0] || '', end: months[months.length - 1] || '' },
+    };
   }
-  function openStarModal(e) {
-    const { draft, insights, src, newKws } = draftStar(e);
+  function openCardModal(p, ids) {
+    const d = draftFromLogs(p, ids);
     const rows = [['situation', 'S', '상황'], ['task', 'T', '과제'], ['action', 'A', '행동'], ['result', 'R', '결과']];
     App.ui.modal({
-      title: 'STAR 초안을 만들었어요',
-      confirmText: '카드에 반영하기',
+      title: '경험 카드 초안을 만들었어요',
+      confirmText: '카드 만들기',
       body: `<div class="pj-star-prev">
-        <p class="pj-form-intro">원문 로그는 그대로 두고, 카드의 STAR 정리만 바꿔요. 반영 후에도 카드에서 고칠 수 있어요.</p>
+        <p class="pj-form-intro">고른 기록 ${d.logs.length}개로 만든 초안이에요. 원문 로그는 프로젝트에 그대로 남고, 카드에서 언제든 고칠 수 있어요.</p>
+        <label class="label" for="pj-f-ctitle">카드 제목</label>
+        <input class="input" id="pj-f-ctitle" value="${esc(d.title)}" maxlength="60" />
         ${rows.map(([k, l, name]) => `<div class="pj-star-row"><div class="pj-star-k">${l}<span>${name}</span></div>
-          <div class="pj-star-v">${draft[k] ? esc(draft[k]) : '<span class="subtle">비어 있어요 — 관련 로그가 쌓이면 채워져요</span>'}
-          <div class="pj-star-src">${esc(src[k])}에서</div></div></div>`).join('')}
-        ${insights ? `<div class="pj-star-row"><div class="pj-star-k">+<span>배운 점</span></div><div class="pj-star-v">${esc(insights)}<div class="pj-star-src">${esc(src.insights)}에서</div></div></div>` : ''}
-        ${newKws.length ? `<div class="pj-star-kws">로그에서 찾은 역량도 함께 추가돼요 ${newKws.map((k) => App.ui.keywordChip(k, { ai: true })).join('')}</div>` : ''}
-        <label class="pj-check"><input type="checkbox" id="pj-only-empty" /> 이미 쓴 칸은 그대로 두고 빈 칸만 채우기</label>
+          <div class="pj-star-v">${d.star[k] ? esc(d.star[k]) : '<span class="subtle">비어 있어요 — 카드에서 AI 질문으로 채울 수 있어요</span>'}</div></div>`).join('')}
+        ${d.insights ? `<div class="pj-star-row"><div class="pj-star-k">+<span>배운 점</span></div><div class="pj-star-v">${esc(d.insights)}</div></div>` : ''}
+        ${d.keywords.length ? `<div class="pj-star-kws">역량 키워드 ${d.keywords.map((k) => App.ui.keywordChip(k, { ai: true })).join('')}</div>` : ''}
       </div>`,
       onConfirm(root) {
-        const onlyEmpty = root.querySelector('#pj-only-empty').checked;
-        const cur = e.star || {}; const star = {};
-        ['situation', 'task', 'action', 'result'].forEach((k) => { star[k] = onlyEmpty && cur[k] ? cur[k] : (draft[k] || cur[k] || ''); });
-        const patch = { star, keywords: e.keywords.concat(newKws) };
-        if (insights && (!onlyEmpty || !e.insights)) patch.insights = insights;
-        const up = App.store.update(e.id, patch);
-        App.ui.toast(`카드에 반영했어요 · 완성도 ${up.completeness}%`);
-        App.rerender();
+        const title = (root.querySelector('#pj-f-ctitle').value || '').trim() || d.title;
+        const card = App.store.create({
+          title, category: '프로젝트', status: 'draft', projectId: p.id, sourceLogIds: d.logs.map((l) => l.id),
+          period: d.period, role: p.role, summary: '', star: d.star, insights: d.insights, keywords: d.keywords,
+          jobs: [App.store.state.user.targetJob].filter(Boolean), links: (p.links || []).slice(0, 1),
+        });
+        ui.pick = null;
+        App.ui.toast(`경험 카드를 만들었어요 · 완성도 ${card.completeness}%`);
+        App.navigate('#/card/' + card.id);
         return true;
       },
     });
@@ -348,9 +430,65 @@
     render(params) { return params && params.id ? renderDetail(params.id) : renderList(); },
     mount(root, params) {
       const id = params && params.id;
-      const rerenderLocal = () => { root.innerHTML = params && params.id ? renderDetail(id) : renderList(); };
+      const rerenderLocal = () => {
+        const ck = root.querySelector('#pj-ta'); const draft = ck ? ck.value : '';
+        root.innerHTML = params && params.id ? renderDetail(id) : renderList();
+        const ck2 = root.querySelector('#pj-ta'); if (ck2 && draft) ck2.value = draft;
+      };
+
+      const kwStateOf = (scope) => (scope === 'ed' ? ui.edit && ui.edit.kw : ckState(id));
+      const redrawKw = (scope) => {
+        const st = kwStateOf(scope); if (!st) return;
+        const box = root.querySelector(scope === 'ed' ? '#pj-ed-kw' : '#pj-ck-kw'); if (box) box.innerHTML = kwEditor(st, scope);
+      };
+      const focusEdit = () => { const ta = root.querySelector('#pj-edit-ta'); if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } };
 
       const onClick = (ev) => {
+        const kwBtn = ev.target.closest('[data-kwact]');
+        if (kwBtn) {
+          const scope = kwBtn.closest('[data-kw-scope]').getAttribute('data-kw-scope'); const st = kwStateOf(scope); if (!st) return;
+          const a = kwBtn.getAttribute('data-kwact'); const k = kwBtn.getAttribute('data-k');
+          if (a === 'remove') kwRemove(st, k);
+          else if (a === 'add') kwAdd(st, k);
+          else if (a === 'picker') st.open = !st.open;
+          redrawKw(scope);
+          if (a === 'picker' && st.open) { const inp = root.querySelector(`[data-kw-scope="${scope}"] [data-kw-input]`); if (inp) inp.focus(); }
+          return;
+        }
+        const eType = ev.target.closest('[data-pj-etype]');
+        if (eType && ui.edit) { ui.edit.type = eType.getAttribute('data-pj-etype'); rerenderLocal(); focusEdit(); return; }
+        const pickEl = ev.target.closest('[data-pj-pick]');
+        if (pickEl && ui.pick) {
+          if (ev.target.closest('a')) return;
+          const lid = pickEl.getAttribute('data-pj-pick');
+          ui.pick.ids = ui.pick.ids.includes(lid) ? ui.pick.ids.filter((x) => x !== lid) : ui.pick.ids.concat([lid]);
+          rerenderLocal(); return;
+        }
+        const logBtn = ev.target.closest('[data-pj-log]');
+        if (logBtn) {
+          const a = logBtn.getAttribute('data-pj-log'); const e = App.store.getProject(id); if (!e) return;
+          if (a === 'edit') {
+            const l = e.logs.find((x) => x.id === logBtn.getAttribute('data-id')); if (!l) return;
+            ui.edit = { logId: l.id, type: l.type, text: l.text, date: l.date, kw: kwNew(l.keywords || [], App.ai.extractKeywords(l.text)) };
+            rerenderLocal(); focusEdit();
+          } else if (a === 'cancel') {
+            ui.edit = null; rerenderLocal();
+          } else if (a === 'save' && ui.edit) {
+            const text = (ui.edit.text || '').trim();
+            if (!text) { App.ui.toast('내용이 비어 있어요. 지우려면 삭제를 눌러 주세요'); focusEdit(); return; }
+            App.store.updateLog(id, ui.edit.logId, { type: ui.edit.type, text, date: ui.edit.date || fmt(todayD()), keywords: kwSelected(ui.edit.kw) });
+            ui.edit = null; App.ui.toast('기록을 수정했어요'); rerenderLocal();
+          } else if (a === 'del') {
+            const l = e.logs.find((x) => x.id === logBtn.getAttribute('data-id')); if (!l) return;
+            const usedBy = cardsByLog(e)[l.id] || [];
+            App.ui.modal({
+              title: '이 기록을 삭제할까요?', confirmText: '삭제', danger: true,
+              body: `<p>「${esc(l.text.length > 60 ? l.text.slice(0, 60) + '…' : l.text)}」</p><p style="margin-top:8px">삭제한 기록은 되돌릴 수 없어요.${usedBy.length ? ' 이 기록으로 만든 경험 카드는 그대로 남아요.' : ''}</p>`,
+              onConfirm() { App.store.removeLog(id, l.id); if (ui.edit && ui.edit.logId === l.id) ui.edit = null; App.ui.toast('기록을 삭제했어요'); rerenderLocal(); return true; },
+            });
+          }
+          return;
+        }
         const typeBtn = ev.target.closest('[data-pj-type]');
         if (typeBtn) {
           const t = typeBtn.getAttribute('data-pj-type');
@@ -363,7 +501,7 @@
           return;
         }
         const btn = ev.target.closest('[data-pj]'); if (!btn) return;
-        const act = btn.getAttribute('data-pj'); const e = id ? App.store.get(id) : null;
+        const act = btn.getAttribute('data-pj'); const e = id ? App.store.getProject(id) : null;
         if (act === 'new') return openNewModal();
         if (!e) return;
         if (act === 'next-q') {
@@ -374,18 +512,20 @@
         } else if (act === 'save') {
           const ta = root.querySelector('#pj-ta'); const text = (ta.value || '').trim();
           if (!text) { App.ui.toast('한 줄만 적어 주세요. 짧아도 괜찮아요'); ta.focus(); return; }
-          const kws = App.ai.extractKeywords(text);
-          App.store.addLog(id, { type: ui.type[id] || 'milestone', text });
-          App.ui.toast(kws.length ? `기록했어요 · ${kws.map((k) => '#' + k).join(' ')} 역량이 보였어요` : '기록했어요. 과정이 하나 더 쌓였어요');
+          const kws = kwSelected(ckState(id));
+          App.store.addLog(id, { type: ui.type[id] || 'milestone', text, keywords: kws });
+          delete ui.ck[id];
+          App.ui.toast(kws.length ? `기록했어요 · ${kws.map((k) => '#' + k).join(' ')}` : '기록했어요. 과정이 하나 더 쌓였어요');
           const Q = window.SEED.projectCheckins;
           ui.qIndex[id] = ((ui.qIndex[id] || 0) + 1) % Q.length; ui.type[id] = Q[ui.qIndex[id]].type;
           rerenderLocal();
-        } else if (act === 'star') {
-          openStarModal(e);
-        } else if (act === 'add-kws') {
-          const add = logKeywordCounts(e).map(([k]) => k).filter((k) => !e.keywords.includes(k));
-          App.store.update(id, { keywords: e.keywords.concat(add) });
-          App.ui.toast('카드에 역량 키워드를 추가했어요'); rerenderLocal();
+        } else if (act === 'pick') {
+          ui.edit = null; ui.pick = { pid: id, ids: [] }; rerenderLocal();
+          const bar = root.querySelector('.pj-pickbar'); if (bar) bar.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else if (act === 'pick-cancel') {
+          ui.pick = null; rerenderLocal();
+        } else if (act === 'make-card') {
+          if (ui.pick && ui.pick.ids.length) openCardModal(e, ui.pick.ids);
         } else if (act === 'add-link') {
           App.ui.modal({
             title: '결과물 링크 연결', confirmText: '연결하기',
@@ -393,22 +533,22 @@
             onConfirm(r) {
               const v = (r.querySelector('#pj-f-link').value || '').trim();
               if (!v) { App.ui.toast('링크를 입력해 주세요'); return false; }
-              App.store.update(id, { links: (e.links || []).concat([v]) }); App.ui.toast('결과물 링크를 연결했어요'); rerenderLocal(); return true;
+              App.store.updateProject(id, { links: (e.links || []).concat([v]) }); App.ui.toast('결과물 링크를 연결했어요'); rerenderLocal(); return true;
             },
           });
         } else if (act === 'finish') {
           App.ui.modal({
             title: '프로젝트를 마무리할까요?', confirmText: '마무리하기',
-            body: `<p>상태가 <b>완성</b>으로 바뀌고 체크인 질문이 멈춰요. 마무리 전에 <b>STAR로 정리하기</b>를 한 번 해 두면 면접 준비가 훨씬 쉬워져요.</p>`,
+            body: `<p>상태가 <b>완성</b>으로 바뀌고 체크인 질문이 멈춰요. 마무리 전에 아직 카드로 만들지 않은 기록을 <b>경험 카드</b>로 정리해 두면 면접 준비가 훨씬 쉬워져요.</p>`,
             onConfirm() {
               const n = new Date();
               App.store.addLog(id, { type: 'milestone', text: '프로젝트 마무리.' });
-              App.store.update(id, { status: 'done', period: Object.assign({}, e.period, { end: `${n.getFullYear()}-${pad(n.getMonth() + 1)}` }) });
+              App.store.updateProject(id, { status: 'done', period: Object.assign({}, e.period, { end: `${n.getFullYear()}-${pad(n.getMonth() + 1)}` }) });
               App.ui.toast('수고했어요! 프로젝트를 마무리했어요'); rerenderLocal(); return true;
             },
           });
         } else if (act === 'reopen') {
-          App.store.update(id, { status: 'ongoing', period: Object.assign({}, e.period, { end: '' }) });
+          App.store.updateProject(id, { status: 'ongoing', period: Object.assign({}, e.period, { end: '' }) });
           App.ui.toast('다시 진행중으로 바꿨어요'); rerenderLocal();
         }
       };
@@ -416,21 +556,34 @@
       // 입력 중 키워드 미리보기
       let t = null;
       const onInput = (ev) => {
-        if (ev.target.id !== 'pj-ta') return;
+        if (ev.target.id === 'pj-edit-date' && ui.edit) { ui.edit.date = ev.target.value; return; }
+        const scope = ev.target.id === 'pj-ta' ? 'ck' : ev.target.id === 'pj-edit-ta' ? 'ed' : null;
+        if (!scope) return;
+        if (scope === 'ed') ui.edit.text = ev.target.value;
+        const val = ev.target.value || '';
         clearTimeout(t);
         t = setTimeout(() => {
-          const el = root.querySelector('#pj-kw-preview'); if (!el) return;
-          const kws = App.ai.extractKeywords(ev.target.value || '');
-          el.innerHTML = kws.length ? `<span class="pj-kw-found">AI가 찾은 역량</span> ${kws.map((k) => App.ui.keywordChip(k, { ai: true })).join(' ')}` : '쓰는 동안 역량 키워드를 찾아 드려요';
+          const st = kwStateOf(scope); if (!st) return;
+          const next = App.ai.extractKeywords(val);
+          if (next.join() === st.suggested.join()) return;
+          st.suggested = next; redrawKw(scope);
         }, 250);
       };
       const onKey = (ev) => {
+        if (ev.target.matches && ev.target.matches('[data-kw-input]') && ev.key === 'Enter' && !ev.isComposing) {
+          ev.preventDefault();
+          const scope = ev.target.closest('[data-kw-scope]').getAttribute('data-kw-scope'); const st = kwStateOf(scope);
+          if (st && ev.target.value.trim()) { kwAdd(st, ev.target.value); redrawKw(scope); const inp = root.querySelector(`[data-kw-scope="${scope}"] [data-kw-input]`); if (inp) inp.focus(); }
+          return;
+        }
+        if (ev.target.id === 'pj-edit-ta' && ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey)) { const b = root.querySelector('[data-pj-log=save]'); if (b) b.click(); return; }
+        if (ev.target.id === 'pj-edit-ta' && ev.key === 'Escape') { ui.edit = null; rerenderLocal(); return; }
         if (ev.target.id === 'pj-ta' && ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey)) { const b = root.querySelector('[data-pj=save]'); if (b) b.click(); }
       };
       root.addEventListener('click', onClick);
       root.addEventListener('input', onInput);
       root.addEventListener('keydown', onKey);
-      return () => { clearTimeout(t); root.removeEventListener('click', onClick); root.removeEventListener('input', onInput); root.removeEventListener('keydown', onKey); };
+      return () => { clearTimeout(t); ui.edit = null; ui.pick = null; root.removeEventListener('click', onClick); root.removeEventListener('input', onInput); root.removeEventListener('keydown', onKey); };
     },
   };
 })(window.App);

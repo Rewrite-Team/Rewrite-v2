@@ -8,7 +8,7 @@
     { key: 'action', letter: 'A', label: '행동', hint: '내가 직접 한 행동과 그렇게 판단한 이유는요?' },
     { key: 'result', letter: 'R', label: '결과', hint: '무엇이 달라졌나요? 숫자로 말할 수 있으면 더 좋아요.' },
   ];
-  const STATUS_OPTS = [['draft', '작성중'], ['done', '완성'], ['ongoing', '진행중 (프로젝트)']];
+  const STATUS_OPTS = [['draft', '작성중'], ['done', '완성']];
   const LOG_TYPES = {
     decision: ['의사결정', '◆'], issue: ['이슈', '!'], collab: ['협업', '◎'], milestone: ['마일스톤', '★'], learning: ['배움', '✎'],
   };
@@ -35,12 +35,19 @@
     const kw = params.kw ? [params.kw] : [];
     return {
       id: null, title: '', category: (params.category && window.SEED.categories.includes(params.category)) ? params.category : '프로젝트',
-      period: { start: '', end: '' }, status: 'draft', isProject: false, role: '', summary: '',
-      star: { situation: '', task: '', action: '', result: '' }, insights: '', keywords: kw, jobs: [], links: [], logs: [], qa: [], completeness: 0,
+      period: { start: '', end: '' }, status: 'draft', projectId: params.project || null, sourceLogIds: [], role: '', summary: '',
+      star: { situation: '', task: '', action: '', result: '' }, insights: '', keywords: kw, jobs: [], links: [], qa: [], completeness: 0,
     };
   }
 
   const clone = (o) => JSON.parse(JSON.stringify(o));
+  // 이 카드가 나온 프로젝트와, 근거로 고른 로그
+  function projectOf(e) { return e.projectId ? App.store.getProject(e.projectId) : null; }
+  function sourceLogs(e) {
+    const p = projectOf(e); if (!p) return [];
+    const ids = e.sourceLogIds || [];
+    return p.logs.filter((l) => ids.includes(l.id)).sort((a, b) => a.date.localeCompare(b.date));
+  }
   const endPunct = (s) => { s = (s || '').trim(); if (!s) return ''; return /[.!?。…)]$/.test(s) ? s : s + '.'; };
 
   function pitch(e) {
@@ -90,7 +97,7 @@
     <div class="cd-head card">
       <div class="cd-head-main">
         <div class="cd-meta">${App.ui.statusTag(e.status)}<span class="cd-meta-cat">${esc(e.category)}</span><span class="cd-dot">·</span><span>${App.ui.period(e.period)}</span>
-          ${e.isProject ? '<span class="cd-proj-badge">프로젝트 트래킹 중</span>' : ''}</div>
+          ${projectOf(e) ? `<a class="cd-proj-badge" href="#/projects/${encodeURIComponent(e.projectId)}">▤ ${esc(projectOf(e).title.split(' — ')[0])}에서 나온 카드</a>` : ''}</div>
         <h1 class="cd-title">${esc(e.title || '제목 없는 경험')}</h1>
         ${e.role ? `<div class="cd-role"><span class="cd-role-lb">역할</span>${esc(e.role)}</div>` : ''}
         <p class="cd-summary ${e.summary ? '' : 'is-empty'}">${esc(e.summary || '아직 한 줄 요약이 없어요. 수정에서 추가하거나 질문에 답하면 채워져요.')}</p>
@@ -154,19 +161,24 @@
           </section>
         </div>
 
-        ${e.isProject ? `
+        ${projectOf(e) ? (() => {
+          const p = projectOf(e); const logs = sourceLogs(e);
+          const siblings = App.store.cardsOf(p.id).filter((x) => x.id !== e.id);
+          return `
         <section class="card card-pad cd-sec">
-          <div class="section-title">프로젝트 로그 <a class="more" href="#/projects/${encodeURIComponent(e.id)}">전체 타임라인 보기 →</a></div>
-          ${e.logs.length ? `<ol class="cd-timeline">${e.logs.slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4).map((l) => {
+          <div class="section-title">근거 기록 <span class="subtle cd-sec-sub">${esc(p.title.split(' — ')[0])} 체크인 로그에서</span><a class="more" href="#/projects/${encodeURIComponent(p.id)}">프로젝트 타임라인 →</a></div>
+          ${logs.length ? `<ol class="cd-timeline">${logs.map((l) => {
             const [lb, ico] = LOG_TYPES[l.type] || ['기록', '•'];
             return `<li class="cd-tl-item" data-type="${esc(l.type)}">
               <span class="cd-tl-dot">${ico}</span>
               <div class="cd-tl-body"><div class="cd-tl-top"><span class="cd-tl-type">${lb}</span><span class="subtle">${esc(l.date)}</span></div>
               <div class="cd-tl-text">${esc(l.text)}</div>
               ${(l.keywords || []).length ? `<div class="cd-tl-kws">${l.keywords.map((k) => App.ui.keywordChip(k)).join('')}</div>` : ''}</div></li>`;
-          }).join('')}</ol>${e.logs.length > 4 ? `<div class="subtle cd-tl-more">외 ${e.logs.length - 4}개의 기록이 더 있어요</div>` : ''}`
-          : '<div class="cd-soft-empty">아직 로그가 없어요. 체크인 질문에 답하면 과정이 쌓여요.</div>'}
-        </section>` : ''}
+          }).join('')}</ol>`
+          : '<div class="cd-soft-empty">연결된 로그가 없어요. 프로젝트 타임라인에서 기록을 골라 카드를 만들면 여기에 근거로 남아요.</div>'}
+          ${siblings.length ? `<div class="cd-siblings"><span class="subtle">같은 프로젝트의 다른 카드</span>${siblings.map((x) => `<a class="cd-sibling" href="#/card/${encodeURIComponent(x.id)}">${App.ui.statusTag(x.status)}<span>${esc(x.title)}</span></a>`).join('')}</div>` : ''}
+        </section>`;
+        })() : ''}
 
         <section class="card card-pad cd-sec">
           <div class="section-title">원문 기록 <span class="subtle cd-sec-sub">질문과 내 답변 그대로</span></div>
@@ -196,6 +208,15 @@
             ${pickQs.length ? `<ul class="cd-qs">${pickQs.map((x) => `<li><a href="#/match?q=${encodeURIComponent(x.q)}">${esc(x.q)}</a>${App.ui.keywordChip(x.k)}</li>`).join('')}</ul>`
               : '<div class="subtle">키워드를 추가하면 어울리는 질문을 찾아 드려요.</div>'}
           </div>
+
+          ${(() => {
+            const fits = App.store.activeApps().map((a) => ({ a, m: (a.competencies || []).filter((c) => e.keywords.includes(c.name)).map((c) => c.name) })).filter((x) => x.m.length);
+            return `<div class="cd-coach-blk">
+            <div class="cd-coach-lb">이 경험을 쓸 수 있는 지원 기업</div>
+            ${fits.length ? `<ul class="cd-fits">${fits.map(({ a, m }) => `<li><a href="#/apply/${encodeURIComponent(a.id)}/competency"><b>${esc(a.company)}</b><span class="subtle"> · ${esc(a.job)}</span></a><div class="cd-fits-kws">${m.map((k) => App.ui.keywordChip(k)).join('')}</div></li>`).join('')}</ul>`
+              : '<div class="subtle">이 경험의 역량을 요구하는 지원 기업이 아직 없어요.</div>'}
+          </div>`;
+          })()}
 
           <div class="cd-coach-blk">
             <div class="cd-coach-lb">면접용 30초 요약 ${sp ? `<span class="cd-secs">약 ${secs}초</span>` : ''}</div>
@@ -239,7 +260,7 @@
           ${field('시작', `<input class="input" type="month" name="start" value="${esc(d.period.start)}">`)}
           ${field('종료', `<input class="input" type="month" name="end" value="${esc(d.period.end)}"><div class="cd-help">비워 두면 ‘진행중’으로 표시돼요</div>`)}
         </div>
-        <label class="cd-check"><input type="checkbox" name="isProject" ${d.isProject ? 'checked' : ''}> 진행 중인 프로젝트로 트래킹하기 <span class="subtle">· 체크인 질문으로 과정을 기록해요</span></label>
+        ${field('나온 프로젝트', `<select class="select" name="projectId"><option value="">없음 (단독 경험)</option>${App.store.projects().map((p) => `<option value="${esc(p.id)}" ${p.id === d.projectId ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}</select><div class="cd-help">프로젝트 하나에서 에피소드별로 카드를 여러 장 만들 수 있어요. 진행 중인 일을 기록하려면 <a class="cd-link" href="#/projects">프로젝트 트래커</a>에서 시작하세요.</div>`)}
         ${field('역할', `<input class="input" name="role" placeholder="예) 백엔드 담당, 4인 팀" value="${esc(d.role)}">`)}
         ${field('한 줄 요약', `<input class="input" name="summary" placeholder="이 경험을 한 문장으로 소개한다면요?" value="${esc(d.summary)}">`)}
       </section>
@@ -320,7 +341,7 @@
         const d = st.draft;
         d.title = v('title').trim(); d.category = v('category'); d.status = v('status');
         d.period = { start: v('start'), end: v('end') };
-        d.isProject = !!(f.elements.isProject && f.elements.isProject.checked);
+        if (f.elements.projectId) { const pid = v('projectId') || null; if (pid !== d.projectId) d.sourceLogIds = []; d.projectId = pid; }
         d.role = v('role').trim(); d.summary = v('summary').trim(); d.insights = v('insights').trim();
         STAR.forEach((s) => { d.star[s.key] = v('star-' + s.key).trim(); });
         d.jobs = v('jobs').split(',').map((x) => x.trim()).filter(Boolean);
@@ -359,7 +380,7 @@
       async function aiSuggest(btn) {
         readForm();
         const d = st.draft;
-        const text = [d.title, d.role, d.summary, d.insights, ...STAR.map((s) => d.star[s.key]), ...(d.qa || []).map((x) => x.a), ...(d.logs || []).map((l) => l.text)].join(' ');
+        const text = [d.title, d.role, d.summary, d.insights, ...STAR.map((s) => d.star[s.key]), ...(d.qa || []).map((x) => x.a), ...sourceLogs(d).map((l) => l.text)].join(' ');
         if (!text.trim()) { App.ui.toast('먼저 STAR나 요약을 조금 적어 주세요. 그 내용을 보고 추천해 드려요.'); return; }
         btn.disabled = true; const prev = btn.innerHTML; btn.innerHTML = '<span class="cd-spin"></span> 분석 중…';
         await App.ai.think(650);
@@ -379,7 +400,7 @@
         }
         if (d.period.start && d.period.end && d.period.end < d.period.start) { App.ui.toast('종료 시점이 시작보다 빨라요'); return; }
         const patch = {
-          title: d.title, category: d.category, status: d.status, period: d.period, isProject: d.isProject, role: d.role, summary: d.summary,
+          title: d.title, category: d.category, status: d.status, period: d.period, projectId: d.projectId, sourceLogIds: d.sourceLogIds || [], role: d.role, summary: d.summary,
           star: d.star, insights: d.insights, keywords: d.keywords, jobs: d.jobs, links: d.links,
         };
         if (!st.id) {
@@ -399,7 +420,7 @@
         const e = App.store.get(st.id); if (!e) return;
         App.ui.modal({
           title: '이 경험 카드를 삭제할까요?',
-          body: `<p><b>${esc(e.title)}</b></p><p style="margin-top:6px">STAR 정리와 원문 기록${e.isProject ? ', 프로젝트 로그' : ''}가 함께 삭제되고 되돌릴 수 없어요.</p>`,
+          body: `<p><b>${esc(e.title)}</b></p><p style="margin-top:6px">STAR 정리와 원문 기록이 함께 삭제되고 되돌릴 수 없어요.${projectOf(e) ? ' 프로젝트의 체크인 로그는 그대로 남아요.' : ''}</p>`,
           confirmText: '삭제하기', danger: true,
           onConfirm() { App.store.remove(e.id); App.ui.toast('경험 카드를 삭제했어요'); App.navigate('#/vault'); },
         });

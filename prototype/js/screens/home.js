@@ -48,7 +48,7 @@
         </div>
       </section>`;
     }
-    const target = q.targetExpId ? App.store.get(q.targetExpId) : null;
+    const target = App.store.questionTarget(q);
     return `<section class="card home-today" data-qid="${esc(q.id)}">
       <div class="home-today-head">
         <span class="home-pill"><span class="home-pill-dot"></span>오늘의 질문</span>
@@ -59,7 +59,7 @@
       ${q.hint ? `<p class="home-today-hint">💡 ${esc(q.hint)}</p>` : ''}
       <textarea class="textarea home-today-input" rows="3" placeholder="한두 줄이면 충분해요. 생각나는 대로 적어 보세요."></textarea>
       <div class="home-today-foot">
-        <span class="subtle home-today-merge">${target ? `답변은 「${esc(target.title)}」 카드에 합쳐져요` : '답변을 바탕으로 새 경험 카드 초안을 만들어 드려요'}</span>
+        <span class="subtle home-today-merge">${target ? `답변은 「${esc(target.title)}」 ${esc(target.place)}에 쌓여요` : '답변을 바탕으로 새 경험 카드 초안을 만들어 드려요'}</span>
         <div class="home-today-actions">
           <button class="btn btn-ghost btn-sm" data-home-act="skip">건너뛰기</button>
           <button class="btn btn-sm" data-home-act="later">나중에</button>
@@ -100,7 +100,7 @@
         <div class="home-proj-ico">▤</div>
         <div class="home-proj-body">
           <div class="home-proj-title">${esc(p.title)}</div>
-          <div class="subtle">로그 ${(p.logs || []).length}개 · 마지막 기록 <b class="${stale ? 'home-stale' : ''}">${esc(relDay(last))}</b>${stale ? ' · 체크인할 때가 됐어요' : ''}</div>
+          <div class="subtle">로그 ${(p.logs || []).length}개 · 카드 ${App.store.cardsOf(p.id).length}장 · 마지막 기록 <b class="${stale ? 'home-stale' : ''}">${esc(relDay(last))}</b>${stale ? ' · 체크인할 때가 됐어요' : ''}</div>
         </div>
         <a class="btn btn-sm ${stale ? 'btn-accent' : ''}" href="#/projects/${esc(p.id)}">체크인</a>
       </div>`;
@@ -117,6 +117,30 @@
     </div>`;
   }
 
+  // 지원 기업 — 마감 임박 순, 준비도
+  function applyBlock() {
+    const apps = App.store.activeApps();
+    const dday = (d) => {
+      if (!d) return '';
+      const [y, m, dd] = d.split('-').map(Number); const t = new Date(); t.setHours(0, 0, 0, 0);
+      const n = Math.round((new Date(y, m - 1, dd) - t) / 86400000);
+      return n < 0 ? '마감 지남' : n === 0 ? '오늘 마감' : `D-${n}`;
+    };
+    const sorted = apps.slice().sort((a, b) => (a.deadline || '9999').localeCompare(b.deadline || '9999')).slice(0, 3);
+    return `<section class="card card-pad home-apply">
+      <div class="section-title">지원 기업<a class="more" href="#/apply">전체 보기 →</a></div>
+      ${sorted.length ? `<div class="home-apply-list">${sorted.map((a) => {
+        const r = App.ai.readiness(a); const dd = dday(a.deadline);
+        return `<a class="home-apply-row" href="#/apply/${esc(a.id)}">
+          <div class="home-apply-top"><b>${esc(a.company)}</b>${dd ? `<span class="home-apply-dday ${/D-[0-7]$|오늘/.test(dd) ? 'is-soon' : ''}">${esc(dd)}</span>` : ''}</div>
+          <div class="subtle home-apply-job">${esc(a.job)}</div>
+          <div class="home-apply-prog"><span>준비도 ${r.score}%</span>${App.ui.progress(r.score)}</div>
+        </a>`;
+      }).join('')}</div>` : `<p class="subtle">지원하려는 기업을 추가하면 기업별로 필요한 역량과 자소서·면접 준비를 따로 챙겨 드려요.</p>
+        <a class="btn btn-sm" href="#/apply" style="margin-top:10px">＋ 지원 기업 추가</a>`}
+    </section>`;
+  }
+
   function keywordBlock() {
     const counts = App.keywords.counts();
     const rows = Object.keys(counts).map((k) => [k, counts[k]]).sort((a, b) => b[1] - a[1]);
@@ -124,7 +148,7 @@
     const empty = App.keywords.all().filter((k) => !counts[k.name]);
     const pick = empty.length ? empty[Math.floor(new Date().getDate() % empty.length)] : null;
     return `<section class="card card-pad home-kw">
-      <div class="section-title">역량 키워드 분포<a class="more" href="#/competency">역량 맵 →</a></div>
+      <div class="section-title">역량 키워드 분포<a class="more" href="#/vault">보관함 →</a></div>
       <div class="home-bars">${rows.map(([k, c]) => `
         <div class="home-bar" role="link" tabindex="0" data-href="#/vault?kw=${encodeURIComponent(k)}" data-tone="${esc(App.keywords.tone(k))}" title="#${esc(k)} 경험 보기">
           <span class="home-bar-name">#${esc(k)}</span>
@@ -189,6 +213,7 @@
           </div>
           <aside class="home-col home-side">
             ${statsBlock()}
+            ${applyBlock()}
             ${recallBlock()}
             ${keywordBlock()}
           </aside>

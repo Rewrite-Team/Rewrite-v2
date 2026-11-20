@@ -2,7 +2,7 @@
 (function (App) {
   const esc = (s) => App.ui.esc(s);
   const VIEW_KEY = 'rewrite-vault-view';
-  const STATUS_FILTERS = [['', '전체'], ['draft', '작성중'], ['done', '완성'], ['ongoing', '진행중']];
+  const STATUS_FILTERS = [['', '전체'], ['draft', '작성중'], ['done', '완성']];
   const SORTS = [['updated', '최근 수정순'], ['complete', '완성도순'], ['period', '기간순']];
 
   function loadView() { try { return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid'; } catch (e) { return 'grid'; } }
@@ -60,7 +60,7 @@
     return `<div class="card vt-table">
       <div class="vt-row vt-row-head"><div>경험</div><div>유형</div><div>기간</div><div>역량 키워드</div><div>완성도</div><div></div></div>
       ${list.map((e) => `<div class="vt-row" data-href="#/card/${esc(e.id)}">
-        <div class="vt-c-title">${App.ui.statusTag(e.status)}<span class="vt-t">${esc(e.title)}</span></div>
+        <div class="vt-c-title">${App.ui.statusTag(e.status)}<span class="vt-t">${esc(e.title)}</span>${e.projectId && App.store.getProject(e.projectId) ? '<span class="vt-from" title="프로젝트에서 나온 카드">▤</span>' : ''}</div>
         <div class="vt-c-cat">${esc(e.category)}</div>
         <div class="vt-c-period">${App.ui.period(e.period)}</div>
         <div class="vt-c-kws">${e.keywords.map((k) => App.ui.keywordChip(k)).join('') || '<span class="subtle">—</span>'}</div>

@@ -211,3 +211,18 @@ p { margin: 0; }
 .mobile-nav a { display: flex; flex-direction: column; align-items: center; font-size: 11px; color: var(--text-3); gap: 2px; padding: 4px 8px; }
 .mobile-nav a.active { color: var(--primary); font-weight: 700; }
 .mobile-nav a .ico { font-size: 18px; }
+.topbar-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.topbar-crumb { font-weight: 500; color: var(--text-3); }
+.topbar-crumb:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+.topbar-sep { color: var(--text-3); font-weight: 400; }
+
+/* 사이드바: 지원 기업 하위 메뉴 */
+.nav-sub { display: flex; flex-direction: column; gap: 1px; margin: 2px 0 4px 19px; padding-left: 10px; border-left: 1px solid var(--border); }
+.nav-sub-item { display: flex; align-items: center; gap: 7px; padding: 6px 8px; border-radius: 7px; font-size: 13px; color: var(--text-2); min-width: 0; }
+.nav-sub-item:hover { background: var(--surface-2); color: var(--text); }
+.nav-sub-item.active { background: var(--primary-soft); color: var(--primary-ink); font-weight: 600; }
+.nav-sub-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.nav-sub-name { white-space: nowrap; }
+.nav-sub-job { color: var(--text-3); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.exp-card-from { font-size: 12px; color: var(--primary-ink); margin-top: -2px; }
+.vt-from { font-size: 12px; color: var(--primary); margin-left: 4px; }

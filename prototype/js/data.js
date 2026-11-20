@@ -37,19 +37,12 @@ window.SEED = (function () {
     projectCheckin: 'every2days',  // daily | every2days | weekly
   };
 
-  const experiences = [
+  // 프로젝트 = 체크인 로그를 담는 그릇. 경험 카드는 여기서 에피소드 단위로 여러 장 나온다 (card.projectId → project.id)
+  const projects = [
     {
-      id: 'e1', title: '팀 프로젝트 「모여봄」 — 동네 모임 매칭 서비스', category: '프로젝트',
-      period: { start: '2026-09', end: '' }, status: 'ongoing', isProject: true,
-      role: '백엔드 (Spring Boot), 4인 팀', summary: '동네 기반 소모임 매칭 서비스를 4인 팀으로 개발 중. API 설계와 인증, 배포를 맡고 있다.',
-      star: {
-        situation: '부트캠프 최종 프로젝트로 4인 팀(프론트 2, 백엔드 2)이 8주간 서비스를 개발하게 됨.',
-        task: '모임 검색 API와 회원 인증, AWS 배포 파이프라인을 책임짐.',
-        action: '검색 API 응답이 느려서 쿼리 로그를 보고 N+1 문제를 발견, fetch join과 인덱스로 개선함. 프론트와 API 명세를 Swagger로 맞추는 규칙을 제안함.',
-        result: '검색 API 평균 응답시간 1.8s → 0.3s. API 관련 재작업 요청이 눈에 띄게 줄어듦.',
-      },
-      insights: '성능 문제는 감이 아니라 측정부터 해야 한다는 것을 배움.',
-      keywords: ['문제해결', '협업', '분석력'], jobs: ['백엔드 개발자'],
+      id: 'p1', title: '팀 프로젝트 「모여봄」 — 동네 모임 매칭 서비스',
+      period: { start: '2026-09', end: '' }, status: 'ongoing',
+      role: '백엔드 (Spring Boot), 4인 팀', summary: '부트캠프 최종 프로젝트로 4인 팀(프론트 2, 백엔드 2)이 8주간 동네 기반 소모임 매칭 서비스를 개발 중.',
       links: ['https://github.com/example/moyeobom'],
       logs: [
         { id: 'l1', date: '2026-09-08', type: 'milestone', text: '킥오프. 역할 분담 — 나는 백엔드 인증/검색 담당.', keywords: ['협업'] },
@@ -58,14 +51,58 @@ window.SEED = (function () {
         { id: 'l4', date: '2026-10-15', type: 'collab', text: '프론트가 API 응답 형식이 자꾸 바뀐다고 힘들어함 → Swagger 명세 먼저 합의 후 구현하는 규칙 제안.', keywords: ['협업', '주도성'] },
         { id: 'l5', date: '2026-11-10', type: 'issue', text: '배포 후 이미지 업로드 500 에러. 파일 크기 제한 설정 누락이었음. 체크리스트 만듦.', keywords: ['문제해결', '꼼꼼함'] },
       ],
+      createdAt: '2026-09-08', updatedAt: '2026-11-10',
+    },
+    {
+      id: 'p2', title: '개인 프로젝트 — 가계부 슬랙봇',
+      period: { start: '2026-10', end: '' }, status: 'ongoing',
+      role: '1인 개발 (Node.js, PostgreSQL)', summary: '친구들과 공동 생활비를 관리하려고, 슬랙 메시지로 지출을 기록하고 주간 리포트를 받는 봇을 만들고 있다.',
+      links: ['https://github.com/example/budget-bot'],
+      logs: [
+        { id: 'l6', date: '2026-10-21', type: 'milestone', text: '아이디어 시작. 친구 3명이 실제로 쓰겠다고 함.', keywords: ['주도성'] },
+        { id: 'l7', date: '2026-11-04', type: 'decision', text: 'DB를 SQLite로 할지 Postgres로 할지 → 동시 입력 고려해서 Postgres.', keywords: ['의사결정'] },
+      ],
+      createdAt: '2026-10-21', updatedAt: '2026-11-04',
+    },
+  ];
+
+  const experiences = [
+    {
+      id: 'e1', title: '「모여봄」 검색 API 응답 속도 개선 (N+1)', category: '프로젝트',
+      period: { start: '2026-10', end: '2026-10' }, status: 'done', projectId: 'p1', sourceLogIds: ['l3'],
+      role: '백엔드 (검색 API 담당)', summary: '모임 검색 API가 느리다는 피드백을 받고, 쿼리 로그로 N+1을 찾아 응답 시간을 1.8초에서 0.3초로 줄였다.',
+      star: {
+        situation: '4인 팀 프로젝트 「모여봄」에서 프론트 팀원이 모임 검색 화면이 버벅인다고 알려 줌.',
+        task: '검색 API 담당으로서 원인을 찾고 응답 속도를 개선해야 했음.',
+        action: '감으로 고치지 않고 쿼리 로그부터 확인해 N+1 문제를 발견함. fetch join으로 쿼리를 묶고, 검색 조건 컬럼에 인덱스를 추가함.',
+        result: '검색 API 평균 응답시간 1.8s → 0.3s.',
+      },
+      insights: '성능 문제는 감이 아니라 측정부터 해야 한다는 것을 배움.',
+      keywords: ['문제해결', '분석력'], jobs: ['백엔드 개발자'],
+      links: ['https://github.com/example/moyeobom'],
       qa: [
         { q: '검색 API가 느리다는 걸 처음 어떻게 알게 됐어요?', a: '프론트 팀원이 화면이 버벅인다고 해서 로그를 봤어요.', date: '2026-10-02' },
       ],
-      completeness: 82, createdAt: '2026-09-08', updatedAt: '2026-11-10',
+      completeness: 82, createdAt: '2026-10-02', updatedAt: '2026-11-10',
+    },
+    {
+      id: 'e8', title: '「모여봄」 API 명세 먼저 합의하기 — 프론트와의 협업', category: '프로젝트',
+      period: { start: '2026-10', end: '2026-10' }, status: 'draft', projectId: 'p1', sourceLogIds: ['l4'],
+      role: '백엔드', summary: '프론트가 API 응답 형식 변경으로 재작업이 잦자, Swagger 명세를 먼저 합의하고 구현하는 규칙을 제안했다.',
+      star: {
+        situation: '「모여봄」 개발 중 프론트 팀원이 API 응답 형식이 자꾸 바뀌어 힘들다고 이야기함.',
+        task: '백엔드 담당으로서 프론트의 재작업을 줄일 방법이 필요했음.',
+        action: '구현 전에 Swagger로 명세를 먼저 작성해 프론트와 합의하고, 바꿀 때는 미리 공유하는 규칙을 제안함.',
+        result: '',
+      },
+      insights: '',
+      keywords: ['협업', '주도성', '커뮤니케이션'], jobs: ['백엔드 개발자'],
+      links: [], qa: [],
+      completeness: 60, createdAt: '2026-10-15', updatedAt: '2026-10-15',
     },
     {
       id: 'e2', title: '카페 아르바이트 — 주문 대기 줄 줄이기', category: '아르바이트',
-      period: { start: '2024-03', end: '2025-02' }, status: 'done', isProject: false,
+      period: { start: '2024-03', end: '2025-02' }, status: 'done',
       role: '바리스타 (주말 오픈조)', summary: '주말 피크 타임 대기 줄이 길어지는 문제를 보고, 주문 동선과 사전 준비 방식을 바꿔 대기 시간을 줄였다.',
       star: {
         situation: '주말 오전 10~12시에 주문이 몰리면 대기 줄이 매장 밖까지 이어지고 손님 불만이 잦았음.',
@@ -75,7 +112,7 @@ window.SEED = (function () {
       },
       insights: '평범한 알바에서도 "세어보기"만으로 개선 포인트를 찾을 수 있다.',
       keywords: ['고객지향', '분석력', '주도성'], jobs: ['백엔드 개발자', '서비스 기획자'],
-      links: [], logs: [],
+      links: [],
       qa: [
         { q: '그 아르바이트에서 "이건 좀 비효율적인데?" 싶었던 순간이 있었나요?', a: '주말 오전에 줄이 너무 길어서 손님들이 그냥 나가는 경우가 있었어요.', date: '2026-11-02' },
         { q: '그때 어떤 걸 먼저 확인해 봤어요?', a: '어떤 메뉴가 많이 나가는지 일주일 정도 메모했어요.', date: '2026-11-02' },
@@ -84,7 +121,7 @@ window.SEED = (function () {
     },
     {
       id: 'e3', title: '알고리즘 스터디 운영', category: '동아리',
-      period: { start: '2025-03', end: '2025-12' }, status: 'done', isProject: false,
+      period: { start: '2025-03', end: '2025-12' }, status: 'done',
       role: '스터디장, 6명', summary: '흐지부지되던 알고리즘 스터디를 맡아 규칙과 발표 방식을 바꿔 10개월 동안 유지했다.',
       star: {
         situation: '학과 알고리즘 스터디가 3주 만에 참여율이 절반으로 떨어짐.',
@@ -94,12 +131,12 @@ window.SEED = (function () {
       },
       insights: '사람이 떠나는 이유를 직접 묻는 게 가장 빠르다.',
       keywords: ['리더십', '커뮤니케이션', '끈기'], jobs: ['백엔드 개발자'],
-      links: [], logs: [], qa: [],
+      links: [], qa: [],
       completeness: 85, createdAt: '2026-10-20', updatedAt: '2026-10-22',
     },
     {
       id: 'e4', title: '데이터베이스 수업 팀과제 — 무임승차 갈등', category: '수업·과제',
-      period: { start: '2025-09', end: '2025-12' }, status: 'draft', isProject: false,
+      period: { start: '2025-09', end: '2025-12' }, status: 'draft',
       role: '팀원 (ERD 설계)', summary: '팀원 한 명이 연락이 안 되던 상황에서 역할을 다시 나누고 일정을 조정해 과제를 제출했다.',
       star: {
         situation: '4인 팀과제에서 한 명이 2주째 연락이 닿지 않음.',
@@ -109,33 +146,14 @@ window.SEED = (function () {
       },
       insights: '',
       keywords: ['갈등조정', '책임감'], jobs: [],
-      links: [], logs: [], qa: [
+      links: [], qa: [
         { q: '그 팀원에게 직접 연락해 본 적이 있나요? 어떻게 했어요?', a: '카톡이랑 학과 메일 둘 다 보냈는데 답이 없었어요.', date: '2026-11-15' },
       ],
       completeness: 45, createdAt: '2026-11-15', updatedAt: '2026-11-15',
     },
     {
-      id: 'e5', title: '개인 프로젝트 — 가계부 슬랙봇', category: '프로젝트',
-      period: { start: '2026-10', end: '' }, status: 'ongoing', isProject: true,
-      role: '1인 개발 (Node.js, PostgreSQL)', summary: '슬랙 메시지로 지출을 기록하고 주간 리포트를 받는 봇을 만들고 있다.',
-      star: {
-        situation: '친구들과 공동 생활비를 관리하는데 엑셀 정리가 번거로웠음.',
-        task: '입력이 가장 쉬운 형태의 기록 도구를 만들기.',
-        action: '슬랙 명령어로 지출을 입력하면 카테고리를 자동 분류하도록 구현 중.',
-        result: '',
-      },
-      insights: '',
-      keywords: ['주도성', '학습능력'], jobs: ['백엔드 개발자'],
-      links: ['https://github.com/example/budget-bot'],
-      logs: [
-        { id: 'l6', date: '2026-10-21', type: 'milestone', text: '아이디어 시작. 친구 3명이 실제로 쓰겠다고 함.', keywords: ['주도성'] },
-        { id: 'l7', date: '2026-11-04', type: 'decision', text: 'DB를 SQLite로 할지 Postgres로 할지 → 동시 입력 고려해서 Postgres.', keywords: ['의사결정'] },
-      ],
-      qa: [], completeness: 40, createdAt: '2026-10-21', updatedAt: '2026-11-04',
-    },
-    {
       id: 'e6', title: '교내 해커톤 — 24시간 안에 MVP', category: '대외활동',
-      period: { start: '2025-05', end: '2025-05' }, status: 'done', isProject: false,
+      period: { start: '2025-05', end: '2025-05' }, status: 'done',
       role: '백엔드 + 발표', summary: '교내 해커톤에서 분실물 찾기 서비스를 만들어 장려상을 받았다.',
       star: {
         situation: '24시간 교내 해커톤, 3인 팀.',
@@ -145,21 +163,21 @@ window.SEED = (function () {
       },
       insights: '완벽함보다 범위를 줄이는 결정이 중요할 때가 있다.',
       keywords: ['의사결정', '협업'], jobs: ['백엔드 개발자'],
-      links: [], logs: [], qa: [], completeness: 75, createdAt: '2026-10-28', updatedAt: '2026-10-28',
+      links: [], qa: [], completeness: 75, createdAt: '2026-10-28', updatedAt: '2026-10-28',
     },
     {
       id: 'e7', title: '편의점 야간 아르바이트 — 재고 실수 줄이기', category: '아르바이트',
-      period: { start: '2023-07', end: '2023-12' }, status: 'draft', isProject: false,
+      period: { start: '2023-07', end: '2023-12' }, status: 'draft',
       role: '야간 근무자', summary: '야간 검수 때 자주 생기던 재고 누락을 체크리스트로 줄였다.',
       star: { situation: '야간 물류 검수 때 누락이 자주 생겨 아침 근무자와 마찰이 있었음.', task: '', action: '', result: '' },
-      insights: '', keywords: ['꼼꼼함'], jobs: [], links: [], logs: [], qa: [],
+      insights: '', keywords: ['꼼꼼함'], jobs: [], links: [], qa: [],
       completeness: 25, createdAt: '2026-11-17', updatedAt: '2026-11-17',
     },
   ];
 
   // 서비스가 먼저 보내는 "오늘의 질문" 인박스
   const inbox = [
-    { id: 'q1', text: '이번 주 「모여봄」 프로젝트에서 팀원과 의견이 갈렸던 순간이 있었나요?', type: 'project', targetExpId: 'e1', hint: '작은 의견 차이도 좋아요. 변수명, 일정, 기술 선택 같은 것도요.', status: 'pending', askedAt: '2026-11-19 12:30' },
+    { id: 'q1', text: '이번 주 「모여봄」 프로젝트에서 팀원과 의견이 갈렸던 순간이 있었나요?', type: 'project', targetExpId: null, targetProjectId: 'p1', hint: '작은 의견 차이도 좋아요. 변수명, 일정, 기술 선택 같은 것도요.', status: 'pending', askedAt: '2026-11-19 12:30' },
     { id: 'q2', text: '편의점 야간 알바에서 재고 누락이 생겼을 때, 처음에 어떻게 대응했어요?', type: 'deepen', targetExpId: 'e7', hint: '누구에게 알렸는지, 무엇을 먼저 확인했는지 떠올려 보세요.', status: 'pending', askedAt: '2026-11-18 21:30' },
     { id: 'q3', text: '최근 한 달 동안 "이건 내가 처음 해본 거다" 싶은 일이 있었나요?', type: 'recall', targetExpId: null, hint: '공부, 운동, 요리, 여행 계획… 뭐든 괜찮아요.', status: 'pending', askedAt: '2026-11-18 12:30' },
     { id: 'q4', text: '알고리즘 스터디에서 그만두려던 팀원을 붙잡은 적이 있나요?', type: 'deepen', targetExpId: 'e3', hint: '', status: 'answered', askedAt: '2026-11-17 21:30', answer: '한 명이 너무 어렵다고 나가려 해서, 쉬운 문제 트랙을 따로 만들어 줬어요.' },
@@ -225,5 +243,63 @@ window.SEED = (function () {
     '실패했던 경험과 그로부터 배운 점을 말씀해 주세요.',
   ];
 
-  return { keywords, categories, user, settings, experiences, inbox, recallPrompts, followups, projectCheckins, sampleQuestions };
+  // 지원 기업 — 기업(+직무)마다 요구 역량·자소서 문항·면접 준비가 다르다 (가상의 기업)
+  // status: preparing(지원 준비중) | applied(지원 완료) | passed(합격) | failed(불합격)
+  const applications = [
+    {
+      id: 'a1', company: '모아페이', job: '백엔드 개발자 (신입)', status: 'preparing', deadline: '2026-11-30', url: '',
+      jdText: '• 결제 API 서버 개발 및 운영\n• 대용량 트래픽 환경에서의 장애 대응과 성능 개선\n• 코드 리뷰를 통한 팀 내 협업\n• 새로운 기술을 빠르게 학습하고 적용하는 분\n• 로그와 지표를 기반으로 문제의 원인을 분석할 수 있는 분',
+      competencies: [
+        { name: '문제해결', weight: 3, reason: '대용량 트래픽 환경에서의 장애 대응과 성능 개선' },
+        { name: '분석력', weight: 2, reason: '로그와 지표를 기반으로 문제의 원인을 분석' },
+        { name: '협업', weight: 2, reason: '코드 리뷰를 통한 팀 내 협업' },
+        { name: '학습능력', weight: 2, reason: '새로운 기술을 빠르게 학습하고 적용' },
+        { name: '꼼꼼함', weight: 1, reason: '결제 도메인 특성상 안정성이 중요' },
+      ],
+      essays: [
+        { id: 'aq1', text: '지원 동기와 입사 후 이루고 싶은 목표를 작성해 주세요.', limit: 700, keywords: ['주도성'], expId: null, note: '' },
+        { id: 'aq2', text: '기술적인 문제를 해결했던 경험과 그 과정에서의 본인 역할을 구체적으로 작성해 주세요.', limit: 1000, keywords: ['문제해결', '분석력'], expId: 'e1', note: 'N+1 개선 수치 강조' },
+        { id: 'aq3', text: '팀원과의 협업 과정에서 갈등을 해결한 경험을 작성해 주세요.', limit: 800, keywords: ['협업', '갈등조정'], expId: null, note: '' },
+      ],
+      interview: [
+        { id: 'ai1', text: '모아페이에 지원한 이유는 무엇인가요?', keywords: [], source: 'common', expId: null, note: '', checked: false },
+        { id: 'ai2', text: '검색 API 성능을 개선할 때 다른 방법은 고려하지 않았나요?', keywords: ['문제해결', '의사결정'], source: 'essay', expId: 'e1', note: '캐시 vs 인덱스 비교 이야기', checked: true },
+      ],
+      pins: { '문제해결': 'e1' }, memo: '결제 도메인 — 정합성/트랜잭션 공부해 두기', createdAt: '2026-11-12', updatedAt: '2026-11-18',
+    },
+    {
+      id: 'a2', company: '그린로지스', job: '서버 개발자', status: 'applied', deadline: '2026-11-25', url: '',
+      jdText: '• 물류 배차 시스템 서버 개발\n• 유관 부서와 소통하며 요구사항을 정리\n• 오너십을 가지고 문제를 먼저 발견하는 분\n• 현장 사용자 불편을 개선하는 데 관심 있는 분',
+      competencies: [
+        { name: '주도성', weight: 3, reason: '오너십을 가지고 문제를 먼저 발견하는 분' },
+        { name: '커뮤니케이션', weight: 2, reason: '유관 부서와 소통하며 요구사항을 정리' },
+        { name: '고객지향', weight: 2, reason: '현장 사용자 불편을 개선하는 데 관심' },
+        { name: '문제해결', weight: 1, reason: '물류 배차 시스템 서버 개발' },
+      ],
+      essays: [
+        { id: 'bq1', text: '스스로 문제를 발견하고 개선한 경험을 작성해 주세요.', limit: 800, keywords: ['주도성', '문제해결'], expId: 'e2', note: '' },
+        { id: 'bq2', text: '다른 직군과 협업하며 의견을 조율한 경험이 있다면 작성해 주세요.', limit: 800, keywords: ['커뮤니케이션', '협업'], expId: 'e8', note: '' },
+      ],
+      interview: [
+        { id: 'bi1', text: '그린로지스에 지원한 이유는 무엇인가요?', keywords: [], source: 'common', expId: null, note: '물류 현장 효율 — 카페 알바 경험과 연결', checked: true },
+        { id: 'bi2', text: '1분 자기소개를 해 주세요.', keywords: [], source: 'common', expId: null, note: '', checked: false },
+        { id: 'bi3', text: '시키지 않았는데 먼저 시작한 일이 있나요?', keywords: ['주도성'], source: 'competency', expId: 'e2', note: '', checked: false },
+        { id: 'bi4', text: '현장 사용자의 불편을 어떻게 파악하겠어요?', keywords: ['고객지향'], source: 'user', expId: 'e2', note: '', checked: false },
+      ],
+      pins: { '주도성': 'e2', '고객지향': 'e2' }, memo: '1차 면접 11/25 14:00 · 기술+인성 통합', createdAt: '2026-11-05', updatedAt: '2026-11-19',
+    },
+    {
+      id: 'a3', company: '핏플랜', job: '서비스 기획자 (직무 전환)', status: 'preparing', deadline: '2026-12-12', url: '',
+      jdText: '• 사용자 인터뷰와 데이터 분석으로 개선점 도출\n• 개발·디자인과 협업하여 기능 출시\n• 지표 기반으로 의사결정',
+      competencies: [
+        { name: '고객지향', weight: 3, reason: '사용자 인터뷰로 개선점 도출' },
+        { name: '분석력', weight: 2, reason: '데이터 분석, 지표 기반' },
+        { name: '협업', weight: 2, reason: '개발·디자인과 협업하여 기능 출시' },
+        { name: '의사결정', weight: 2, reason: '지표 기반으로 의사결정' },
+      ],
+      essays: [], interview: [], pins: {}, memo: '', createdAt: '2026-11-19', updatedAt: '2026-11-19',
+    },
+  ];
+
+  return { keywords, categories, user, settings, projects, experiences, inbox, applications, recallPrompts, followups, projectCheckins, sampleQuestions };
 })();
