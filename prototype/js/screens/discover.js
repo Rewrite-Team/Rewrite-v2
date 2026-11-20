@@ -23,6 +23,14 @@
     result: '거의 다 왔어요! 그래서 어떻게 됐는지 볼까요?',
     insight: '마지막이에요. 이 경험이 남긴 걸 정리해 볼게요.',
   };
+  // 이미 채워진 칸을 다듬을 때 쓰는 질문 (더 구체적으로 / 근거 / 수치)
+  const REFINE = {
+    situation: ['처음 듣는 면접관도 그려지게, 언제·어디서·누구와였는지 조금 더 알려 줄래요?', '그때 왜 그게 문제였어요? 그대로 두면 어떻게 됐을까요?'],
+    task: ['그 안에서 당신만 맡았던 몫은 정확히 뭐였어요?', '목표를 숫자나 기준으로 말할 수 있었나요? (예: 언제까지, 얼마나)'],
+    action: ['그 방법을 고른 이유는 뭐였어요? 다른 선택지도 있었나요?', '하는 중에 가장 막혔던 순간과, 그걸 어떻게 넘겼는지 알려 줄래요?', '혼자 한 일과 함께 한 일을 나눠 보면 어떻게 되나요?'],
+    result: ['결과를 숫자로 말할 수 있을까요? (시간, 비율, 횟수, 금액 등)', '팀원·고객·상사의 반응은 어땠어요?', '그 결과가 이후에도 이어졌나요? (규칙이 됐다, 다른 곳에도 적용됐다 등)'],
+    insight: ['그 경험 이후 실제로 다르게 하게 된 행동이 있나요?', '지원하는 직무에서 이 배움을 어떻게 써먹을 수 있을까요?'],
+  };
   const ACKS = ['그렇군요.', '좋아요, 그림이 그려져요.', '오, 구체적이에요!', '고마워요. 조금만 더 들어가 볼게요.', '흥미로운데요?'];
   const EMPATHY = ['괜찮아요, 오래된 일은 흐릿한 게 당연해요.', '그럴 수 있어요. 정확하지 않아도 돼요.', '천천히 해도 괜찮아요. 떠오르는 조각만 있어도 충분해요.'];
   const CAT_HINTS = [
@@ -155,7 +163,7 @@
         Object.assign(S, {
           d: blankDraft(), src, stage: 'situation', asked: {}, idx: {}, altTurn: 0,
           currentQ: '', busy: false, wrap: false, answers: 0, kwCooldown: 0, crossedHalf: false, sheet: false,
-          startComp: 0, initialQa: 0,
+          startComp: 0, initialQa: 0, edits: [],
         });
         ORDER.forEach((k) => { S.asked[k] = 0; S.idx[k] = 0; });
 
@@ -173,15 +181,23 @@
             const F = window.SEED.followups;
             g = { stage: src.stage, text: src.stage === 'insight' ? '이 경험 이후 당신이 다르게 하게 된 것이 있나요?' : F[src.stage][0] };
           }
-          intro = `「${e.title}」 카드를 이어서 채워 볼게요. 지금 완성도는 <b>${App.ai.completeness(e)}%</b>예요.`;
-          if (g) {
+          intro = `「${esc(e.title)}」 카드를 이어서 채워 볼게요. 지금 완성도는 <b>${App.ai.completeness(e)}%</b>예요.`;
+          const cur = src.stage && STAGE[src.stage] ? (src.stage === 'insight' ? e.insights : (e.star || {})[src.stage]) : '';
+          if (cur && cur.trim()) {
+            // 이미 채운 칸을 다듬기
+            const pool = REFINE[src.stage];
+            firstStage = src.stage; firstQ = pool[0]; S.idx[firstStage] = 1;
+            intro = `「${esc(e.title)}」의 <b>${STAGE[src.stage].label}</b> 부분을 다듬어 볼게요. 지금은 이렇게 적혀 있어요.
+              <blockquote class="dc-cur">${esc(cur)}</blockquote>
+              <span class="dc-sub">답변은 기존 내용 뒤에 덧붙여요. 통째로 바꾸고 싶으면 답변 아래 <b>이 답변으로 바꾸기</b>를 누르거나, 오른쪽 초안에서 직접 고쳐도 돼요.</span>`;
+          } else if (g) {
             firstStage = g.stage; firstQ = g.text;
             intro += ` 비어 있는 <b>${STAGE[g.stage].label}</b> 부분부터 물어볼게요.`;
           } else {
-            firstStage = 'action'; firstQ = window.SEED.followups.action[1];
-            intro += ' 이미 탄탄한 카드라, 행동의 이유를 한 번 더 깊게 파 볼게요.';
+            firstStage = 'action'; firstQ = REFINE.action[0];
+            intro += ` 빈 칸은 없어요. 행동의 이유부터 한 번 더 깊게 파 볼게요. 다른 부분을 다듬고 싶으면 위 단계(${STAGES.map((x) => x.label).join('·')})를 눌러 골라 주세요.`;
           }
-          S.idx[firstStage] = 1;
+          if (!(cur && cur.trim())) S.idx[firstStage] = 1;
         } else if (src.type === 'seed') {
           const p = window.SEED.recallPrompts[src.index];
           S.d.category = p.theme;
@@ -254,7 +270,8 @@
           const done = filled(s.key);
           const cur = !S.wrap && S.stage === s.key;
           return `<li class="dc-step ${done ? 'is-done' : ''} ${cur ? 'is-current' : ''}">
-            <span class="dc-step-dot">${done ? '✓' : i + 1}</span><span class="dc-step-label">${s.label}</span></li>`;
+            <button type="button" class="dc-step-btn" data-act="goto" data-stage="${s.key}" title="${s.label} 부분 이야기하기">
+            <span class="dc-step-dot">${done ? '✓' : i + 1}</span><span class="dc-step-label">${s.label}</span></button></li>`;
         }).join('');
       }
 
@@ -383,6 +400,7 @@
       /* ---------- flow ---------- */
       function nextQText(stage) {
         const i = S.idx[stage]++;
+        if (S.src.type === 'exp' && filled(stage)) return REFINE[stage][i % REFINE[stage].length];
         if (stage === 'insight') return INSIGHT_POOL[i % INSIGHT_POOL.length];
         return App.ai.nextQuestion({ stage, turn: i }).text;
       }
@@ -400,6 +418,18 @@
       }
       function showWrap(ack) {
         S.wrap = true; S.currentQ = '';
+        if (S.src.type === 'exp') {
+          // 기존 카드 다듬기 → 저장하거나 다른 칸을 골라 계속
+          addAi(`${ack ? `<div class="dc-ack">${ack}</div>` : ''}
+            <div class="dc-q">이 부분은 꽤 단단해졌어요. 지금 카드에 저장할까요?</div>
+            <div class="dc-sub">다른 부분도 다듬고 싶으면 골라 주세요. 그냥 이어서 적으면 가장 얇은 칸에 덧붙일게요.</div>
+            <div class="dc-inline-acts">
+              <button class="btn btn-primary btn-sm" data-act="save" type="button">카드에 저장하기</button>
+              ${STAGES.map((x) => `<button class="btn btn-sm" data-act="goto" data-stage="${x.key}" type="button">${x.label}</button>`).join('')}
+            </div>`);
+          renderDraft(); updateMeta(); syncBusy();
+          return;
+        }
         addAi(`${ack ? `<div class="dc-ack">${ack}</div>` : ''}
           <div class="dc-q">와, 상황부터 배운 점까지 한 바퀴 다 돌았어요! 지금 카드로 저장해 둘까요?</div>
           <div class="dc-sub">더 이야기하고 싶다면 계속 적어도 좋아요. 가장 얇은 부분을 더 물어볼게요.</div>
@@ -434,6 +464,14 @@
         S.d.qa.push({ q: S.currentQ || '(자유롭게 덧붙인 이야기)', a: text, date: today() });
         const prev = field(stage).trim();
         setField(stage, prev ? prev + ' ' + text : text);
+        if (prev) {
+          // 기존 내용이 있던 칸 → 덧붙임. 바꾸기/되돌리기 선택지를 준다
+          const eid = 'ed' + (S.edits.length);
+          S.edits.push({ stage, prev, text, state: 'appended' });
+          addEl(`<div class="dc-edit" data-edit="${eid}"><span>↳ <b>${STAGE[stage].label}</b>에 덧붙였어요</span>
+            <button type="button" class="dc-edit-btn" data-act="edit-replace" data-edit-id="${eid}">이 답변으로 바꾸기</button>
+            <button type="button" class="dc-edit-btn" data-act="edit-undo" data-edit-id="${eid}">되돌리기</button></div>`);
+        }
         if (!S.d.title.trim()) {
           S.d.title = firstSentence(text, 28); S.d.titleSource = 'ai';
           const gc = guessCategory(text); if (gc && S.src.type !== 'seed') S.d.category = gc;
@@ -470,6 +508,34 @@
           }
           focusInput();
         })();
+      }
+
+      // 사용자가 다룰 칸을 직접 고르기 (단계 표시를 눌러서)
+      function gotoStage(stage) {
+        if (!STAGE[stage] || S.busy || (!S.wrap && S.stage === stage && S.currentQ)) return;
+        addUser(`${STAGE[stage].label} 부분을 이야기할래요`, true);
+        const cur = field(stage).trim();
+        const sid = session;
+        (async () => {
+          if (!(await typing(600, sid))) return;
+          const ack = cur
+            ? `좋아요, <b>${STAGE[stage].label}</b> 부분을 다듬어 볼게요. 지금은 이렇게 적혀 있어요.<blockquote class="dc-cur">${esc(cur)}</blockquote>`
+            : `좋아요, 비어 있는 <b>${STAGE[stage].label}</b>부터 채워 볼게요.`;
+          ask(nextQText(stage), stage, ack);
+          focusInput();
+        })();
+      }
+      function applyEdit(eid, mode) {
+        const i = Number(String(eid).slice(2)); const ed = S.edits[i]; if (!ed || ed.state !== 'appended') return;
+        const curVal = field(ed.stage);
+        const appended = ed.prev + ' ' + ed.text;
+        // 덧붙인 뒤 사용자가 초안을 직접 고쳤으면 해당 부분만 바꾼다
+        if (mode === 'replaced') setField(ed.stage, curVal.includes(appended) ? curVal.replace(appended, ed.text) : ed.text);
+        else setField(ed.stage, curVal.includes(appended) ? curVal.replace(appended, ed.prev) : curVal.replace(' ' + ed.text, ''));
+        ed.state = mode;
+        const box = root.querySelector(`[data-edit="${eid}"]`);
+        if (box) box.innerHTML = mode === 'replaced' ? `<span>↳ <b>${STAGE[ed.stage].label}</b> 칸을 이 답변으로 바꿨어요</span>` : `<span>↳ <b>${STAGE[ed.stage].label}</b> 칸은 원래대로 두었어요 <span class="subtle">(답변은 원문 기록에 남아요)</span></span>`;
+        renderDraft(); updateMeta(); flashField(ed.stage);
       }
 
       function weakestStage() {
@@ -642,6 +708,8 @@
         else if (act === 'stop') onStop();
         else if (act === 'save') save();
         else if (act === 'another') App.navigate('#/discover');
+        else if (act === 'goto') gotoStage(actEl.dataset.stage);
+        else if (act === 'edit-replace' || act === 'edit-undo') applyEdit(actEl.dataset.editId, act === 'edit-replace' ? 'replaced' : 'undone');
         else if (act === 'sheet') {
           S.sheet = !S.sheet;
           const l = root.querySelector('#dc-layout'); if (l) l.classList.toggle('is-sheet-open', S.sheet);

@@ -107,7 +107,8 @@
         <div class="cd-comp-text"><div class="cd-comp-lb">완성도</div><div class="cd-comp-hint">${esc(nextHint(e))}</div></div>
       </div>
       <div class="cd-head-actions">
-        <button class="btn btn-sm" data-act="edit">✎ 수정</button>
+        <a class="btn btn-sm cd-ai-talk" href="#/discover?exp=${encodeURIComponent(e.id)}"><span class="cd-ai-mini">AI</span> AI와 대화하며 다듬기</a>
+        <button class="btn btn-sm" data-act="edit">✎ 직접 수정</button>
         <button class="btn btn-sm btn-ghost cd-del" data-act="delete">삭제</button>
       </div>
     </div>
@@ -121,7 +122,8 @@
               const v = (e.star[s.key] || '').trim();
               return `<div class="cd-star-blk ${v ? '' : 'is-empty'}" data-stage="${s.key}">
                 <div class="cd-star-lb"><span class="cd-star-letter">${s.letter}</span>${s.label}</div>
-                ${v ? `<div class="cd-star-text">${esc(v)}</div>` : `
+                ${v ? `<div class="cd-star-text">${esc(v)}</div>
+                  <a class="cd-refine" href="#/discover?exp=${encodeURIComponent(e.id)}&stage=${s.key}">✦ AI와 다듬기</a>` : `
                   <div class="cd-star-empty"><div>아직 비어 있어요</div><div class="subtle">${esc(s.hint)}</div>
                   <a class="btn btn-sm cd-fill-btn" href="#/discover?exp=${encodeURIComponent(e.id)}&stage=${s.key}"><span class="cd-ai-mini">AI</span> AI 질문으로 채우기</a></div>`}
               </div>`;
@@ -131,7 +133,7 @@
 
         <section class="card card-pad cd-sec">
           <div class="section-title">배운 점 · 성장</div>
-          ${e.insights ? `<p class="cd-insight">${esc(e.insights)}</p>` : `<div class="cd-soft-empty">아직 비어 있어요. 이 경험 이후 달라진 점이 있다면 적어 보세요.
+          ${e.insights ? `<p class="cd-insight">${esc(e.insights)}</p><a class="cd-refine" href="#/discover?exp=${encodeURIComponent(e.id)}&stage=insight">✦ AI와 다듬기</a>` : `<div class="cd-soft-empty">아직 비어 있어요. 이 경험 이후 달라진 점이 있다면 적어 보세요.
             <a class="cd-link" href="#/discover?exp=${encodeURIComponent(e.id)}&stage=insight">AI와 떠올려 보기 →</a></div>`}
         </section>
 
