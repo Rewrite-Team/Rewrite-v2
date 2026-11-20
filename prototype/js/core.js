@@ -1,7 +1,7 @@
 /* App core: store, router, ui helpers, mock AI. 모든 화면이 이 API만 사용한다. */
 window.App = window.App || {};
 (function (App) {
-  const LS_KEY = 'rewrite-proto-v4'; // v2: 프로젝트와 경험 카드 분리 (1 프로젝트 : N 카드), v3: 완료 프로젝트 예시 추가, v4: 지난 질문 기록 시드 + 연속 기록을 답변 날짜에서 계산
+  const LS_KEY = 'rewrite-proto-v5'; // v5: 깃허브 레포 분석 + 마스터 이력서, v2: 프로젝트와 경험 카드 분리 (1 프로젝트 : N 카드), v3: 완료 프로젝트 예시 추가, v4: 지난 질문 기록 시드 + 연속 기록을 답변 날짜에서 계산
   const clone = (o) => JSON.parse(JSON.stringify(o));
 
   /* ---------------- Store ---------------- */
@@ -11,14 +11,16 @@ window.App = window.App || {};
       if (raw) return JSON.parse(raw);
     } catch (e) { /* ignore */ }
     const s = clone(window.SEED);
-    return { user: s.user, settings: s.settings, projects: s.projects, experiences: s.experiences, inbox: s.inbox, applications: s.applications };
+    return { user: s.user, settings: s.settings, projects: s.projects, experiences: s.experiences, inbox: s.inbox, applications: s.applications, resume: s.resume };
   }
+  function EMPTY_RESUME() { return { profile: { name: '', headline: '', email: '', phone: '', github: '', blog: '', intro: '' }, skills: [], entries: [], versions: [] }; }
   let state = load();
   // 이전 버전 저장 데이터에는 지원 기업이 없을 수 있음
   if (!Array.isArray(state.applications)) state.applications = clone(window.SEED.applications || []);
   // 지원 상태 4단계로 통합 (이전 5단계 → 새 단계)
   const LEGACY_STATUS = { interest: 'preparing', writing: 'preparing', submitted: 'applied', interview: 'applied', done: 'failed' };
   state.applications.forEach((a) => { if (LEGACY_STATUS[a.status]) a.status = LEGACY_STATUS[a.status]; });
+  if (!state.resume) state.resume = clone(window.SEED.resume || EMPTY_RESUME());
   const listeners = new Set();
   function persist() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ } }
   function emit() { persist(); listeners.forEach((fn) => fn(state)); }
@@ -239,6 +241,114 @@ window.App = window.App || {};
       a.updatedAt = today(); emit();
     },
 
+
+    // ---------------- 깃허브 레포 분석 (project.repo) ----------------
+    // repo = { url, owner, name, branch, source:'github'|'sample', analyzedAt, meta:{description,stars,languages:{lang:pct},topics}, stack:[], findings:[Finding] }
+    // Finding = { id, category, title, bullet, detail, tags:[], confidence:'high'|'mid', evidence:[{path,start,end,code,url}], status:'new'|'added'|'dismissed' }
+    setRepo(projectId, repo) {
+      const p = this.getProject(projectId); if (!p) return null;
+      // 다시 분석해도 이미 이력서에 담은 항목은 '담음' 상태 유지
+      const added = new Set(this.resumeBullets().map((b) => b.source && b.source.findingId).filter(Boolean));
+      p.repo = clone(repo); (p.repo.findings || []).forEach((f) => { if (added.has(f.id)) f.status = 'added'; else if (!f.status) f.status = 'new'; });
+      p.updatedAt = today(); emit(); return p.repo;
+    },
+    removeRepo(projectId) { const p = this.getProject(projectId); if (!p) return; delete p.repo; emit(); },
+    updateFinding(projectId, findingId, patch) {
+      const p = this.getProject(projectId); const f = p && p.repo && (p.repo.findings || []).find((x) => x.id === findingId); if (!f) return null;
+      Object.assign(f, clone(patch)); emit(); return f;
+    },
+    findFinding(findingId) {
+      for (const p of state.projects) { const f = p.repo && (p.repo.findings || []).find((x) => x.id === findingId); if (f) return { project: p, finding: f }; }
+      return null;
+    },
+
+    // ---------------- 마스터 이력서 (state.resume) ----------------
+    // 이력서에 쓸 수 있는 모든 재료가 쌓이는 곳. included=true 인 것만 '현재 이력서'에 보인다.
+    // entry = { id, section:'project'|'career'|'activity'|'education'|'award', title, org, period:{start,end}, role, projectId?, included, order, bullets:[Bullet] }
+    // Bullet = { id, text, included, addedAt, source:{ type:'github'|'card'|'log'|'manual', projectId?, findingId?, expId?, logId?, evidence?:[{path,start,end,url}] } }
+    // skill = { id, name, group:'언어'|'프레임워크·라이브러리'|'DB·인프라'|'도구·협업', included, source? }
+    // version = { id, name, note, savedAt, snapshot:{profile,skills,entries} }
+    resume() { return state.resume; },
+    resumeBullets() { return state.resume.entries.flatMap((e) => e.bullets.map((b) => Object.assign({ entryId: e.id }, b))); },
+    updateResumeProfile(patch) { Object.assign(state.resume.profile, clone(patch)); emit(); },
+    resumeEntry(id) { return state.resume.entries.find((e) => e.id === id) || null; },
+    addResumeEntry(partial = {}) {
+      const e = Object.assign({ id: uid('re'), section: 'project', title: '', org: '', period: { start: '', end: '' }, role: '', projectId: null, included: true, order: state.resume.entries.length, bullets: [] }, clone(partial));
+      state.resume.entries.push(e); emit(); return e;
+    },
+    updateResumeEntry(id, patch) { const e = this.resumeEntry(id); if (!e) return null; Object.assign(e, clone(patch)); emit(); return e; },
+    removeResumeEntry(id) {
+      const e = this.resumeEntry(id); if (!e) return;
+      e.bullets.forEach((b) => this._releaseFinding(b));
+      state.resume.entries = state.resume.entries.filter((x) => x.id !== id); emit();
+    },
+    reorderResumeEntries(orderIds) { orderIds.forEach((id, i) => { const e = this.resumeEntry(id); if (e) e.order = i; }); emit(); },
+    // 프로젝트에 해당하는 이력서 항목 (없으면 프로젝트 정보로 만든다)
+    resumeEntryFor(projectId, create = true) {
+      let e = state.resume.entries.find((x) => x.projectId === projectId);
+      if (!e && create) {
+        const p = this.getProject(projectId); if (!p) return null;
+        e = { id: uid('re'), section: 'project', title: p.title, org: '', period: clone(p.period || { start: '', end: '' }), role: p.role || '', projectId, included: true, order: state.resume.entries.length, bullets: [] };
+        state.resume.entries.push(e); emit();
+      }
+      return e || null;
+    },
+    // items: [{ text, source }] → 프로젝트 항목에 bullet 으로 추가. 같은 findingId 는 중복 추가하지 않는다. tags 는 기술 스택 풀에 쌓인다.
+    addResumeBullets(projectId, items, opts = {}) {
+      const e = projectId ? this.resumeEntryFor(projectId) : this.resumeEntry(opts.entryId); if (!e) return null;
+      items.forEach((it) => {
+        const src = clone(it.source || { type: 'manual' });
+        if (src.findingId && e.bullets.some((b) => b.source && b.source.findingId === src.findingId)) return;
+        e.bullets.push({ id: uid('rb'), text: it.text, included: it.included !== false, addedAt: localDay(), source: src });
+        if (src.findingId) { const ff = this.findFinding(src.findingId); if (ff) ff.finding.status = 'added'; }
+        (it.tags || []).forEach((t) => this._poolSkill(t, src));
+      });
+      emit(); return e;
+    },
+    updateResumeBullet(entryId, bulletId, patch) {
+      const e = this.resumeEntry(entryId); const b = e && e.bullets.find((x) => x.id === bulletId); if (!b) return null;
+      Object.assign(b, clone(patch)); emit(); return b;
+    },
+    removeResumeBullet(entryId, bulletId) {
+      const e = this.resumeEntry(entryId); if (!e) return;
+      const b = e.bullets.find((x) => x.id === bulletId); if (b) this._releaseFinding(b);
+      e.bullets = e.bullets.filter((x) => x.id !== bulletId); emit();
+    },
+    reorderResumeBullets(entryId, orderIds) {
+      const e = this.resumeEntry(entryId); if (!e) return;
+      e.bullets.sort((a, b) => orderIds.indexOf(a.id) - orderIds.indexOf(b.id)); emit();
+    },
+    _releaseFinding(b) { if (b.source && b.source.findingId) { const ff = this.findFinding(b.source.findingId); if (ff && ff.finding.status === 'added') ff.finding.status = 'new'; } },
+    _poolSkill(name, source) {
+      if (!name || state.resume.skills.some((s) => s.name.toLowerCase() === String(name).toLowerCase())) return;
+      state.resume.skills.push({ id: uid('rs'), name, group: App.store.skillGroup(name), included: false, source: clone(source || null) });
+    },
+    skillGroup(name) {
+      const n = String(name).toLowerCase();
+      if (/^(java|kotlin|javascript|typescript|python|go|c\+\+|c#|c|rust|swift|sql)$/.test(n)) return '언어';
+      if (/(mysql|postgres|redis|mongo|docker|kubernetes|aws|gcp|nginx|kafka|elastic|github actions|jenkins|h2|sqlite|firebase)/.test(n)) return 'DB·인프라';
+      if (/(git|jira|notion|slack|figma|swagger|postman|junit|jest)/.test(n)) return '도구·협업';
+      return '프레임워크·라이브러리';
+    },
+    addSkill(partial) { const s = Object.assign({ id: uid('rs'), name: '', group: '프레임워크·라이브러리', included: true, source: { type: 'manual' } }, clone(partial)); state.resume.skills.push(s); emit(); return s; },
+    updateSkill(id, patch) { const s = state.resume.skills.find((x) => x.id === id); if (!s) return; Object.assign(s, clone(patch)); emit(); },
+    removeSkill(id) { state.resume.skills = state.resume.skills.filter((x) => x.id !== id); emit(); },
+    // 버전: 현재 이력서(포함 상태 포함) 스냅숏
+    saveResumeVersion(name, note = '') {
+      const r = state.resume;
+      const v = { id: uid('rv'), name: name || `버전 ${r.versions.length + 1}`, note, savedAt: localDay(), snapshot: clone({ profile: r.profile, skills: r.skills, entries: r.entries }) };
+      r.versions.unshift(v); emit(); return v;
+    },
+    restoreResumeVersion(id) {
+      const r = state.resume; const v = r.versions.find((x) => x.id === id); if (!v) return;
+      Object.assign(r, clone(v.snapshot));
+      // 되돌린 이력서에 없는 코드 분석 항목은 다시 '새 재료'로
+      const added = new Set(this.resumeBullets().map((b) => b.source && b.source.findingId).filter(Boolean));
+      state.projects.forEach((p) => ((p.repo && p.repo.findings) || []).forEach((f) => { if (added.has(f.id)) f.status = 'added'; else if (f.status === 'added') f.status = 'new'; }));
+      emit();
+    },
+    removeResumeVersion(id) { state.resume.versions = state.resume.versions.filter((x) => x.id !== id); emit(); },
+
     // 사용자/설정
     updateUser(patch) { Object.assign(state.user, patch); emit(); },
     updateSettings(patch) { Object.assign(state.settings, patch); emit(); },
@@ -436,7 +546,7 @@ window.App = window.App || {};
     ['#/onboarding', 'onboarding'], ['#/home', 'home'], ['#/discover', 'discover'], ['#/daily', 'daily'],
     ['#/projects/:id', 'projects'], ['#/projects', 'projects'], ['#/vault', 'vault'], ['#/card/:id', 'card'],
     ['#/apply/:id/:tab', 'apply'], ['#/apply/:id', 'apply'], ['#/apply', 'apply'],
-    ['#/competency', 'apply'], ['#/match', 'apply'], ['#/settings', 'settings'],
+    ['#/competency', 'apply'], ['#/match', 'apply'], ['#/settings', 'settings'], ['#/resume', 'resume'],
   ];
   App.navigate = (hash) => { if (location.hash === hash) window.dispatchEvent(new HashChangeEvent('hashchange')); else location.hash = hash; };
   App.matchRoute = function (hash) {

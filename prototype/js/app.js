@@ -9,6 +9,7 @@
     { group: '경험 관리' },
     { href: '#/vault', name: 'vault', ico: '▦', label: '경험 보관함' },
     { group: '커리어 활용' },
+    { href: '#/resume', name: 'resume', ico: '☰', label: '마스터 이력서' },
     { href: '#/apply', name: 'apply', ico: '◎', label: '지원 기업', apps: true },
   ];
   const MOBILE = [['#/home', 'home', '⌂', '홈'], ['#/daily', 'daily', '✉', '질문'], ['#/discover', 'discover', '✦', '발굴'], ['#/vault', 'vault', '▦', '보관함'], ['#/apply', 'apply', '◎', '지원']];

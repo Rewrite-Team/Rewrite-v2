@@ -77,6 +77,8 @@
         ${e.status === 'ongoing' ? `<span class="pj-due ${nx.due ? 'is-due' : ''}">${nx.due ? '● ' : ''}${esc(nx.text)}</span>` : ''}</div>
       <div class="pj-card-title">${esc(e.title)}</div>
       <div class="pj-card-role">${esc(e.role || '역할 미입력')}</div>
+      ${e.repo ? (() => { const live = liveFindings(e.repo); const added = live.filter((f) => f.status === 'added').length;
+        return `<a class="pj-card-gh" href="#/projects/${esc(e.id)}?tab=code" title="${esc(e.repo.owner + '/' + e.repo.name)} 코드 분석 결과"><span>⌥ 코드 분석 ${live.length}</span>${added ? `<span class="pj-card-gh-n">이력서에 ${added}개 담음</span>` : ''}</a>`; })() : ''}
       <div class="pj-card-stats">
         <div><b>${(e.logs || []).length}</b><span>기록</span></div>
         <div><b>${App.store.cardsOf(e.id).length}</b><span>경험 카드</span></div>
@@ -126,9 +128,9 @@
         <input class="input" id="pj-f-role" placeholder="예) 백엔드 (Spring Boot), 4인 팀" maxlength="60" />
         <label class="label" for="pj-f-start">시작한 달</label>
         <input class="input" id="pj-f-start" type="month" value="${month}" />
-        <label class="label" for="pj-f-gh">GitHub 링크 <span class="subtle">(선택)</span></label>
-        <input class="input" id="pj-f-gh" placeholder="https://github.com/..." />
-        <p class="subtle pj-form-note">결과물 링크는 보조 근거로만 붙여 둘게요. 핵심은 과정 기록이에요.</p>
+        <label class="label" for="pj-f-gh">GitHub 레포 <span class="subtle">(선택)</span></label>
+        <input class="input" id="pj-f-gh" placeholder="https://github.com/owner/repo" spellcheck="false" />
+        <p class="subtle pj-form-note">GitHub 레포 주소를 넣으면 코드에서 이력서에 쓸 기술 포인트도 찾아 드려요. 핵심은 여전히 과정 기록이에요.</p>
       </div>`,
       onConfirm(root) {
         const v = (id) => (root.querySelector('#' + id).value || '').trim();
@@ -140,7 +142,9 @@
           period: { start: v('pj-f-start') || month, end: '' }, links: gh ? [gh] : [],
         });
         App.store.addLog(exp.id, { type: 'milestone', text: `프로젝트 시작!${role ? ' 역할: ' + role : ''}` });
-        App.ui.toast('프로젝트 트래킹을 시작했어요');
+        const isRepo = gh && App.github && App.github.parseUrl(gh);
+        if (isRepo) ui.tab[exp.id] = 'code';
+        App.ui.toast(isRepo ? '프로젝트 트래킹을 시작했어요 · 코드 분석 탭에서 레포를 분석해 보세요' : '프로젝트 트래킹을 시작했어요');
         App.navigate('#/projects/' + exp.id);
         return true;
       },
@@ -150,7 +154,7 @@
 
   /* ---------- 상세 ---------- */
   // 화면 상태 (프로젝트별 질문 인덱스)
-  const ui = { qIndex: {}, type: {}, ck: {}, edit: null, pick: null }; // pick: { pid, ids: [] } — 카드로 만들 로그 고르는 중
+  const ui = { qIndex: {}, type: {}, ck: {}, edit: null, pick: null, tab: {}, gh: {}, ghView: null }; // tab: 프로젝트별 'timeline'|'code', gh: 레포 분석 화면 상태 // pick: { pid, ids: [] } — 카드로 만들 로그 고르는 중
 
   /* ---------- 역량 키워드 편집기 (체크인·로그 수정 공용) ----------
      selected = 직접 고른 것(manual) ∪ (AI 추천(suggested) − 사용자가 뺀 것(rejected))
@@ -301,6 +305,7 @@
         ${unused.length ? `<p class="pj-side-hint"><span class="ai-dot">R</span>아직 카드로 만들지 않은 기록이 ${unused.length}개 있어요${notOnCard.length ? ` · ${notOnCard.slice(0, 3).map((k) => '#' + esc(k)).join(' ')} 에피소드가 비어 있어요` : ''}.</p>` : ''}
         <button class="btn btn-primary pj-full" data-pj="pick" ${(e.logs || []).length ? '' : 'disabled'}>✦ 기록 골라 경험 카드 만들기</button>
       </div>
+      ${ghSideBox(e)}
       <div class="card card-pad">
         <div class="section-title">이 프로젝트에서 드러난 역량</div>
         ${kc.length ? `<div class="pj-comp">${kc.slice(0, 6).map(([k, n]) => `<div class="pj-comp-row">
@@ -327,6 +332,149 @@
     </div>`;
   }
 
+  /* ---------- 코드에서 이력서 거리 찾기 (GitHub 레포 분석) ---------- */
+  const GH_CATS = ['성능', '아키텍처', '인증·보안', '데이터', '테스트', '인프라·배포', '협업·품질'];
+  const GH_CONF = { high: ['근거 확실', 'is-high', '코드에서 분명한 근거를 찾았어요'], mid: ['확인 필요', 'is-mid', '패턴은 보이지만 실제로 쓰였는지 한 번 확인해 주세요'] };
+  const LANG_COLOR = { Java: '#b07219', Kotlin: '#a97bff', JavaScript: '#e8c930', TypeScript: '#3178c6', Python: '#3572a5', HTML: '#e34c26', CSS: '#563d7c',
+    SCSS: '#c6538c', Shell: '#89e051', Dockerfile: '#384d54', Go: '#00add8', Vue: '#41b883', Groovy: '#4298b8', Ruby: '#701516', 'C#': '#178600', Swift: '#f05138' };
+  const ghState = (pid) => (ui.gh[pid] = ui.gh[pid] || { url: '', running: false, progress: null, error: null, sample: null, sel: [], open: {}, cat: '전체', showDismissed: false });
+  const isGh = (u) => !!(App.github && App.github.parseUrl(u));
+  const ghUrlOf = (e) => (e.links || []).find(isGh) || '';
+  const liveFindings = (repo) => ((repo && repo.findings) || []).filter((f) => f.status !== 'dismissed');
+  const ghBulletOf = (f) => App.store.resumeBullets().find((b) => b.source && b.source.findingId === f.id) || null;
+
+  function ghEmpty(e, st) {
+    const prefill = st.url || ghUrlOf(e);
+    return `<div class="card pj-gh-empty">
+      <span class="ai-badge"><span class="ai-dot">R</span>코드에서 이력서 거리 찾기</span>
+      <div class="pj-gh-empty-title">GitHub 레포를 연결하면, 코드 속에서 이력서에 쓸 기술 포인트를 찾아 드려요</div>
+      <p class="pj-gh-empty-desc">캐시·인증·동시성 제어·테스트·CI 같은 구현을 찾아 이력서 문장으로 정리하고, <b>어느 파일 몇 번째 줄</b>에서 찾았는지 근거 코드도 함께 보여 드려요.</p>
+      <div class="pj-gh-form">
+        <input class="input" id="pj-gh-url" value="${esc(prefill)}" placeholder="https://github.com/owner/repo" spellcheck="false" autocomplete="off" />
+        <button class="btn btn-primary" data-gh="analyze">코드 분석하기</button>
+      </div>
+      ${st.error ? ghErrorBox(st) : ''}
+      <div class="pj-gh-note">공개(public) 레포만 분석할 수 있어요 · 로그인 없이 GitHub API를 쓰기 때문에 1시간에 약 20번까지 분석할 수 있어요.
+        ${prefill ? '' : ' <button type="button" class="pj-link pj-gh-try" data-gh="fill" data-url="https://github.com/spring-projects/spring-petclinic">예시 레포로 해 보기</button>'}</div>
+    </div>`;
+  }
+  function ghErrorBox(st) {
+    return `<div class="pj-gh-error" role="alert"><b>분석하지 못했어요</b><span>${esc(st.error.message)}</span>
+      <div class="pj-gh-error-acts">
+        ${st.sample ? '<button class="btn btn-sm btn-primary" data-gh="use-sample">저장해 둔 예시 데이터로 보기</button>' : ''}
+        ${st.error.code !== 'invalid' ? '<button class="btn btn-sm" data-gh="retry">다시 시도</button>' : ''}
+      </div></div>`;
+  }
+  function ghProgress(st) {
+    const steps = App.github.STEPS; const p = st.progress || { step: 0 };
+    const pct = p.total ? Math.round((p.done / p.total) * 100) : 0;
+    return `<div class="card pj-gh-run" aria-live="polite">
+      <span class="ai-badge"><span class="ai-dot">R</span>코드를 읽고 있어요</span>
+      <div class="pj-gh-run-url">${esc(prettyLink(st.url))}</div>
+      <ol class="pj-gh-steps">${steps.map((s, i) => `<li class="${i < p.step ? 'is-done' : i === p.step ? 'is-now' : ''}">
+          <span class="pj-gh-step-ico">${i < p.step ? '✓' : i === p.step ? '<span class="pj-spin"></span>' : i + 1}</span>
+          <span>${esc(i === p.step && p.text ? p.text : s)}</span>
+          ${i === 2 && i === p.step && p.total ? `<span class="pj-gh-step-bar"><span style="width:${pct}%"></span></span>` : ''}</li>`).join('')}</ol>
+      <p class="subtle">빌드 파일·설정·서비스 코드 위주로 최대 30개 파일을 골라 읽어요. 보통 10초 안에 끝나요.</p>
+    </div>`;
+  }
+  function langBar(langs) {
+    const entries = Object.entries(langs || {}); if (!entries.length) return '';
+    return `<div class="pj-gh-langs"><div class="pj-gh-langbar">${entries.map(([l, v]) => `<span style="width:${v}%;background:${LANG_COLOR[l] || '#c9c4bb'}" title="${esc(l)} ${v}%"></span>`).join('')}</div>
+      <div class="pj-gh-langkeys">${entries.slice(0, 5).map(([l, v]) => `<span><i style="background:${LANG_COLOR[l] || '#c9c4bb'}"></i>${esc(l)} <b>${v}%</b></span>`).join('')}</div></div>`;
+  }
+  function ghHead(e, repo, st) {
+    const live = liveFindings(repo); const added = live.filter((f) => f.status === 'added').length;
+    return `<div class="card pj-gh-head">
+      <div class="pj-gh-head-top">
+        <a class="pj-gh-repo" href="${esc(repo.url)}" target="_blank" rel="noopener noreferrer"><span class="pj-gh-repo-ico">⌥</span>${esc(repo.owner)}/<b>${esc(repo.name)}</b> ↗</a>
+        ${repo.source === 'sample' ? '<span class="pj-gh-badge" title="실제 GitHub가 아닌 프로토타입용 예시 레포예요">예시 데이터</span>' : ''}
+        <span class="pj-gh-when">${repo.meta && repo.meta.stars ? `★ ${repo.meta.stars} · ` : ''}${esc(md(repo.analyzedAt))} 분석${repo.branch ? ` · ${esc(repo.branch)}` : ''}</span>
+        <span class="pj-gh-head-acts"><button class="btn btn-sm" data-gh="reanalyze">↻ 다시 분석</button><button class="btn btn-sm btn-ghost" data-gh="disconnect">연결 해제</button></span>
+      </div>
+      ${repo.meta && repo.meta.description ? `<div class="pj-gh-desc">${esc(repo.meta.description)}</div>` : ''}
+      ${langBar(repo.meta && repo.meta.languages)}
+      ${(repo.stack || []).length ? `<div class="pj-gh-stack"><span class="pj-gh-k">기술 스택</span>${repo.stack.map((s) => `<span class="pj-gh-chip">${esc(s)}</span>`).join('')}</div>` : ''}
+      <div class="pj-gh-sum"><span class="ai-dot">R</span><span>${live.length ? `이력서에 쓸 만한 기술 포인트 <b>${live.length}개</b>를 찾았어요${added ? ` · 마스터 이력서에 <b>${added}개</b> 담았어요` : ''}. 문장은 담기 전에 고칠 수 있어요.` : '이력서에 쓸 만한 패턴을 아직 찾지 못했어요. 코드가 더 쌓이면 다시 분석해 보세요.'}</span></div>
+      ${st.error ? ghErrorBox(st) : ''}
+    </div>`;
+  }
+  function codeBlock(ev) {
+    const hl = new Set(ev.hl || []);
+    const lines = String(ev.code || '').split('\n');
+    return `<div class="pj-ev">
+      <div class="pj-ev-head"><span class="pj-ev-path" title="${esc(ev.path)}">${esc(ev.path)}</span><span class="pj-ev-lines">L${ev.start}${ev.end !== ev.start ? `–${ev.end}` : ''}</span>
+        <a class="pj-ev-link" href="${esc(ev.url)}" target="_blank" rel="noopener noreferrer">GitHub에서 보기 ↗</a></div>
+      <div class="pj-ev-code" tabindex="0" aria-label="${esc(ev.path)} ${ev.start}~${ev.end}번째 줄"><pre>${lines.map((l, i) => `<span class="pj-ev-ln${hl.has(ev.start + i) ? ' is-hl' : ''}"><span class="pj-ev-n">${ev.start + i}</span><span class="pj-ev-c">${esc(l) || ' '}</span></span>`).join('')}</pre></div>
+    </div>`;
+  }
+  function findingCard(e, f, st) {
+    const conf = GH_CONF[f.confidence] || GH_CONF.mid; const open = !!st.open[f.id];
+    const sel = st.sel.includes(f.id); const added = f.status === 'added';
+    const ev = f.evidence || [];
+    const rows = Math.max(2, Math.ceil(String(f.bullet || '').length / 52));
+    return `<div class="pj-gf ${added ? 'is-added' : ''} ${sel ? 'is-sel' : ''}" data-cat="${esc(f.category)}">
+      <div class="pj-gf-top">
+        ${added ? '<span class="pj-gf-check is-on" aria-hidden="true">✓</span>' : `<label class="pj-gf-check-wrap" title="담을 항목으로 고르기"><input type="checkbox" class="pj-gf-cb" data-gh-sel="${esc(f.id)}" ${sel ? 'checked' : ''} aria-label="${esc(f.title)} 고르기" /></label>`}
+        <span class="pj-gf-cat">${esc(f.category)}</span>
+        <span class="pj-gf-conf ${conf[1]}" title="${esc(conf[2])}">${conf[0]}</span>
+        ${added ? '<span class="pj-gf-added">이력서에 담김 ✓</span>' : ''}
+      </div>
+      <div class="pj-gf-title">${esc(f.title)}</div>
+      ${added ? `<div class="pj-gf-bullet is-static">${esc((ghBulletOf(f) || {}).text || f.bullet)}</div>`
+        : `<textarea class="textarea pj-gf-ta" data-gh-bullet="${esc(f.id)}" rows="${rows}" maxlength="200" aria-label="이력서 문장">${esc(f.bullet)}</textarea>`}
+      ${!added && /○○|○/.test(f.bullet) ? '<div class="pj-gf-fill">○○ 자리는 코드만으로 알 수 없는 수치예요. 직접 잰 값으로 바꿔 주세요.</div>' : ''}
+      ${(f.tags || []).length ? `<div class="pj-gf-tags">${f.tags.map((t) => `<span class="pj-gh-chip">${esc(t)}</span>`).join('')}</div>` : ''}
+      <div class="pj-gf-detail"><b>면접 포인트</b> ${esc(f.detail)}</div>
+      <div class="pj-gf-foot">
+        <button type="button" class="pj-gf-evtoggle ${open ? 'on' : ''}" data-gh="toggle-ev" data-id="${esc(f.id)}" aria-expanded="${open}"><span class="pj-gf-evlabel">${open ? '▾' : '▸'} 근거 코드 ${ev.length}곳</span> <span class="pj-gf-evfiles">${esc(ev.map((x) => x.path.split('/').pop() + ':' + x.start).slice(0, 2).join(', '))}</span></button>
+        <span class="pj-gf-acts">
+          ${added ? `<a class="btn btn-sm btn-ghost" href="#/resume">이력서에서 보기</a><button class="btn btn-sm" data-gh="undo" data-id="${esc(f.id)}">담기 취소</button>`
+            : `<button class="btn btn-sm btn-ghost" data-gh="dismiss" data-id="${esc(f.id)}">제외</button><button class="btn btn-sm" data-gh="add-one" data-id="${esc(f.id)}">＋ 이력서에 담기</button>`}
+        </span>
+      </div>
+      ${open ? `<div class="pj-gf-evs">${ev.map(codeBlock).join('')}</div>` : ''}
+    </div>`;
+  }
+  function codeSection(e) {
+    const st = ghState(e.id);
+    if (st.running) return ghProgress(st);
+    const repo = e.repo;
+    if (!repo) return ghEmpty(e, st);
+    const live = liveFindings(repo); const dismissed = (repo.findings || []).filter((f) => f.status === 'dismissed');
+    const counts = {}; live.forEach((f) => { counts[f.category] = (counts[f.category] || 0) + 1; });
+    if (st.cat !== '전체' && !counts[st.cat]) st.cat = '전체';
+    const shown = live.filter((f) => st.cat === '전체' || f.category === st.cat);
+    const selectable = shown.filter((f) => f.status === 'new');
+    st.sel = st.sel.filter((id) => live.some((f) => f.id === id && f.status === 'new'));
+    const allOn = selectable.length && selectable.every((f) => st.sel.includes(f.id));
+    return `${ghHead(e, repo, st)}
+      ${live.length ? `<div class="pj-gh-filter">
+        <div class="pj-gh-cats" role="tablist" aria-label="분류">${['전체'].concat(GH_CATS.filter((c) => counts[c])).map((c) => `<button type="button" class="pj-gh-cat ${st.cat === c ? 'on' : ''}" data-gh="cat" data-cat="${esc(c)}">${esc(c)} <span>${c === '전체' ? live.length : counts[c]}</span></button>`).join('')}</div>
+        ${selectable.length ? `<button type="button" class="pj-link pj-gh-all" data-gh="select-all">${allOn ? '선택 해제' : `담을 수 있는 ${selectable.length}개 모두 고르기`}</button>` : ''}
+      </div>
+      <div class="pj-gf-list">${shown.map((f) => findingCard(e, f, st)).join('')}</div>` : ''}
+      ${dismissed.length ? `<div class="pj-gh-dismissed">
+        <button type="button" class="pj-gh-dis-toggle" data-gh="show-dismissed">${st.showDismissed ? '▾' : '▸'} 제외한 항목 ${dismissed.length}개</button>
+        ${st.showDismissed ? dismissed.map((f) => `<div class="pj-gh-dis-row"><span class="pj-gf-cat">${esc(f.category)}</span><span class="pj-gh-dis-title">${esc(f.title)}</span><button class="btn btn-sm btn-ghost" data-gh="restore" data-id="${esc(f.id)}">되살리기</button></div>`).join('') : ''}
+      </div>` : ''}
+      ${st.sel.length ? `<div class="pj-gh-bar"><span><b>${st.sel.length}개</b> 골랐어요 <span class="subtle">· ${esc(shortName(e.title))} 항목에 들어가요</span></span>
+        <span class="pj-gh-bar-acts"><button class="btn btn-sm btn-ghost" data-gh="clear-sel">취소</button><button class="btn btn-sm btn-primary" data-gh="add-selected">선택한 ${st.sel.length}개 마스터 이력서에 담기</button></span></div>` : ''}`;
+  }
+  function ghSideBox(e) {
+    const repo = e.repo;
+    if (!repo) {
+      return `<div class="card card-pad pj-gh-side"><div class="section-title">코드에서 이력서 거리 찾기</div>
+        <p class="subtle">GitHub 레포를 연결하면 캐시·인증·테스트 같은 구현을 찾아 이력서 문장으로 정리해 드려요.</p>
+        <button class="btn btn-sm pj-full" data-pj-tab="code">⌥ 레포 연결하기</button></div>`;
+    }
+    const live = liveFindings(repo); const added = live.filter((f) => f.status === 'added').length;
+    return `<div class="card card-pad pj-gh-side"><div class="section-title">코드에서 찾은 이력서 거리 <span class="subtle">${live.length}</span></div>
+      <div class="pj-gh-side-row"><span>마스터 이력서에 담음</span><b>${added} / ${live.length}</b></div>
+      ${App.ui.progress(live.length ? Math.round((added / live.length) * 100) : 0)}
+      <button class="btn btn-sm pj-full" data-pj-tab="code" style="margin-top:12px">⌥ 코드 분석 결과 보기</button></div>`;
+  }
+
   function renderDetail(id) {
     const e = App.store.getProject(id);
     if (!e) {
@@ -334,6 +482,7 @@
         <div style="margin-top:14px"><a class="btn" href="#/projects">← 프로젝트 목록으로</a></div></div></div>`;
     }
     const gh = ghLink(e); const nx = nextCheckin(e);
+    const tab = ui.pick && ui.pick.pid === e.id ? 'timeline' : (ui.tab[e.id] || 'timeline');
     return `<div class="page pj">
       <a class="pj-back" href="#/projects">← 프로젝트 목록</a>
       <div class="card pj-hero">
@@ -351,9 +500,11 @@
       <div class="pj-layout">
         <div class="pj-main">
           ${e.status !== 'done' && !(ui.pick && ui.pick.pid === e.id) ? checkinCard(e) : ''}
-          <div class="section-title pj-tl-title">과정 타임라인 <span class="subtle">${(e.logs || []).length}개 기록</span></div>
-          ${pickBar(e)}
-          ${timeline(e)}
+          <div class="pj-tabs" role="tablist">
+            <button type="button" class="pj-tab ${tab === 'timeline' ? 'on' : ''}" data-pj-tab="timeline" role="tab" aria-selected="${tab === 'timeline'}">과정 타임라인 <span>${(e.logs || []).length}</span></button>
+            <button type="button" class="pj-tab ${tab === 'code' ? 'on' : ''}" data-pj-tab="code" role="tab" aria-selected="${tab === 'code'}">⌥ 코드 분석 <span>${e.repo ? liveFindings(e.repo).length : '＋'}</span></button>
+          </div>
+          ${tab === 'code' ? `<div id="pj-gh" class="pj-gh">${codeSection(e)}</div>` : `${pickBar(e)}${timeline(e)}`}
         </div>
         ${sidePanel(e)}
       </div>
@@ -428,23 +579,130 @@
   /* ---------- 화면 등록 ---------- */
   App.screens.projects = {
     title: '프로젝트 트래커',
-    render(params) { return params && params.id ? renderDetail(params.id) : renderList(); },
+    render(params) {
+      if (params && params.id && params.tab) ui.tab[params.id] = params.tab === 'code' ? 'code' : 'timeline';
+      return params && params.id ? renderDetail(params.id) : renderList();
+    },
     mount(root, params) {
       const id = params && params.id;
       const rerenderLocal = () => {
         const ck = root.querySelector('#pj-ta'); const draft = ck ? ck.value : '';
         root.innerHTML = params && params.id ? renderDetail(id) : renderList();
         const ck2 = root.querySelector('#pj-ta'); if (ck2 && draft) ck2.value = draft;
+        fitTas();
       };
+      // 이력서 문장 입력칸은 내용 길이에 맞춰 높이 조절
+      const fitTa = (ta) => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 2 + 'px'; };
+      const fitTas = () => root.querySelectorAll('.pj-gf-ta').forEach(fitTa);
 
       const kwStateOf = (scope) => (scope === 'ed' ? ui.edit && ui.edit.kw : ckState(id));
       const redrawKw = (scope) => {
         const st = kwStateOf(scope); if (!st) return;
         const box = root.querySelector(scope === 'ed' ? '#pj-ed-kw' : '#pj-ck-kw'); if (box) box.innerHTML = kwEditor(st, scope);
       };
+      /* ---- 코드 분석 ---- */
+      let alive = true;
+      const ghRedraw = () => { if (!alive) return; const box = root.querySelector('#pj-gh'); const e = App.store.getProject(id); if (box && e) { box.innerHTML = codeSection(e); fitTas(); } };
+      ui.ghView = { pid: id, redraw: ghRedraw, full: () => alive && rerenderLocal() };
+      // 다른 화면에 갔다 와도 진행 중인 분석은 계속되고, 돌아오면 이어서 보인다
+      const view = (pid) => (ui.ghView && ui.ghView.pid === pid ? ui.ghView : null);
+      async function runAnalyze(pid, url) {
+        const st = ghState(pid); if (st.running) return;
+        url = String(url || '').trim();
+        if (!App.github.parseUrl(url)) { st.error = { code: 'invalid', message: 'GitHub 레포 주소 형식이 아니에요. 예) https://github.com/owner/repo' }; st.sample = null; st.url = url; const v = view(pid); if (v) v.redraw(); return; }
+        Object.assign(st, { url, running: true, error: null, sample: null, progress: { step: 0, text: App.github.STEPS[0] } });
+        { const v = view(pid); if (v) v.full(); }
+        try {
+          const repo = await App.github.analyze(url, { onProgress: (pr) => { st.progress = pr; const v = view(pid); if (v) v.redraw(); } });
+          st.running = false; st.sel = []; st.open = {}; st.cat = '전체';
+          applyRepo(pid, repo);
+          const n = liveFindings(App.store.getProject(pid).repo).length;
+          App.ui.toast(n ? `이력서에 쓸 만한 기술 포인트 ${n}개를 찾았어요` : '분석은 끝났는데, 이력서에 쓸 만한 패턴을 찾지 못했어요');
+        } catch (err) {
+          st.running = false; st.error = { code: err.code || 'network', message: err.message || '분석하지 못했어요' }; st.sample = err.sample || null;
+        }
+        const v = view(pid); if (v) v.full();
+      }
+      function applyRepo(pid, repo) {
+        const p = App.store.getProject(pid); const old = {};
+        ((p.repo && p.repo.findings) || []).forEach((f) => { old[f.id] = f; });
+        // 다시 분석해도 제외한 항목·직접 고친 문장은 그대로
+        (repo.findings || []).forEach((f) => { const o = old[f.id]; if (!o) return; if (o.status === 'dismissed') f.status = 'dismissed'; if (o.edited) { f.bullet = o.bullet; f.edited = true; } });
+        App.store.setRepo(pid, repo);
+        const key = App.github.keyOf(repo.owner, repo.name);
+        const links = p.links || [];
+        if (!links.some((l) => { const x = App.github.parseUrl(l); return x && App.github.keyOf(x.owner, x.name) === key; })) App.store.updateProject(pid, { links: links.concat([repo.url]) });
+      }
+      const draftOf = (fid) => { const ta = root.querySelector(`[data-gh-bullet="${CSS.escape(fid)}"]`); return ta ? ta.value.trim() : ''; };
+      function addFindings(ids) {
+        const p = App.store.getProject(id); if (!p || !p.repo) return;
+        const fs = ids.map((fid) => p.repo.findings.find((f) => f.id === fid)).filter((f) => f && f.status === 'new');
+        if (!fs.length) return;
+        const items = fs.map((f) => {
+          const text = draftOf(f.id) || f.bullet;
+          if (text !== f.bullet) App.store.updateFinding(id, f.id, { bullet: text, edited: true });
+          return { text, tags: f.tags || [], source: { type: 'github', projectId: id, findingId: f.id, evidence: (f.evidence || []).map(({ path, start, end, url }) => ({ path, start, end, url })) } };
+        });
+        App.store.addResumeBullets(id, items);
+        const st = ghState(id); st.sel = st.sel.filter((x) => !ids.includes(x));
+        const hasBlank = items.some((it) => /○/.test(it.text));
+        App.ui.pushToast(`마스터 이력서에 ${items.length}개 담았어요`, `${shortName(p.title)} 항목에 들어갔어요.${hasBlank ? ' ○○ 수치는 이력서에서 채워 주세요.' : ''} 눌러서 확인하기 →`, '#/resume');
+        rerenderLocal();
+      }
+      function onGh(btn) {
+        const a = btn.getAttribute('data-gh'); const e = App.store.getProject(id); if (!e) return;
+        const st = ghState(id); const fid = btn.getAttribute('data-id');
+        if (a === 'analyze') { const inp = root.querySelector('#pj-gh-url'); runAnalyze(id, inp ? inp.value : st.url); }
+        else if (a === 'fill') { const inp = root.querySelector('#pj-gh-url'); if (inp) { inp.value = btn.getAttribute('data-url'); inp.focus(); } }
+        else if (a === 'retry') runAnalyze(id, st.url || (e.repo && e.repo.url) || ghUrlOf(e));
+        else if (a === 'reanalyze') runAnalyze(id, e.repo.url);
+        else if (a === 'use-sample' && st.sample) { const s2 = st.sample; Object.assign(st, { error: null, sample: null, sel: [], open: {} }); applyRepo(id, s2); App.ui.toast('저장해 둔 예시 데이터를 불러왔어요'); rerenderLocal(); }
+        else if (a === 'disconnect') {
+          App.ui.modal({
+            title: '레포 연결을 해제할까요?', confirmText: '연결 해제', danger: true,
+            body: '<p>코드에서 찾은 항목 목록이 지워져요. 이미 마스터 이력서에 담은 문장은 그대로 남아요. 언제든 다시 분석할 수 있어요.</p>',
+            onConfirm() { st.url = e.repo.url; App.store.removeRepo(id); Object.assign(st, { sel: [], open: {}, error: null }); App.ui.toast('레포 연결을 해제했어요'); rerenderLocal(); return true; },
+          });
+        }
+        else if (a === 'cat') { st.cat = btn.getAttribute('data-cat'); ghRedraw(); }
+        else if (a === 'toggle-ev') { st.open[fid] = !st.open[fid]; ghRedraw(); }
+        else if (a === 'select-all') {
+          const shown = liveFindings(e.repo).filter((f) => f.status === 'new' && (st.cat === '전체' || f.category === st.cat)).map((f) => f.id);
+          const allOn = shown.every((x) => st.sel.includes(x));
+          st.sel = allOn ? st.sel.filter((x) => !shown.includes(x)) : [...new Set(st.sel.concat(shown))];
+          ghRedraw();
+        }
+        else if (a === 'clear-sel') { st.sel = []; ghRedraw(); }
+        else if (a === 'add-one') addFindings([fid]);
+        else if (a === 'add-selected') addFindings(st.sel.slice());
+        else if (a === 'undo') {
+          const f = e.repo.findings.find((x) => x.id === fid); if (!f) return;
+          const b = ghBulletOf(f);
+          if (b) App.store.removeResumeBullet(b.entryId, b.id); else App.store.updateFinding(id, fid, { status: 'new' });
+          App.ui.toast('마스터 이력서에서 뺐어요'); rerenderLocal();
+        }
+        else if (a === 'dismiss') { App.store.updateFinding(id, fid, { status: 'dismissed' }); st.sel = st.sel.filter((x) => x !== fid); App.ui.toast('이 항목은 제외했어요 · 아래에서 되살릴 수 있어요'); rerenderLocal(); }
+        else if (a === 'restore') { App.store.updateFinding(id, fid, { status: 'new' }); rerenderLocal(); }
+        else if (a === 'show-dismissed') { st.showDismissed = !st.showDismissed; ghRedraw(); }
+      }
+
       const focusEdit = () => { const ta = root.querySelector('#pj-edit-ta'); if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } };
 
       const onClick = (ev) => {
+        const tabBtn = ev.target.closest('[data-pj-tab]');
+        if (tabBtn && id) {
+          ui.tab[id] = tabBtn.getAttribute('data-pj-tab'); ui.pick = null; rerenderLocal();
+          if (tabBtn.closest('.pj-side')) { const t = root.querySelector('.pj-tabs'); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+          return;
+        }
+        const selCb = ev.target.closest('[data-gh-sel]');
+        if (selCb) {
+          const st = ghState(id); const fid = selCb.getAttribute('data-gh-sel');
+          st.sel = selCb.checked ? [...new Set(st.sel.concat([fid]))] : st.sel.filter((x) => x !== fid);
+          ghRedraw(); return;
+        }
+        const ghBtn = ev.target.closest('[data-gh]');
+        if (ghBtn) { onGh(ghBtn); return; }
         const kwBtn = ev.target.closest('[data-kwact]');
         if (kwBtn) {
           const scope = kwBtn.closest('[data-kw-scope]').getAttribute('data-kw-scope'); const st = kwStateOf(scope); if (!st) return;
@@ -527,7 +785,7 @@
           ui.qIndex[id] = ((ui.qIndex[id] || 0) + 1) % Q.length; ui.type[id] = Q[ui.qIndex[id]].type;
           rerenderLocal();
         } else if (act === 'pick') {
-          ui.edit = null; ui.pick = { pid: id, ids: [] }; rerenderLocal();
+          ui.edit = null; ui.pick = { pid: id, ids: [] }; ui.tab[id] = 'timeline'; rerenderLocal();
           const bar = root.querySelector('.pj-pickbar'); if (bar) bar.scrollIntoView({ behavior: 'smooth', block: 'center' });
         } else if (act === 'pick-cancel') {
           ui.pick = null; rerenderLocal();
@@ -563,6 +821,7 @@
       // 입력 중 키워드 미리보기
       let t = null;
       const onInput = (ev) => {
+        if (ev.target.matches && ev.target.matches('.pj-gf-ta')) { fitTa(ev.target); return; }
         if (ev.target.id === 'pj-edit-date' && ui.edit) { ui.edit.date = ev.target.value; return; }
         const scope = ev.target.id === 'pj-ta' ? 'ck' : ev.target.id === 'pj-edit-ta' ? 'ed' : null;
         if (!scope) return;
@@ -576,7 +835,15 @@
           st.suggested = next; redrawKw(scope);
         }, 250);
       };
+      // 담기 전에 고친 이력서 문장은 포커스가 빠질 때 저장
+      const onChange = (ev) => {
+        const fid = ev.target.getAttribute && ev.target.getAttribute('data-gh-bullet'); if (!fid) return;
+        const text = ev.target.value.trim(); const p = App.store.getProject(id);
+        const f = p && p.repo && p.repo.findings.find((x) => x.id === fid);
+        if (f && text && text !== f.bullet) App.store.updateFinding(id, fid, { bullet: text, edited: true });
+      };
       const onKey = (ev) => {
+        if (ev.target.id === 'pj-gh-url' && ev.key === 'Enter' && !ev.isComposing) { ev.preventDefault(); runAnalyze(id, ev.target.value); return; }
         if (ev.target.matches && ev.target.matches('[data-kw-input]') && ev.key === 'Enter' && !ev.isComposing) {
           ev.preventDefault();
           const scope = ev.target.closest('[data-kw-scope]').getAttribute('data-kw-scope'); const st = kwStateOf(scope);
@@ -590,7 +857,12 @@
       root.addEventListener('click', onClick);
       root.addEventListener('input', onInput);
       root.addEventListener('keydown', onKey);
-      return () => { clearTimeout(t); ui.edit = null; ui.pick = null; root.removeEventListener('click', onClick); root.removeEventListener('input', onInput); root.removeEventListener('keydown', onKey); };
+      root.addEventListener('change', onChange);
+      fitTas();
+      return () => {
+        clearTimeout(t); ui.edit = null; ui.pick = null; alive = false; if (ui.ghView && ui.ghView.redraw === ghRedraw) ui.ghView = null;
+        root.removeEventListener('click', onClick); root.removeEventListener('input', onInput); root.removeEventListener('keydown', onKey); root.removeEventListener('change', onChange);
+      };
     },
   };
 })(window.App);

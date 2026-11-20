@@ -211,3 +211,12 @@ a.cd-proj-badge:hover { background: var(--primary); color: #fff; }
 .cd-star-blk:hover .cd-refine, .cd-sec:hover .cd-refine, .cd-refine:focus-visible { opacity: 1; color: var(--primary); }
 .cd-refine:hover { background: var(--primary-soft); }
 @media (hover: none) { .cd-refine { opacity: 1; color: var(--primary); } }
+
+/* 마스터 이력서에 한 줄로 담기 */
+.cd-head-actions { flex-wrap: wrap; }
+.cd-resume-in {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600;
+  color: var(--success); background: var(--success-soft); white-space: nowrap;
+}
+.cd-resume-in:hover { background: #d4eee1; }
+.cd-resume-check { width: 16px; height: 16px; border-radius: 50%; background: var(--success); color: #fff; font-size: 10px; display: grid; place-items: center; }

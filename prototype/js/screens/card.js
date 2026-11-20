@@ -109,6 +109,9 @@
       <div class="cd-head-actions">
         <a class="btn btn-sm cd-ai-talk" href="#/discover?exp=${encodeURIComponent(e.id)}"><span class="cd-ai-mini">AI</span> AI와 대화하며 다듬기</a>
         <button class="btn btn-sm" data-act="edit">✎ 직접 수정</button>
+        ${App.resumeKit ? (App.resumeKit.isCardIn(e.id)
+          ? `<a class="cd-resume-in" href="#/resume" title="마스터 이력서 풀에 이 카드에서 나온 한 줄이 있어요"><span class="cd-resume-check">✓</span>이력서에 담김 · 보기 →</a>`
+          : `<button class="btn btn-sm cd-resume-btn" data-act="resume">☰ 이력서에 한 줄로 담기</button>`) : ''}
         <button class="btn btn-sm btn-ghost cd-del" data-act="delete">삭제</button>
       </div>
     </div>
@@ -451,6 +454,7 @@
         }
         else if (act === 'save') save();
         else if (act === 'delete') confirmDelete();
+        else if (act === 'resume') { const e = App.store.get(st.id); if (e && App.resumeKit) App.resumeKit.openCardModal(e, () => draw()); }
         else if (act === 'ai-kw') aiSuggest(a);
         else if (act === 'accept-all') { st.suggest.slice().forEach((k) => { if (!st.draft.keywords.includes(k)) st.draft.keywords.push(k); }); st.suggest = []; drawKw(); }
         else if (act === 'copy') {
