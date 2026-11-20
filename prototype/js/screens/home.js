@@ -49,7 +49,8 @@
       </section>`;
     }
     const target = App.store.questionTarget(q);
-    return `<section class="card home-today" data-qid="${esc(q.id)}">
+    // 답변은 오늘의 질문 화면 한 곳에서만 받는다. 홈은 미리보기 + 바로가기
+    return `<section class="card home-today" data-href="#/daily">
       <div class="home-today-head">
         <span class="home-pill"><span class="home-pill-dot"></span>오늘의 질문</span>
         <span class="subtle">${esc(TYPE_LABEL[q.type] || '질문')} · ${esc((q.askedAt || '').slice(11) || '방금')} 도착</span>
@@ -57,13 +58,10 @@
       </div>
       <h2 class="home-today-q">${esc(q.text)}</h2>
       ${q.hint ? `<p class="home-today-hint">💡 ${esc(q.hint)}</p>` : ''}
-      <textarea class="textarea home-today-input" rows="3" placeholder="한두 줄이면 충분해요. 생각나는 대로 적어 보세요."></textarea>
       <div class="home-today-foot">
-        <span class="subtle home-today-merge">${target ? `답변은 「${esc(target.title)}」 ${esc(target.place)}에 쌓여요` : '답변을 바탕으로 새 경험 카드 초안을 만들어 드려요'}</span>
+        <span class="subtle home-today-merge">${target ? `답변은 「${esc(target.title)}」 ${esc(target.place)}에 쌓여요` : '답하고 나면 새 경험 카드로 저장할 수 있어요'}</span>
         <div class="home-today-actions">
-          <button class="btn btn-ghost btn-sm" data-home-act="skip">건너뛰기</button>
-          <button class="btn btn-sm" data-home-act="later">나중에</button>
-          <button class="btn btn-primary btn-sm" data-home-act="answer" disabled>답변 저장</button>
+          <a class="btn btn-primary" href="#/daily">답하러 가기 →</a>
         </div>
       </div>
     </section>`;
@@ -221,15 +219,6 @@
       </div>`;
     },
     mount(root) {
-      const card = root.querySelector('.home-today[data-qid]');
-      const input = card && card.querySelector('.home-today-input');
-      const saveBtn = card && card.querySelector('[data-home-act=answer]');
-      if (input) {
-        input.addEventListener('input', () => { saveBtn.disabled = !input.value.trim(); });
-        input.addEventListener('keydown', (ev) => {
-          if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey) && input.value.trim()) { ev.preventDefault(); saveBtn.click(); }
-        });
-      }
 
       function swapRecall() {
         const el = root.querySelector('.home-recall');
@@ -242,27 +231,6 @@
         if (!btn) return;
         const act = btn.getAttribute('data-home-act');
         if (act === 'recall-next') { recallIdx++; swapRecall(); restartTimer(); return; }
-        const qid = card && card.getAttribute('data-qid');
-        if (!qid) return;
-        if (act === 'answer') {
-          const text = input.value.trim();
-          if (!text) return;
-          App.store.answer(qid, text);
-          const kws = App.ai.extractKeywords(text);
-          App.ui.toast(kws.length ? `답변을 저장했어요 · ${kws.map((k) => '#' + k).join(' ')} 감지` : '답변을 저장했어요. 연속 기록이 이어졌어요 🔥');
-          card.classList.add('home-leaving');
-          setTimeout(() => App.rerender(), 220);
-        } else if (act === 'skip') {
-          App.store.setQuestionStatus(qid, 'skipped');
-          App.ui.toast('이 질문은 건너뛸게요. 다음 질문이에요');
-          card.classList.add('home-leaving');
-          setTimeout(() => App.rerender(), 220);
-        } else if (act === 'later') {
-          App.store.setQuestionStatus(qid, 'later');
-          App.ui.toast('좋아요, 나중에 다시 물어볼게요');
-          card.classList.add('home-leaving');
-          setTimeout(() => App.rerender(), 220);
-        }
       }
       root.addEventListener('click', onClick);
 

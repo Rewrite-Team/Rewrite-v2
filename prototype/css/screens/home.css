@@ -25,7 +25,6 @@
   box-shadow: 0 6px 24px rgba(75, 79, 214, 0.08), var(--shadow-sm);
   transition: opacity .2s, transform .2s;
 }
-.home-today.home-leaving { opacity: 0; transform: translateY(-6px); }
 .home-today-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
 .home-pill {
   display: inline-flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid #dcdcf7;
@@ -38,8 +37,9 @@
 .home-today-count:hover { color: var(--primary); }
 .home-today-q { font-size: 20px; font-weight: 750; line-height: 1.45; letter-spacing: -0.015em; }
 .home-today-hint { margin-top: 8px; color: var(--text-2); font-size: 14px; }
-.home-today-input { margin-top: 16px; min-height: 84px; background: var(--surface); }
-.home-today-foot { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.home-today-foot { display: flex; align-items: center; gap: 12px; margin-top: 18px; flex-wrap: wrap; }
+.home-today[data-href] { cursor: pointer; transition: box-shadow .15s, border-color .15s; }
+.home-today[data-href]:hover { box-shadow: var(--shadow); border-color: var(--border-strong); }
 .home-today-merge { flex: 1; min-width: 180px; }
 .home-today-actions { display: flex; gap: 6px; margin-left: auto; }
 .home-today-done .home-today-actions { margin: 16px 0 0; }
