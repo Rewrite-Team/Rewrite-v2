@@ -269,3 +269,56 @@
 .dc-edit-btn:hover { border-color: var(--primary); color: var(--primary); }
 .dc-to-vault { align-self: flex-start; font-size: 13.5px; color: var(--text-2); text-decoration: none; }
 .dc-to-vault:hover { color: var(--primary); }
+
+/* ---------- 대화방 안에 붙은 깊은 대화 (App.deep.mount → .dc-embed) ----------
+   질문함의 오른쪽 칸(.ask-deep)을 꽉 채운다. 넓으면 초안을 오른쪽에, 좁으면(칸 폭 기준) 아래에서 올라오는 시트로 */
+.ask-deep { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; overflow: hidden; container-type: inline-size; container-name: deep; }
+.dc-embed { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; background: var(--surface-2); }
+.dc-embed .dc-picker { width: 100%; padding: 18px 20px 28px; gap: 18px; }
+.dc-embed .dc-picker-head h1 { font-size: 22px; }
+.dc-embed .dc-done { padding: 0 20px; margin: 24px auto 32px; }
+.dc-embed .dc-done h1 { font-size: 22px; }
+.dc-embed .dc-layout { flex: 1; min-height: 0; height: 100%; gap: 0; align-items: stretch; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.dc-embed .dc-chat { height: auto; min-height: 0; border: 0; border-radius: 0; box-shadow: none; }
+.dc-embed .dc-chat-head { padding: 10px 16px; }
+.dc-embed .dc-draft { border: 0; box-shadow: none; }
+.dc-history { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; border-bottom: 1px dashed var(--border-strong); opacity: .85; }
+.dc-history-cap { font-size: 11.5px; font-weight: 700; color: var(--text-3); }
+.dc-history .tk-rm-b { font-size: 13px; padding: 6px 10px; max-width: 80%; white-space: pre-wrap; }
+.dc-history .tk-thread-foot { display: none; }
+
+@container deep (min-width: 681px) {
+  .dc-embed .dc-layout { grid-template-columns: minmax(0, 1fr) 300px; }
+  .dc-embed .dc-draft-pane { position: static; transform: none; max-height: none; min-height: 0; overflow-y: auto; border-left: 1px solid var(--border); border-radius: 0; box-shadow: none; }
+  .dc-embed .dc-draft { border-radius: 0; }
+  .dc-embed .dc-draft-toggle, .dc-embed .dc-sheet-close, .dc-embed .dc-backdrop { display: none; }
+}
+@container deep (min-width: 900px) {
+  .dc-embed .dc-layout { grid-template-columns: minmax(0, 1fr) 340px; }
+}
+@container deep (max-width: 680px) {
+  .dc-embed .dc-draft-toggle { display: inline-flex; }
+  .dc-embed .dc-step-label, .dc-embed .dc-step.is-current .dc-step-label { display: none; }
+  .dc-embed .dc-step:not(:last-child)::after { margin: 0 4px; min-width: 4px; }
+  .dc-embed .dc-msgs { padding: 16px 12px 10px; }
+  .dc-embed .dc-msg { max-width: 92%; }
+  .dc-embed .dc-composer { padding: 10px 10px 12px; }
+  .dc-embed .dc-escapes { flex-wrap: nowrap; overflow-x: auto; margin: 8px -10px 0; padding: 0 10px 2px; scrollbar-width: none; }
+  .dc-embed .dc-esc { flex-shrink: 0; }
+  .dc-embed .dc-kbd { display: none; }
+  /* 시트: .ask-deep(container)가 기준이라 대화방 칸 안에서 올라온다 */
+  .dc-embed .dc-draft-pane {
+    position: fixed; left: 0; right: 0; bottom: 0; top: auto; z-index: 40; max-height: 88%; overflow-y: auto; border-radius: 20px 20px 0 0;
+    transform: translateY(105%); transition: transform .28s cubic-bezier(.2, .8, .2, 1); box-shadow: var(--shadow-lg);
+  }
+  .dc-embed .dc-draft { border-radius: 20px 20px 0 0; padding-bottom: 28px; }
+  .dc-embed .dc-sheet-close { display: inline-flex; }
+  .dc-embed .dc-live { display: none; }
+  .dc-embed .dc-draft-head .dc-sheet-close { margin-left: auto; }
+  .dc-embed .dc-backdrop { display: block; position: fixed; inset: 0; z-index: 35; background: rgba(20, 18, 14, .35); opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .dc-embed .dc-layout.is-sheet-open .dc-draft-pane { transform: none; }
+  .dc-embed .dc-layout.is-sheet-open .dc-backdrop { opacity: 1; pointer-events: auto; }
+  .dc-embed .dc-seeds { grid-template-columns: 1fr; }
+  .dc-embed .dc-free-row { flex-direction: column; }
+  .dc-embed .dc-picker { padding: 14px 12px 24px; }
+}

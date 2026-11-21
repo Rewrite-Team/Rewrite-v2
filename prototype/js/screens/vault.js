@@ -84,14 +84,14 @@
     if (!App.store.list().length) {
       return `<div class="card vt-empty"><div class="vt-empty-ico">📭</div><h3>아직 위키에 경험이 없어요</h3>
         <p class="muted">평범해 보이는 일도 좋은 경험이 될 수 있어요. 한 줄만 기록해도 AI가 경험 페이지로 정리해요.</p>
-        <div class="row vt-empty-actions"><button type="button" class="btn btn-primary" data-capture>＋ 기록하기</button><a class="btn" href="#/discover">✦ AI와 대화하며 기록</a></div></div>`;
+        <div class="row vt-empty-actions"><button type="button" class="btn btn-primary" data-capture>＋ 기록하기</button></div></div>`;
     }
     if (st.kws.size) {
       const names = Array.from(st.kws);
       return `<div class="card vt-empty"><div class="vt-empty-kws">${names.map((k) => App.ui.keywordChip(k, { size: 'lg' })).join('')}</div>
         <h3>이 역량의 경험이 아직 없어요</h3>
-        <p class="muted">이 역량이 드러났던 순간을 AI와 대화하며 기록해 볼까요? 답하면 경험 페이지가 만들어져요.</p>
-        <div class="row vt-empty-actions"><a class="btn btn-primary" href="#/discover?kw=${encodeURIComponent(names[0])}">✦ AI와 대화하며 기록</a>
+        <p class="muted">이 역량이 드러났던 순간을 AI와 대화하며 정리해 볼까요? 답하면 경험 페이지가 만들어져요.</p>
+        <div class="row vt-empty-actions"><a class="btn btn-primary" href="#/ask/new?mode=deep&kw=${encodeURIComponent(names[0])}">✦ 경험 정리하기</a>
         <button type="button" class="btn" data-act="reset">필터 초기화</button></div></div>`;
     }
     return `<div class="card vt-empty"><div class="vt-empty-ico">🔍</div><h3>조건에 맞는 경험이 없어요</h3>
@@ -291,7 +291,7 @@
           <div><h1>경험 위키</h1>
             <p>답변·체크인·AI 대화·코드 분석을 기록하면 AI가 경험 페이지로 정리하고, 프로젝트별로 묶어 둬요. 이력서와 자소서는 여기서 꺼내 써요.</p>
             <div class="vt-stats" data-vt-stats>${statsText()}</div></div>
-          <div class="row vt-head-acts"><a class="btn" href="#/discover">✦ AI와 대화하며 기록</a><button type="button" class="btn btn-primary" data-capture>＋ 기록하기</button></div>
+          <div class="row vt-head-acts"><button type="button" class="btn btn-primary" data-capture>＋ 기록하기</button></div>
         </div>
         <div class="vt-wk">
           <section class="card card-pad vt-panel" data-vt-lint>${lintHTML(st)}</section>

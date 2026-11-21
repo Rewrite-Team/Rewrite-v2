@@ -208,7 +208,7 @@
         <div class="cd-comp-text"><div class="cd-comp-lb">완성도</div><div class="cd-comp-hint">${esc(nextHint(e))}</div></div>
       </div>
       <div class="cd-head-actions">
-        <a class="btn btn-primary btn-sm" href="#/discover?exp=${encodeURIComponent(e.id)}">✦ AI와 길게 대화하며 채우기</a>
+        <a class="btn btn-primary btn-sm" href="#/ask/new?mode=deep&exp=${encodeURIComponent(e.id)}">✦ 끝까지 정리하기</a>
         ${askBtn}
         <button class="btn btn-sm" data-act="edit">✎ 직접 수정</button>
         ${App.resumeKit ? (App.resumeKit.isCardIn(e.id)

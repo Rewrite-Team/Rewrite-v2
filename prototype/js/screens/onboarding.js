@@ -207,7 +207,7 @@
         const text = d.seedText.trim();
         if (mode === 'chat') {
           App.ui.toast('준비 완료! AI와 대화하며 기록해 볼게요');
-          App.navigate('#/discover?seed=onboarding' + (project ? '&project=' + encodeURIComponent(project.id) : ''));
+          App.navigate('#/ask/new?mode=deep&seed=onboarding' + (project ? '&project=' + encodeURIComponent(project.id) : ''));
           return;
         }
         if (!text && d.seeds.length) {

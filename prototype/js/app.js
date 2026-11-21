@@ -23,7 +23,7 @@
   }
 
   // 메뉴에 없는 화면 → 어느 메뉴 탭에 속하는지 (사이드바 강조 + 상단 경로 표시)
-  const NAV_PARENT = { card: 'vault', discover: 'vault', projects: 'vault' };
+  const NAV_PARENT = { card: 'vault', discover: 'ask', projects: 'vault' };
 
   let cleanup = null;
 

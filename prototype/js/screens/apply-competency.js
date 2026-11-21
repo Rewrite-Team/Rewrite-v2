@@ -98,7 +98,7 @@
       <span class="ac-tile-top"><span class="ac-tile-name">${esc(c.name)}</span>${stars(c.weight)}</span>
       <span class="ac-tile-reason">${c.reason ? `“${esc(c.reason)}”` : '<span class="ac-muted">공고 속 근거 문장이 없어요</span>'}</span>
       <span class="ac-tile-foot"><span class="ac-pill is-${c.state}">${STATE[c.state].label}</span>
-        <span class="ac-tile-exp">${c.exp ? esc(shortTitle(c.exp.title)) : 'AI와 대화하며 기록 →'}</span></span>
+        <span class="ac-tile-exp">${c.exp ? esc(shortTitle(c.exp.title)) : '✦ 경험 정리하기 →'}</span></span>
     </button>`).join('')}</div>`;
   }
 
@@ -145,7 +145,7 @@
       return `<div class="card card-pad">${head}
         <div class="ac-zero"><div class="ac-empty-ico">✦</div><b>아직 #${esc(c.name)} 경험이 없어요</b>
           <p class="subtle">떠오르지 않아도 괜찮아요. 질문 몇 개로 같이 찾아봐요.${meta.hints && meta.hints.length ? ` ‘${esc(meta.hints.slice(0, 3).join('·'))}’ 같은 순간이 있었는지 떠올려 보세요.` : ''}</p>
-          <a class="btn btn-primary" href="#/discover?kw=${encodeURIComponent(c.name)}">✦ AI와 대화하며 기록</a></div></div>`;
+          <a class="btn btn-primary" href="#/ask/new?mode=deep&kw=${encodeURIComponent(c.name)}">✦ 경험 정리하기</a></div></div>`;
     }
 
     const e = c.exp; const b = App.ai.starBrief(e);
@@ -162,7 +162,7 @@
       <div class="ac-tailor"><span class="ac-tailor-k">이 기업에 맞춰 말하기</span><span>${tailor(app, c, e)}</span></div>
       <div class="ac-answer-foot"><a class="ac-link" href="#/card/${esc(e.id)}">경험 페이지에서 고치기 →</a></div>
       ${e.completeness < READY ? `<div class="ac-weak"><span>완성도 ${e.completeness}%예요. 비어 있는 부분을 채우면 답변이 훨씬 단단해져요.</span>
-        <a class="ac-link" href="#/discover?exp=${encodeURIComponent(e.id)}">AI와 이어서 채우기 →</a></div>` : ''}
+        <a class="ac-link" href="#/ask/new?mode=deep&exp=${encodeURIComponent(e.id)}">AI와 이어서 채우기 →</a></div>` : ''}
     </div>`;
 
     const rows = list.map((x) => {

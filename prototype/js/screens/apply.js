@@ -493,7 +493,7 @@
     }
     if (!r.competencies.length) out.push({ ico: '◎', text: '이 기업의 요구 역량을 먼저 정리해 주세요.', href: '', act: 'focus-comps', cta: '역량 추가' });
     sortComps(r.competencies).forEach((c) => {
-      if (!c.exp) out.push({ tone: 'warn', ico: '✦', html: `${App.ui.keywordChip(c.name)} 대표 경험이 아직 없어요.`, href: `#/discover?kw=${encodeURIComponent(c.name)}`, cta: 'AI와 대화하며 기록' });
+      if (!c.exp) out.push({ tone: 'warn', ico: '✦', html: `${App.ui.keywordChip(c.name)} 대표 경험이 아직 없어요.`, href: `#/ask/new?mode=deep&kw=${encodeURIComponent(c.name)}`, cta: '✦ 경험 정리하기' });
       else if (!c.ready) out.push({ ico: '✎', html: `${App.ui.keywordChip(c.name)} 대표 경험 「${esc(c.exp.title.split(' — ')[0])}」 완성도가 ${c.exp.completeness}%예요. 조금만 더 채워요.`, href: `#/card/${encodeURIComponent(c.exp.id)}`, cta: '보완하기' });
     });
     const unpinned = r.competencies.filter((c) => c.exp && !c.pinned).length;
@@ -569,7 +569,7 @@
       ${r.competencies.length ? `<div class="ap-rlist">${sortComps(r.competencies).map((c) => `<div class="ap-ritem">
         <div class="ap-ritem-k">${compChip(c)}${c.ready ? '<span class="ap-ok" title="준비됨">✓</span>' : ''}</div>
         ${c.exp ? `<a class="ap-ritem-exp" href="#/card/${esc(c.exp.id)}">${c.pinned ? '<span class="ap-pin" title="이 기업용으로 고정한 경험">📌</span>' : ''}<span class="ap-ritem-title">${esc(c.exp.title)}</span><span class="ap-ritem-pct ${c.ready ? '' : 'low'}">${c.exp.completeness}%</span></a>`
-          : `<a class="ap-ritem-exp none" href="#/discover?kw=${encodeURIComponent(c.name)}">경험 없음 → <b>AI와 대화하며 기록</b></a>`}
+          : `<a class="ap-ritem-exp none" href="#/ask/new?mode=deep&kw=${encodeURIComponent(c.name)}">경험 없음 → <b>✦ 경험 정리하기</b></a>`}
       </div>`).join('')}</div>` : ''}
       <p class="subtle ap-ov-foot">대표 경험 완성도가 70% 이상이면 ‘준비됨’으로 봐요.</p>
     </div>`;

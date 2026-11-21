@@ -129,6 +129,13 @@ a.ask-dest:hover { box-shadow: 0 0 0 1px var(--primary) inset; }
 
 /* 빈 상태 */
 .ask-room.is-done { justify-content: center; }
+/* 경험 하나 끝까지 정리하기 */
+.ask-deep-btn { white-space: nowrap; color: var(--primary); border-color: var(--primary-soft); background: var(--primary-soft); font-weight: 700; }
+.ask-deep-btn:hover { border-color: var(--primary); }
+.ask-deep-hint { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px dashed var(--border-strong); border-radius: var(--radius); background: var(--surface); }
+.ask-deep-hint b { display: block; font-size: 13.5px; }
+.ask-deep-hint .subtle { font-size: 12px; }
+.ask-type[data-type="deep"] { color: var(--primary); font-weight: 700; }
 .ask-done { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 40px 28px; margin: auto 0; }
 .ask-done-ill { width: 64px; height: 64px; border-radius: 50%; background: var(--success-soft); color: var(--success); display: grid; place-items: center; font-size: 28px; font-weight: 800; }
 .ask-done h2 { font-size: 20px; font-weight: 800; }
@@ -164,4 +171,5 @@ a.ask-dest:hover { box-shadow: 0 0 0 1px var(--primary) inset; }
   .ask-room-body .tk-rm-b { max-width: 86%; }
   .ask-talk .tk-input, .ask-cont .tk-input, .ask-talk .tk-next, .ask-cont .tk-next { margin: 4px -12px -16px; padding: 8px 12px 12px; }
   .ask-room-actions .btn { padding: 4px 7px; font-size: 12px; }
+  .ask-deep-l { display: none; }
 }

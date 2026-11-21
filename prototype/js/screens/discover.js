@@ -1,5 +1,18 @@
-/* AI와 대화하며 기록 — "앉은 자리에서" AI가 꼬리질문으로 경험을 끌어내고, 실시간으로 경험 페이지 초안을 채운다.
-   대화가 끝나거나(저장·그만하기·나중에) 화면을 떠나면 경험 위키에 반영하고, 반영 결과(App.wiki.reportHTML)를 보여 준다. */
+/* 경험 하나 끝까지 정리하기 (깊은 대화) — AI가 상황→과제→행동→결과→배운 점 순서로 꼬리질문을 하며 경험을 끌어내고,
+   실시간으로 경험 페이지 초안을 채운다. 질문함의 대화방 안에 붙는다 (따로 된 화면은 없다).
+   대화가 끝나거나(저장·그만하기·나중에) 방을 떠나면 경험 위키에 반영하고, 반영 결과(App.wiki.reportHTML)를 보여 준다.
+
+   App.deep.mount(el, {
+     exp?, stage?,                 // 이 경험을 이어서 다듬기 (stage: 그 칸부터)
+     kw?, seed?, free?, cat?,      // 옛 #/discover 파라미터 그대로 (seed='onboarding' 이면 첫 경험 흐름)
+     projectId?,                   // 어느 프로젝트 이야기인지
+     answer?, question?,           // 대화방에서 이미 한 말 → 첫 답변으로 초안에 넣고 다시 묻지 않는다
+     ask?,                         // 첫 질문을 이걸로 (질문함의 질문)
+     threadId?, questionId?,       // 이 대화를 남길 대화방(thread). 없으면 첫 답변 때 새로 만든다
+     historyHTML?,                 // 대화창 맨 위에 보여 줄 이 방의 지난 대화
+     onThread?(id), onPersist?({ expId, entryId, threadId, firstAnswer }), onDone?(entry), onExit?()
+   }) → cleanup()
+   #/discover?... 는 옛 주소 → #/ask/new?mode=deep&... 로 넘긴다 */
 (function (App) {
   const esc = (s) => App.ui.esc(s);
 
@@ -59,14 +72,23 @@
   const projLabel = (p) => (p.title.match(/「[^」]+」/) || [p.title.split(' — ')[0]])[0];
   const projectsSorted = () => App.store.projects().filter((p) => p.status === 'ongoing').concat(App.store.projects().filter((p) => p.status !== 'ongoing'));
 
+  // 옛 주소: #/discover?kw=… → #/ask/new?mode=deep&kw=…
   App.screens.discover = {
-    title: 'AI와 대화하며 기록',
-    render() {
-      return '<div class="page dc-page"><div class="dc-root" id="dc-root"></div></div>';
+    title: '질문함',
+    render() { return '<div class="page"></div>'; },
+    mount() {
+      const qs = (location.hash.split('?')[1] || '');
+      const p = new URLSearchParams(qs); p.delete('mode');
+      const rest = p.toString();
+      location.replace('#/ask/new?mode=deep' + (rest ? '&' + rest : ''));
     },
-    mount(screenEl, params) {
-      const root = screenEl.querySelector('#dc-root');
+  };
+
+  function mountDeep(root, opts = {}) {
+      const params = Object.assign({}, opts, { project: opts.projectId || opts.project || '' });
+      root.classList.add('dc-root', 'dc-embed');
       let alive = true;
+      let threadBase = null; // 이 방(thread)에 원래 있던 메시지 수 — 그 뒤에 이번 대화를 붙인다
       let session = 0; // 새 대화를 시작하거나 화면을 떠나면 증가 → 진행 중이던 AI 응답(think)을 무효화
       const S = {};
 
@@ -183,6 +205,7 @@
           projectId: null, projectMode: 'auto',
           mergeChecked: false, mergeInto: null, pendingTarget: null, merged: false,
           dirty: false, finished: false, codeOffered: false, entryId: null, baseBefore: undefined,
+          threadId: S.threadId || opts.threadId || null,
         });
         if (src.type === 'exp') { S.projectId = src.exp.projectId || null; S.projectMode = src.exp.projectId ? 'set' : 'auto'; }
         else if (src.projectId === 'none') S.projectMode = 'set';
@@ -205,6 +228,11 @@
             g = { stage: src.stage, text: src.stage === 'insight' ? '이 경험 이후 당신이 다르게 하게 된 것이 있나요?' : F[src.stage][0] };
           }
           intro = `「${esc(e.title)}」 경험 페이지를 이어서 채워 볼게요. 지금 완성도는 <b>${App.ai.completeness(e)}%</b>예요.`;
+          if (src.ask && !src.answer) {
+            // 질문함의 질문으로 시작 (그 질문이 겨냥한 칸부터)
+            const st = src.stage && STAGE[src.stage] ? src.stage : g ? g.stage : 'situation';
+            g = { stage: st, text: src.ask };
+          }
           const cur = src.stage && STAGE[src.stage] ? (src.stage === 'insight' ? e.insights : (e.star || {})[src.stage]) : '';
           if (cur && cur.trim()) {
             // 이미 채운 칸을 다듬기
@@ -215,7 +243,7 @@
               <span class="dc-sub">답변은 기존 내용 뒤에 덧붙여요. 통째로 바꾸고 싶으면 답변 아래 <b>이 답변으로 바꾸기</b>를 누르거나, 오른쪽 초안에서 직접 고쳐도 돼요.</span>`;
           } else if (g) {
             firstStage = g.stage; firstQ = g.text;
-            intro += ` 비어 있는 <b>${STAGE[g.stage].label}</b> 부분부터 물어볼게요.`;
+            intro += src.ask && !src.answer ? ` <b>${STAGE[g.stage].label}</b> 부분부터 물어볼게요.` : ` 비어 있는 <b>${STAGE[g.stage].label}</b> 부분부터 물어볼게요.`;
           } else {
             firstStage = 'action'; firstQ = REFINE.action[0];
             intro += ` 빈 칸은 없어요. 행동의 이유부터 한 번 더 깊게 파 볼게요. 다른 부분을 다듬고 싶으면 위 단계(${STAGES.map((x) => x.label).join('·')})를 눌러 골라 주세요.`;
@@ -237,6 +265,29 @@
           S.d.category = src.cat || '일상';
           intro = '좋아요, 이 질문으로 시작해 볼게요. 떠오르는 장면을 편하게 적어 주세요.';
           firstQ = src.text;
+        } else if (src.type === 'room') {
+          S.d.category = guessCategory(src.answer || '') || src.cat || '일상';
+        }
+        // 대화방에서 이미 한 말 → 첫 답변으로 초안에 넣는다 (다시 묻지 않는다)
+        if (src.answer) {
+          const text = String(src.answer).trim();
+          const f = App.wiki.inferField ? App.wiki.inferField(text, src.question || '', src.stage || null) : 'situation';
+          const stage = f === 'insights' ? 'insight' : STAGE[f] ? f : 'situation';
+          S.d.qa.push({ q: src.question || '(대화방에서 한 이야기)', a: text, date: today(), source: 'chat', seeded: true });
+          const prev = field(stage).trim();
+          setField(stage, prev ? prev + ' ' + text : text);
+          if (!S.d.title.trim()) { S.d.title = firstSentence(text, 28); S.d.titleSource = 'ai'; }
+          S.asked[stage] = (S.asked[stage] || 0) + 1; S.answers++;
+          acceptKeywords(text);
+          if (src.type !== 'exp' || !firstQ) {
+            // 비어 있는 첫 칸부터 (상황에 넣었으면 상황을 한 번 더 파고든다)
+            firstStage = stage === 'situation' && S.asked.situation < QUOTA.situation ? 'situation' : (ORDER.find((k) => !stageSatisfied(k)) || 'action');
+            firstQ = nextQText(firstStage);
+          }
+          intro = src.type === 'exp'
+            ? `「${esc(S.d.title)}」 경험 페이지를 이어서 채워 볼게요. 방금 한 이야기는 초안의 <b>${STAGE[stage].label}</b> 칸에 넣어 뒀어요.`
+            : `방금 한 이야기를 바탕으로 이 경험을 끝까지 정리해 볼게요. 이미 말한 건 초안의 <b>${STAGE[stage].label}</b> 칸에 넣어 뒀어요.
+              <blockquote class="dc-cur">${esc(text)}</blockquote>`;
         }
         const proj = S.projectId && App.store.getProject(S.projectId);
         if (proj) S.d.category = '프로젝트';
@@ -265,7 +316,7 @@
                 <ol class="dc-stepper" id="dc-stepper"></ol>
                 <button class="dc-draft-toggle" data-act="sheet" type="button"><span>경험 초안</span><b id="dc-toggle-pct">0%</b></button>
               </header>
-              <div class="dc-msgs" id="dc-msgs" aria-live="polite"></div>
+              <div class="dc-msgs" id="dc-msgs" aria-live="polite">${opts.historyHTML ? `<div class="dc-history"><div class="dc-history-cap">이 방에서 나눈 대화</div>${opts.historyHTML}</div>` : ''}</div>
               <div class="dc-composer">
                 <div class="dc-input-wrap">
                   <textarea id="dc-input" class="dc-input" rows="1" placeholder="${window.matchMedia('(max-width: 480px)').matches ? '편하게 적어 주세요' : '편하게 적어 주세요. 한두 문장이면 충분해요'}"></textarea>
@@ -382,8 +433,8 @@
       function flashField(key) {
         const f = root.querySelector(`.dc-field[data-field="${key}"]`); if (!f) return;
         f.classList.remove('dc-flash'); void f.offsetWidth; f.classList.add('dc-flash');
-        if (!S.sheet && window.matchMedia('(min-width: 901px)').matches) {
-          const pane = root.querySelector('#dc-draft-pane');
+        const pane = root.querySelector('#dc-draft-pane');
+        if (!S.sheet && pane && getComputedStyle(pane).position !== 'fixed') {
           if (pane && pane.scrollHeight > pane.clientHeight) pane.scrollTo({ top: f.offsetTop - 120, behavior: 'smooth' });
         }
         const tg = root.querySelector('.dc-draft-toggle');
@@ -540,6 +591,7 @@
           const gc = guessCategory(text); if (gc && S.src.type !== 'seed') S.d.category = gc;
         }
         S.answers++; S.asked[stage]++;
+        writeThread();
         const fresh = acceptKeywords(text);
         renderDraft(); updateMeta(); flashField(stage);
 
@@ -664,7 +716,7 @@
             title: '오늘은 여기까지 할까요?',
             body: '<p>아직 반영할 답변이 없어요. 괜찮아요, 다음에 오늘의 질문으로 먼저 말 걸게요.</p>',
             confirmText: '나가기', cancelText: '조금 더 할래요',
-            onConfirm: () => { App.navigate('#/home'); },
+            onConfirm: () => { if (opts.onExit) opts.onExit(); else App.navigate('#/ask'); },
           });
           return;
         }
@@ -767,19 +819,40 @@
         if (i >= 0) log.splice(i, 1);
         const entry = App.wiki.recordEdit('chat', id, S.baseBefore, { text: last ? last.a : '', question: last ? last.q : '' });
         S.entryId = entry ? entry.id : i >= 0 ? null : S.entryId;
-        // 이 대화의 원문도 대화 기록(채팅방)에 남긴다 — 저장할 때마다 이번 대화분으로 다시 맞춘다
-        const turns = d.qa.slice(S.initialQa || 0);
-        if (turns.length) {
-          let t = S.threadId && App.wiki.getThread(S.threadId);
-          if (!t) { t = App.wiki.startThread({ source: 'chat', projectId: S.projectId || null, expId: id }); S.threadId = t.id; }
-          t.msgs = []; turns.forEach((x) => { t.msgs.push({ who: 'ai', text: x.q, at: t.at }); t.msgs.push({ who: 'me', text: x.a, at: t.at }); x.threadId = t.id; });
-          t.projectId = S.projectId || null;
-          const ex = App.store.get(id);
-          t.msgs.push({ who: 'ai', text: `「${String(ex ? ex.title : '').replace(/[「」]/g, '')}」에 반영했어요.`, at: t.at });
-          App.wiki.closeThread(t.id, { kind: 'applied', expId: id, entryId: S.entryId || null });
-        }
+        // 이 대화의 원문도 같은 대화방(thread)에 남긴다 — 저장할 때마다 이번 대화분으로 다시 맞춘다
+        const t = writeThread(id);
+        if (t) App.wiki.closeThread(t.id, { kind: 'applied', expId: id, entryId: S.entryId || null });
         S.dirty = false;
+        const first = d.qa.slice(S.initialQa || 0)[0];
+        if (opts.onPersist) { try { opts.onPersist({ expId: id, entryId: S.entryId || null, threadId: S.threadId || null, firstAnswer: first ? first.a : '' }); } catch (e) { /* ignore */ } }
         return id;
+      }
+
+      /* ---------- 대화방(thread)에 원문 남기기 ----------
+         방에 원래 있던 메시지는 그대로 두고, 그 뒤에 이번 깊은 대화(질문·답)를 붙인다. 대화방에서 이미 한 말(seeded)은 다시 적지 않는다.
+         appliedId 를 주면 끝에 '반영했어요' 한 줄을 붙인다 */
+      function writeThread(appliedId) {
+        if (!S.d) return null;
+        const turns = S.d.qa.slice(S.initialQa || 0).filter((x) => !x.seeded);
+        let t = S.threadId && App.wiki.getThread(S.threadId);
+        if (!t && !turns.length && !(appliedId && S.d.qa.length > (S.initialQa || 0))) return null;
+        if (!t) {
+          t = App.wiki.startThread({ source: 'chat', projectId: S.projectId || null, expId: appliedId || S.d.id || null, questionId: opts.questionId || null });
+          S.threadId = t.id; threadBase = 0;
+          if (opts.onThread) { try { opts.onThread(t.id); } catch (e) { /* ignore */ } }
+        }
+        if (threadBase == null) threadBase = t.msgs.length;
+        const now = new Date(); const at = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        const date = App.store.localDay();
+        t.msgs = t.msgs.slice(0, threadBase);
+        t.msgs.push({ who: 'ai', text: '✦ 경험 하나 끝까지 정리하기 — 상황→과제→행동→결과→배운 점 순서로 물어볼게요.', at, date });
+        turns.forEach((x) => { t.msgs.push({ who: 'ai', text: x.q, at, date }); t.msgs.push({ who: 'me', text: x.a, at, date }); x.threadId = t.id; });
+        if (!t.projectId && S.projectId) t.projectId = S.projectId;
+        if (appliedId) {
+          const ex = App.store.get(appliedId);
+          t.msgs.push({ who: 'ai', text: `「${String(ex ? ex.title : '').replace(/[「」]/g, '')}」에 반영했어요.`, at, date });
+        } else App.store.touch();
+        return t;
       }
 
       function save() {
@@ -790,8 +863,10 @@
       function showDone() {
         session++;
         S.finished = true;
-        paintDone(S.entryId ? App.wiki.get(S.entryId) : null);
-        window.scrollTo(0, 0);
+        const entry = S.entryId ? App.wiki.get(S.entryId) : null;
+        paintDone(entry);
+        root.scrollTop = 0;
+        if (opts.onDone) { try { opts.onDone(entry); } catch (e) { /* ignore */ } }
       }
 
       function paintDone(entry) {
@@ -819,8 +894,8 @@
               ${queued ? '<span class="subtle" style="font-size:12.5px;align-self:center">✓ 오늘의 질문에 있어요</span>' : `<button class="btn btn-sm" data-act="queue-gap" data-stage="${esc(g.stage)}" data-text="${esc(g.text)}" data-exp="${esc(e.id)}" type="button">오늘의 질문으로 받기</button>`}</div>`; })() : ''}
             <div class="dc-done-actions">
               ${!entry && e ? `<a class="btn btn-lg" href="#/card/${esc(e.id)}">경험 페이지 보기</a>` : ''}
-              <button class="btn btn-primary btn-lg" data-act="another" type="button">다른 경험 기록하기</button>
-              <a class="btn btn-ghost btn-lg" href="#/home">홈으로</a>
+              ${opts.onExit ? '<button class="btn btn-primary btn-lg" data-act="exit" type="button">대화방으로 돌아가기</button>' : ''}
+              <button class="btn btn-lg" data-act="another" type="button">다른 경험 정리하기</button>
             </div>
           </div>`;
         App.wiki.bindReport(root.querySelector('.dc-done-report'), (ne) => paintDone(ne || entry));
@@ -846,7 +921,7 @@
         }
         const seed = t.closest('[data-seed]');
         const pickedProj = S.picker ? S.picker.projectId : '';
-        if (seed) { App.navigate('#/discover?seed=' + seed.dataset.seed + (pickedProj ? '&project=' + encodeURIComponent(pickedProj) : '')); return; }
+        if (seed) { startChat({ type: 'seed', index: Number(seed.dataset.seed), projectId: pickedProj }); return; }
         const pseed = t.closest('[data-project-seed]');
         if (pseed) {
           const p = App.store.getProject(pseed.dataset.projectSeed);
@@ -862,8 +937,6 @@
         if (projBtn && S.picker) { showPicker({ cat: S.picker.cat, onboarding: S.picker.onboarding, projectId: projBtn.dataset.proj }); return; }
         const cat = t.closest('[data-cat]');
         if (cat && S.picker) { showPicker({ cat: cat.dataset.cat, onboarding: S.picker.onboarding, projectId: S.picker.projectId }); return; }
-        const cont = t.closest('[data-exp]');
-        if (cont) { App.navigate('#/discover?exp=' + cont.dataset.exp); return; }
 
         const actEl = t.closest('[data-act]');
         if (!actEl || actEl.disabled) return;
@@ -874,7 +947,8 @@
         else if (act === 'later') onLater();
         else if (act === 'stop') onStop();
         else if (act === 'save') save();
-        else if (act === 'another') App.navigate('#/discover');
+        else if (act === 'another') App.navigate('#/ask/new?mode=deep');
+        else if (act === 'exit') { if (opts.onExit) opts.onExit(); }
         else if (act === 'queue-gap') {
           App.store.pushQuestion({ type: 'deepen', targetExpId: actEl.dataset.exp, stage: actEl.dataset.stage, text: actEl.dataset.text, hint: '답하면 이 경험의 비어 있는 칸이 채워져요.' });
           actEl.outerHTML = '<span class="subtle" style="font-size:12.5px;align-self:center">✓ 오늘의 질문에 있어요</span>';
@@ -915,10 +989,15 @@
       root.addEventListener('click', onClick);
 
       /* ---------- entry ---------- */
+      const extra = { answer: opts.answer || '', question: opts.question || '', ask: opts.ask || '' };
       if (params.exp) {
         const e = App.store.get(params.exp);
-        if (e) startChat({ type: 'exp', exp: e, stage: params.stage });
+        if (e) startChat(Object.assign({ type: 'exp', exp: e, stage: params.stage }, extra));
         else { App.ui.toast('경험을 찾을 수 없어요. 새 경험부터 떠올려 볼까요?'); showPicker(); }
+      } else if (extra.answer) {
+        startChat({ type: 'room', answer: extra.answer, question: extra.question, cat: params.cat || '', projectId: params.project || '' });
+      } else if (extra.ask) {
+        startChat({ type: 'custom', cat: params.cat || '일상', projectId: params.project || '', text: extra.ask });
       } else if (params.seed != null && params.seed !== '' && params.seed !== 'onboarding' && window.SEED.recallPrompts[Number(params.seed)]) {
         startChat({ type: 'seed', index: Number(params.seed), projectId: params.project || '' });
       } else if (params.free && params.free.trim()) {
@@ -943,7 +1022,10 @@
         if (S.d && !S.finished && S.dirty && (sessionAnswers() > 0 || S.d.id)) {
           try { S.pendingTarget = null; persist(); App.ui.toast('나눈 이야기는 작성 중인 경험으로 위키에 반영해 뒀어요'); } catch (e) { /* noop */ }
         }
+        root.innerHTML = '';
+        root.classList.remove('dc-root', 'dc-embed');
       };
-    },
-  };
+  }
+
+  App.deep = { mount: mountDeep };
 })(window.App);

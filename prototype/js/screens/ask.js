@@ -1,6 +1,8 @@
 /* 질문함 — 질문 하나 = 대화방 하나. (옛 '오늘의 질문' + '대화 기록'을 합친 화면)
    #/ask/:room
      room = 'new'            새 대화 (질문에 없는 이야기). ?project=<id> 면 그 프로젝트 기록으로. App.consumeCapturePreset() 로 미리 채운다
+                             ?mode=deep&kw|exp|seed|free|cat|project|stage 면 바로 '경험 하나 끝까지 정리하기'(App.deep)로 연다 (옛 #/discover)
+     모든 방에는 [✦ 경험 하나 끝까지 정리하기] 가 있다 — 누르면 그 방이 그 자리에서 깊은 대화(App.deep)로 바뀌고, 대화는 같은 방(thread)에 남는다
      room = 'q_<questionId>' 그 질문의 대화방 (대기·건너뜀·나중에·답변함)
      room = <threadId>       자유 대화방 (질문 없이 시작한 대화). 질문에 딸린 대화면 그 질문의 방으로 연다
    #/ask              기본: 첫 대기 질문 (모바일은 목록만)
@@ -174,7 +176,8 @@
       const S = App.store; const W = App.wiki;
       const R = resolve(params);
       let cur = R.room; // 지금 열린 방 id
-      let talk = null; let org = null; let mo = null;
+      let talk = null; let org = null; let mo = null; let deep = null;
+      let newProject = null; // 새 대화방이 정해 둔 프로젝트
       const listEl = root.querySelector('[data-ask-list]');
       const roomEl = root.querySelector('[data-ask-room]');
 
@@ -328,6 +331,7 @@
 
       /* ========== 오른쪽: 대화방 ========== */
       function dropRoom() {
+        if (deep) { const d = deep; deep = null; try { d(); } catch (e) { /* ignore */ } }
         if (talk) { try { talk.destroy(); } catch (e) { /* ignore */ } talk = null; }
         if (org) { try { org.destroy(); } catch (e) { /* ignore */ } org = null; }
         if (mo) { mo.disconnect(); mo = null; }
@@ -343,6 +347,7 @@
           <div class="ask-room-actions">${actions || ''}</div>
         </div>`;
       }
+      const deepBtn = () => `<button type="button" class="btn btn-sm ask-deep-btn" data-ask-act="deep" title="상황→과제→행동→결과→배운 점 순서로 이 이야기를 끝까지 정리해요">✦ <span class="ask-deep-l">경험 하나 </span>끝까지 정리하기</button>`;
       const delBtn = (id) => `<button type="button" class="btn btn-ghost btn-sm ask-del-btn" data-ask-del="${esc(id)}" title="대화방 지우기">🗑 삭제</button>`;
       function qMeta(q) {
         const t = typeInfo(q.type); const p = q.targetProjectId && S.getProject(q.targetProjectId);
@@ -374,7 +379,7 @@
       }
       function roomOpenQ(q) {
         const closed = qThreads(q.id).filter((t) => t.outcome.kind !== 'open');
-        const actions = (q.status === 'pending' ? `<button type="button" class="btn btn-ghost btn-sm" data-ask-act="skip">건너뛰기</button><button type="button" class="btn btn-ghost btn-sm" data-ask-act="later">나중에</button>` : '') + delBtn(cur);
+        const actions = deepBtn() + (q.status === 'pending' ? `<button type="button" class="btn btn-ghost btn-sm" data-ask-act="skip">건너뛰기</button><button type="button" class="btn btn-ghost btn-sm" data-ask-act="later">나중에</button>` : '') + delBtn(cur);
         roomEl.innerHTML = headHTML({ meta: qMeta(q), h: esc(q.text), actions }) + `
           <div class="ask-room-body" data-ask-body>
             ${closed.length ? `<div class="ask-history"><div class="ask-history-cap">지난 대화</div>${App.talk.roomHTML(closed, { highlight: R.hl })}</div>` : ''}
@@ -391,7 +396,7 @@
           onDone: () => {
             App.ui.toast(`🔥 ${S.streak()}일 연속 기록 중`);
             const h = roomEl.querySelector('.ask-room-head'); const fresh = S.getQuestion(q.id);
-            if (h && fresh) h.outerHTML = headHTML({ meta: qMeta(fresh), h: esc(fresh.text), actions: `<button type="button" class="btn btn-ghost btn-sm" data-ask-act="reask">다시 답하기</button>${delBtn(cur)}` });
+            if (h && fresh) h.outerHTML = headHTML({ meta: qMeta(fresh), h: esc(fresh.text), actions: `${deepBtn()}<button type="button" class="btn btn-ghost btn-sm" data-ask-act="reask">다시 답하기</button>${delBtn(cur)}` });
             const rv = roomEl.querySelector('.ask-revisit'); if (rv) rv.remove();
             const ds = roomEl.querySelector('.ask-dest'); if (ds) ds.remove();
             refreshAll();
@@ -407,7 +412,7 @@
       function roomAnswered(q) {
         const ths = qThreads(q.id);
         const went = wentOf(q).filter((w) => w.kind === 'applied');
-        roomEl.innerHTML = headHTML({ meta: qMeta(q), h: esc(q.text), actions: delBtn(cur) }) + `
+        roomEl.innerHTML = headHTML({ meta: qMeta(q), h: esc(q.text), actions: deepBtn() + delBtn(cur) }) + `
           <div class="ask-room-body" data-ask-body>
             ${ths.length ? App.talk.roomHTML(ths, { organize: true, highlight: R.hl })
               : `<div class="tk-thread"><div class="tk-rm ai"><div class="tk-rm-b">${esc(q.text)}</div></div>${q.answer ? `<div class="tk-rm me"><div class="tk-rm-b">${esc(q.answer)}</div></div>` : ''}</div>`}
@@ -424,7 +429,7 @@
         const o = (t.outcome || {}).kind || 'open';
         const meta = `<span class="ask-type" data-type="thread">${SRC_ICO[t.source] || '💬'} ${esc(t.label || '대화')}</span>${p ? `<span>▤ ${esc(projName(p))}</span>` : ''}<span>${esc(dayWord(t.date))} ${esc(t.at || '')}</span><span class="ask-oc is-${o}">${OUT_LABEL[o]}</span>`;
         const first = t.msgs.find((m) => m.who === 'me');
-        roomEl.innerHTML = headHTML({ meta, h: esc(short(first ? first.text : t.label || '대화', 80)), actions: delBtn(t.id) }) + `
+        roomEl.innerHTML = headHTML({ meta, h: esc(short(first ? first.text : t.label || '대화', 80)), actions: deepBtn() + delBtn(t.id) }) + `
           <div class="ask-room-body" data-ask-body>
             ${App.talk.roomHTML([t], { organize: true })}
             <div class="ask-cont" data-ask-cont></div>
@@ -450,17 +455,24 @@
 
       // ----- 새 대화 -----
       function roomNew() {
+        if (params.mode === 'deep') {
+          // 옛 #/discover 와 '경험 정리하기' 링크: 새 방을 바로 깊은 대화로
+          const pick = ['exp', 'stage', 'kw', 'seed', 'free', 'cat'];
+          const cfg = {}; pick.forEach((k) => { if (params[k] != null && params[k] !== '') cfg[k] = params[k]; });
+          if (params.project) cfg.projectId = params.project;
+          return enterDeep(cfg);
+        }
         const preset = App.consumeCapturePreset ? (App.consumeCapturePreset() || {}) : {};
         const pid = preset.projectId || params.project || '';
         const project = pid ? S.getProject(pid) : null;
+        newProject = project;
         const meta = `<span class="ask-type" data-type="thread">✎ 새 대화</span>${project ? `<span>▤ ${esc(projName(project))}</span>` : ''}<span>질문에 없는 이야기도 괜찮아요</span>`;
-        roomEl.innerHTML = headHTML({ meta, h: project ? `「${esc(projName(project))}」 기록하기` : '무엇이든 기록해 두세요' }) + `
+        roomEl.innerHTML = headHTML({ meta, h: project ? `「${esc(projName(project))}」 기록하기` : '무엇이든 기록해 두세요', actions: deepBtn() }) + `
           <div class="ask-room-body" data-ask-body>
             <div class="ask-intro" data-ask-intro>
               <p>한 줄이면 충분해요. 어느 경험의 어느 칸에 넣을지는 AI가 제안하고, 정하는 건 나예요.</p>
               <div class="ask-modes">
-                <div class="subtle ask-modes-cap">더 깊게 — 결과는 모두 같은 위키에 쌓여요</div>
-                <a class="ask-mode" href="#/discover${project ? '?project=' + esc(project.id) : ''}"><span class="ask-mode-ico">✦</span><div><b>AI와 길게 대화하며 기록</b><span class="subtle">상황→과제→행동→결과 순서로 질문을 따라가며 한 경험을 끝까지 정리</span></div></a>
+                <div class="ask-deep-hint"><span class="ask-mode-ico">✦</span><div><b>더 깊게 정리하고 싶어지면 언제든</b><span class="subtle">이 방 위의 [경험 하나 끝까지 정리하기]를 누르면, 지금까지 한 이야기를 이어받아 상황→과제→행동→결과→배운 점 순서로 한 경험을 끝까지 정리해요.</span></div></div>
                 <a class="ask-mode" href="${project ? `#/vault/p/${esc(project.id)}?tab=code` : '#/vault'}"><span class="ask-mode-ico">⌥</span><div><b>GitHub 레포 분석</b><span class="subtle">코드에서 찾은 기술 포인트가 근거로 붙고, 빈 이야기는 질문으로 와요</span></div></a>
               </div>
             </div>
@@ -492,9 +504,85 @@
         cur = tid;
         try { history.replaceState(null, '', roomHref(tid)); } catch (e) { /* ignore */ }
         const intro = roomEl.querySelector('[data-ask-intro]'); if (intro) intro.remove();
-        const del = roomEl.querySelector('.ask-room-actions'); if (del && !del.innerHTML.trim()) del.innerHTML = delBtn(tid);
+        const acts = roomEl.querySelector('.ask-room-actions'); if (acts && !acts.querySelector('[data-ask-del]')) acts.insertAdjacentHTML('beforeend', delBtn(tid));
         roomEl.closest('.ask').classList.add('has-room');
         refreshSecs();
+      }
+
+      // ----- 경험 하나 끝까지 정리하기 (깊은 대화) — 지금 방 그대로, 오른쪽 칸만 App.deep 으로 바꾼다 -----
+      // 이 방에서 이미 한 이야기를 이어받는다: 경험에 반영된 방이면 그 경험을 다듬고, 아니면 한 말을 첫 답변으로
+      function deepCfgFor() {
+        const live = talk && talk.threadId ? W.getThread(talk.threadId) : null;
+        const expOf = (t) => (t && t.outcome && t.outcome.kind === 'applied' && t.outcome.expId && S.get(t.outcome.expId) ? t.outcome.expId : null);
+        const firstAi = (t) => ((t && t.msgs.find((m) => m.who === 'ai')) || {}).text || '';
+        if (cur === 'new' && !live) return { projectId: newProject ? newProject.id : '' };
+        if (cur.startsWith('q_')) {
+          const q = S.getQuestion(cur.slice(2)); if (!q) return {};
+          const ths = qThreads(q.id); const lt = live || ths[ths.length - 1] || null;
+          const all = ths.concat(live && !ths.includes(live) ? [live] : []);
+          const exp = (q.compiledTo && S.get(q.compiledTo) ? q.compiledTo : null) || expOf(lt) || (q.targetExpId && S.get(q.targetExpId) ? q.targetExpId : null);
+          const applied = q.status === 'answered' || (lt && lt.outcome.kind === 'applied');
+          const said = applied ? '' : (lt ? W.threadText(lt) : '');
+          return {
+            exp, stage: q.stage || null, projectId: q.targetProjectId || '', questionId: q.id, threadId: lt ? lt.id : null,
+            ask: q.status !== 'answered' ? q.text : '', question: q.text, answer: said || (!exp && q.status === 'answered' ? q.answer || '' : ''),
+            historyHTML: all.length ? App.talk.roomHTML(all, {}) : q.answer ? `<div class="tk-thread"><div class="tk-rm ai"><div class="tk-rm-b">${esc(q.text)}</div></div><div class="tk-rm me"><div class="tk-rm-b">${esc(q.answer)}</div></div></div>` : '',
+          };
+        }
+        const t = live || W.getThread(cur); if (!t) return {};
+        const exp = expOf(t);
+        return {
+          exp, projectId: t.projectId || (newProject ? newProject.id : ''), threadId: t.id, questionId: t.questionId || null,
+          answer: exp ? '' : W.threadText(t), question: firstAi(t),
+          historyHTML: App.talk.roomHTML([t], {}),
+        };
+      }
+      function enterDeep(cfg) {
+        dropRoom();
+        roomEl.classList.remove('is-done');
+        const q = cur.startsWith('q_') ? S.getQuestion(cur.slice(2)) : null;
+        const t = !q && cur !== 'new' ? W.getThread(cur) : null;
+        const p = cfg.projectId && S.getProject(cfg.projectId);
+        const e = cfg.exp && S.get(cfg.exp);
+        const h = q ? esc(q.text) : t ? esc(short(((t.msgs.find((m) => m.who === 'me') || {}).text) || t.label || '대화', 80)) : e ? `「${esc(title(e.title, 40))}」 다듬기` : '경험 하나 끝까지 정리하기';
+        const meta = `<span class="ask-type" data-type="deep">✦ 경험 하나 끝까지 정리하기</span>${p ? `<span>▤ ${esc(projName(p))}</span>` : ''}<span>상황→과제→행동→결과→배운 점</span>`;
+        const actions = `<button type="button" class="btn btn-ghost btn-sm" data-ask-act="deep-exit" title="정리를 멈추고 대화방으로">✕ 정리 닫기</button>${cur !== 'new' ? delBtn(cur) : ''}`;
+        roomEl.innerHTML = headHTML({ meta, h, actions }) + '<div class="ask-deep" data-ask-deep></div>';
+        roomEl.closest('.ask').classList.add('has-room');
+        const qid = q ? q.id : cfg.questionId || null;
+        deep = App.deep.mount(roomEl.querySelector('[data-ask-deep]'), Object.assign({}, cfg, {
+          questionId: qid,
+          onThread: (id) => {
+            if (cur === 'new') {
+              cur = id; params.mode = null;
+              try { history.replaceState(null, '', roomHref(id)); } catch (e) { /* ignore */ }
+              const acts = roomEl.querySelector('.ask-room-actions'); if (acts && !acts.querySelector('[data-ask-del]')) acts.insertAdjacentHTML('beforeend', delBtn(id));
+            }
+            refreshSecs();
+          },
+          onPersist: ({ expId, entryId, firstAnswer }) => {
+            // 질문방에서 정리했으면 그 질문은 답한 것으로
+            const qq = qid && S.getQuestion(qid);
+            if (qq && qq.status !== 'answered') {
+              qq.answer = qq.answer || firstAnswer || ''; qq.answeredAt = S.localDay(); qq.compiledTo = expId;
+              if (entryId) qq.wikiEntry = entryId;
+              // 프로젝트 체크인 질문이었다면 짧게 답할 때처럼 첫 답을 프로젝트 타임라인에도 남긴다
+              if (qq.checkin && qq.targetProjectId && S.getProject(qq.targetProjectId) && qq.answer) {
+                const tid = cur && cur !== 'new' && !String(cur).startsWith('q_') ? cur : (W.threadsFor({}).find((t) => t.questionId === qq.id) || {}).id;
+                S.addLog(qq.targetProjectId, Object.assign({ text: qq.answer, type: qq.checkinType || 'milestone', fromQuestion: qq.text }, tid ? { threadId: tid } : {}));
+              }
+              S.setQuestionStatus(qq.id, 'answered');
+            }
+            refreshAll();
+          },
+          onDone: () => { refreshAll(); },
+          onExit: () => exitDeep(),
+        }));
+      }
+      function exitDeep() {
+        dropRoom();
+        if (cur === 'new') { params.mode = null; try { history.replaceState(null, '', '#/ask/new'); } catch (e) { /* ignore */ } }
+        renderRoom(); refreshAll();
       }
 
       // ----- 빈 상태 -----
@@ -591,6 +679,8 @@
           App.navigate(roomHref(n ? 'q_' + n.id : cur));
         } else if (act === 'reask' && q) reask(q.id);
         else if (act === 'continue') { const th = W.getThread(cur); if (th) continueThread(th); }
+        else if (act === 'deep') enterDeep(deepCfgFor());
+        else if (act === 'deep-exit') exitDeep();
       });
 
       renderList();

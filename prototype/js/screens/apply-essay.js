@@ -204,7 +204,7 @@
     const nudge = best < 50 ? `<div class="ae-nudge"><span class="ae-nudge-ico">✦</span><div class="ae-nudge-body">
         <b>${all.length ? '딱 맞는 경험이 아직 부족해요' : '이 역량을 보여 줄 경험이 아직 없어요'}</b>
         <span>${all.length ? '적합도 50% 이상인 경험이 없어요. ' : ''}${kw ? `#${esc(kw)} 경험을 ` : '경험을 '}질문 몇 개로 같이 찾아봐요.</span></div>
-        <a class="btn btn-sm btn-primary" href="#/discover${kw ? '?kw=' + encodeURIComponent(kw) : ''}">AI와 대화하며 기록</a></div>` : '';
+        <a class="btn btn-sm btn-primary" href="#/ask/new?mode=deep${kw ? '&kw=' + encodeURIComponent(kw) : ''}">✦ 경험 정리하기</a></div>` : '';
     return `<div class="ae-sec">
       <div class="ae-sec-h"><b>추천 경험</b><span class="subtle">${all.length ? `${recs.length}개 · 적합도 순 · ${esc(app.company)} 요구 역량 반영` : ''}</span></div>
       ${recs.length ? `<div class="ae-recs">${recs.map((r, i) => recCard(r, all.indexOf(r), q, app, use)).join('')}</div>` : ''}
