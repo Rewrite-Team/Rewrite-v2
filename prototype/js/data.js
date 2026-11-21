@@ -45,7 +45,6 @@ window.SEED = (function () {
       role: '백엔드 (Spring Boot), 4인 팀', summary: '부트캠프 최종 프로젝트로 4인 팀(프론트 2, 백엔드 2)이 8주간 동네 기반 소모임 매칭 서비스를 개발 중.',
       links: ['https://github.com/example/moyeobom'],
       logs: [
-        { id: 'l1', date: '2026-09-08', type: 'milestone', text: '킥오프. 역할 분담 — 나는 백엔드 인증/검색 담당.', keywords: ['협업'] },
         { id: 'l2', date: '2026-09-19', type: 'decision', text: 'JWT vs 세션 고민. 모바일 확장 고려해서 JWT + Refresh Token으로 결정. 팀원에게 장단점 표로 공유.', keywords: ['의사결정', '커뮤니케이션'] },
         { id: 'l3', date: '2026-10-02', type: 'issue', text: '모임 검색이 1.8초 걸림. 쿼리 로그 보니 N+1. fetch join + 인덱스 추가로 0.3초.', keywords: ['문제해결', '분석력'] },
         { id: 'l4', date: '2026-10-15', type: 'collab', text: '프론트가 API 응답 형식이 자꾸 바뀐다고 힘들어함 → Swagger 명세 먼저 합의 후 구현하는 규칙 제안.', keywords: ['협업', '주도성'] },
@@ -59,7 +58,6 @@ window.SEED = (function () {
       role: '1인 개발 (Node.js, PostgreSQL)', summary: '친구들과 공동 생활비를 관리하려고, 슬랙 메시지로 지출을 기록하고 주간 리포트를 받는 봇을 만들고 있다.',
       links: ['https://github.com/example/budget-bot'],
       logs: [
-        { id: 'l6', date: '2026-10-21', type: 'milestone', text: '아이디어 시작. 친구 3명이 실제로 쓰겠다고 함.', keywords: ['주도성'] },
         { id: 'l7', date: '2026-11-04', type: 'decision', text: 'DB를 SQLite로 할지 Postgres로 할지 → 동시 입력 고려해서 Postgres.', keywords: ['의사결정'] },
       ],
       createdAt: '2026-10-21', updatedAt: '2026-11-04',
@@ -70,7 +68,6 @@ window.SEED = (function () {
       role: '백엔드 + 팀장, 3인 팀', summary: '학과 캡스톤으로 3인 팀이 빈 강의실을 찾아 예약하는 웹앱을 만들어 학과 공식 서비스로 시범 운영했다.',
       links: ['https://github.com/example/empty-classroom'],
       logs: [
-        { id: 'l8', date: '2025-03-10', type: 'milestone', text: '팀 결성. 내가 팀장 겸 백엔드. 학생들이 빈 강의실을 찾으려고 건물을 돌아다니는 문제에서 출발.', keywords: ['리더십'] },
         { id: 'l9', date: '2025-03-24', type: 'decision', text: '학과 시간표 API가 없어서 PDF 시간표를 파싱하기로 결정. 수작업 입력 대비 학기마다 재사용 가능.', keywords: ['의사결정', '문제해결'] },
         { id: 'l10', date: '2025-04-14', type: 'issue', text: '같은 강의실·시간에 예약이 두 건 들어가는 중복 예약 발생 → DB 유니크 제약 + 낙관적 락으로 막음.', keywords: ['문제해결', '꼼꼼함'] },
         { id: 'l11', date: '2025-04-28', type: 'collab', text: '중간발표 앞두고 팀원 한 명이 일정이 밀려 의견이 갈림 → 기능을 "검색·예약·취소" 3개로 줄이자고 조율.', keywords: ['갈등조정', '협업'] },
@@ -202,6 +199,79 @@ window.SEED = (function () {
       star: { situation: '야간 물류 검수 때 누락이 자주 생겨 아침 근무자와 마찰이 있었음.', task: '', action: '', result: '' },
       insights: '', keywords: ['꼼꼼함'], jobs: [], links: [], qa: [],
       completeness: 25, createdAt: '2026-11-17', updatedAt: '2026-11-17',
+    },
+    {
+      id: 'e10', title: '「모여봄」 JWT + Refresh Token 인증 설계', category: '프로젝트',
+      period: { start: '2026-09', end: '2026-09' }, status: 'draft', projectId: 'p1', sourceLogIds: ['l2'], codeRefs: [],
+      role: '백엔드 (인증 담당)', summary: '모바일 확장을 고려해 세션 대신 JWT + Refresh Token 인증을 고르고, 장단점을 표로 정리해 팀에 공유했다.',
+      star: {
+        situation: '「모여봄」 인증 방식을 정해야 했는데 팀원마다 세션과 JWT 의견이 갈림.',
+        task: '인증 담당으로 팀이 납득할 수 있는 근거를 갖고 방식을 정해야 했음.',
+        action: '모바일 앱 확장 가능성을 기준으로 세션과 JWT의 장단점을 표로 비교해 공유하고, JWT + Refresh Token으로 결정함.',
+        result: '',
+      },
+      insights: '', keywords: ['의사결정', '커뮤니케이션'], jobs: ['백엔드 개발자'], links: [], qa: [],
+      completeness: 0, createdAt: '2026-09-19', updatedAt: '2026-09-19',
+    },
+    {
+      id: 'e11', title: '「모여봄」 배포 후 업로드 500 에러와 배포 체크리스트', category: '프로젝트',
+      period: { start: '2026-11', end: '2026-11' }, status: 'draft', projectId: 'p1', sourceLogIds: ['l5'], codeRefs: [],
+      role: '백엔드', summary: '배포 직후 이미지 업로드가 500 에러로 실패한 원인을 찾고, 같은 실수를 막는 배포 체크리스트를 만들었다.',
+      star: {
+        situation: '「모여봄」 배포 직후 이미지 업로드가 500 에러로 실패함.',
+        task: '',
+        action: '서버 로그로 원인을 좁혀 파일 크기 제한 설정이 빠진 것을 찾아 고치고, 배포 전에 설정값을 확인하는 체크리스트를 만듦.',
+        result: '',
+      },
+      insights: '', keywords: ['문제해결', '꼼꼼함'], jobs: ['백엔드 개발자'], links: [], qa: [],
+      completeness: 0, createdAt: '2026-11-10', updatedAt: '2026-11-10',
+    },
+    {
+      id: 'e12', title: '「가계부 슬랙봇」 SQLite 대신 Postgres를 고른 이유', category: '프로젝트',
+      period: { start: '2026-11', end: '2026-11' }, status: 'draft', projectId: 'p2', sourceLogIds: ['l7'], codeRefs: [],
+      role: '1인 개발', summary: '친구들이 동시에 지출을 입력하는 상황을 고려해 SQLite 대신 Postgres를 골랐다.',
+      star: { situation: '가계부 슬랙봇의 DB를 정해야 했음.', task: '', action: '여러 명이 동시에 입력하는 경우를 따져 보고 SQLite 대신 Postgres를 선택함.', result: '' },
+      insights: '', keywords: ['의사결정'], jobs: ['백엔드 개발자'], links: [], qa: [],
+      completeness: 0, createdAt: '2026-11-04', updatedAt: '2026-11-04',
+    },
+    {
+      id: 'e13', title: '「빈강의실」 PDF 시간표 파싱으로 강의실 데이터 만들기', category: '프로젝트',
+      period: { start: '2025-03', end: '2025-04' }, status: 'draft', projectId: 'p3', sourceLogIds: ['l9'], codeRefs: [],
+      role: '백엔드 + 팀장', summary: '학과 시간표 API가 없어서, PDF 시간표를 파싱해 학기마다 다시 쓸 수 있는 강의실 데이터를 만들었다.',
+      star: {
+        situation: '빈 강의실을 찾으려면 시간표 데이터가 필요했지만 학과에 시간표 API가 없었음.',
+        task: '시범 운영 전까지 강의실·시간 데이터를 확보해야 했음.',
+        action: '수작업 입력 대신 학과 PDF 시간표를 파싱하기로 결정하고, 학기마다 다시 돌릴 수 있게 파서를 만듦.',
+        result: '',
+      },
+      insights: '', keywords: ['문제해결', '의사결정'], jobs: ['백엔드 개발자'], links: [], qa: [],
+      completeness: 0, createdAt: '2025-03-24', updatedAt: '2025-03-24',
+    },
+    {
+      id: 'e14', title: '「빈강의실」 일정이 밀렸을 때 기능 범위 조율', category: '프로젝트',
+      period: { start: '2025-04', end: '2025-04' }, status: 'draft', projectId: 'p3', sourceLogIds: ['l11'], codeRefs: [],
+      role: '팀장', summary: '중간발표 전 팀원 일정이 밀려 의견이 갈리자, 기능을 검색·예약·취소 3개로 줄이자고 조율했다.',
+      star: {
+        situation: '중간발표를 앞두고 팀원 한 명의 일정이 밀려 무엇을 먼저 할지 의견이 갈림.',
+        task: '팀장으로서 발표 일정 안에 동작하는 결과물을 내야 했음.',
+        action: '핵심 흐름만 남기자고 제안해 기능을 「검색·예약·취소」 3개로 줄이고 역할을 다시 나눔.',
+        result: '',
+      },
+      insights: '', keywords: ['갈등조정', '리더십'], jobs: ['백엔드 개발자'], links: [], qa: [],
+      completeness: 0, createdAt: '2025-04-28', updatedAt: '2025-04-28',
+    },
+    {
+      id: 'e15', title: '「빈강의실」 사용자 테스트로 예약 취소 동선 고치기', category: '프로젝트',
+      period: { start: '2025-05', end: '2025-05' }, status: 'draft', projectId: 'p3', sourceLogIds: ['l12'], codeRefs: [],
+      role: '백엔드 + 팀장', summary: '실사용자 5명 테스트에서 예약 취소를 못 찾는다는 피드백을 받고 동선을 고쳤다.',
+      star: {
+        situation: '실사용자 5명 테스트에서 "예약 취소가 어디 있는지 모르겠다"는 피드백이 나옴.',
+        task: '',
+        action: '예약 목록에서 바로 취소할 수 있게 버튼 위치를 옮김.',
+        result: '',
+      },
+      insights: '기능보다 사용자가 찾을 수 있는지가 먼저라는 걸 배움.', keywords: ['고객지향'], jobs: ['백엔드 개발자'], links: [], qa: [],
+      completeness: 0, createdAt: '2025-05-19', updatedAt: '2025-05-19',
     },
   ];
 

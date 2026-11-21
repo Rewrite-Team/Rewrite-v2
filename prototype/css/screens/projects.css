@@ -7,6 +7,7 @@
 .pj [data-type="collab"] { --pj-c: var(--pj-collab); --pj-s: var(--pj-collab-soft); }
 .pj [data-type="milestone"] { --pj-c: var(--pj-milestone); --pj-s: var(--pj-milestone-soft); }
 .pj [data-type="learning"] { --pj-c: var(--pj-learning); --pj-s: var(--pj-learning-soft); }
+.pj [data-type="talk"] { --pj-c: var(--text-2); --pj-s: var(--surface-2); }
 
 .pj-head { display: flex; align-items: flex-end; gap: 16px; justify-content: space-between; flex-wrap: wrap; }
 .pj-link { color: var(--primary); font-weight: 600; }
@@ -373,7 +374,14 @@
 .pj-log-wiki { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; }
 .pj-log-wiki:empty { display: none; }
 .pj-log-wiki .pj-log-card { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pj-log-ingest { margin-left: auto; }
+/* 타임라인 = 대화 원문: AI 질문(작게) · 내 말 · 어디에 반영됐는지 */
+.pj-log-meta { flex-wrap: wrap; }
+.pj-log-raw { font-size: 12px; font-weight: 600; color: var(--text-3); text-decoration: none; }
+.pj-log-raw:hover { color: var(--primary); text-decoration: underline; }
+.pj-log-q { display: flex; gap: 6px; align-items: flex-start; font-size: 12.5px; color: var(--text-3); word-break: break-word; }
+.pj-log-q .ai-dot { flex-shrink: 0; width: 16px; height: 16px; font-size: 9px; }
+.pj-log-out { font-size: 11.5px; font-weight: 700; color: var(--text-2); background: var(--surface-2); padding: 1px 7px; border-radius: 99px; }
+.pj-log-org { margin-left: auto; }
 .pj-gf-wiki { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; }
 .pj-gf-wiki.is-empty { padding: 8px 10px; border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); justify-content: space-between; }
 .pj-gf-exp { font-size: 12px; font-weight: 700; color: var(--success); background: var(--success-soft, #e9f6ee); padding: 2px 8px; border-radius: 99px; text-decoration: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -386,6 +394,6 @@
 @media (max-width: 600px) {
   .pj-exp-head { flex-direction: column; align-items: stretch; }
   .pj-exp-grid { grid-template-columns: 1fr; }
-  .pj-log-ingest { margin-left: 0; }
+  .pj-log-org { margin-left: 0; }
   .pj-gf-wiki.is-empty .btn { width: 100%; }
 }

@@ -91,16 +91,41 @@
     return !!gap && App.store.state.inbox.some((q) => q.targetExpId === e.id && q.type === 'deepen' && (q.status === 'pending' || q.status === 'later') && (!q.stage || q.stage === gap.stage));
   }
 
+  // 출처 → 그 원문이 나온 대화 (qa 의 threadId, 체크인 로그의 threadId, 아니면 이 페이지로 정리된 대화 중 같은 말을 한 것)
+  function threadOfSource(e, s, mine) {
+    const W = App.wiki; if (!W.getThread) return null;
+    const ok = (id) => (id && W.getThread(id) ? id : null);
+    if (s.type !== 'code') {
+      const qa = (e.qa || []).find((x) => x.threadId && x.a === s.text && (!s.q || x.q === s.q));
+      if (qa && ok(qa.threadId)) return qa.threadId;
+      if (s.type === 'checkin') { const p = projectOf(e); const l = p && (p.logs || []).find((x) => x.threadId && x.text === s.text); if (l && ok(l.threadId)) return l.threadId; }
+      const txt = String(s.text || '').trim();
+      const t = txt && mine.find((x) => (x.msgs || []).some((m) => m.who === 'me' && m.text.trim() === txt) || W.threadText(x).includes(txt));
+      if (t) return t.id;
+    }
+    return null;
+  }
+  const chatHref = (id) => '#/chat?thread=' + encodeURIComponent(id);
+  function threadsLine(e) {
+    const list = App.wiki.threadsFor ? App.wiki.threadsFor({ expId: e.id }) : [];
+    if (!list.length) return '';
+    const last = list[list.length - 1];
+    return `<div class="cd-threads-line">💬 이 경험을 만든 대화 <b>${list.length}개</b><a href="${esc(chatHref(last.id))}">대화 기록에서 보기 →</a></div>`;
+  }
+
   // 출처: 답변·대화·체크인·코드 분석 — 이 페이지를 만든 원문 기록 그대로
   function sourcesHTML(e) {
     const W = App.wiki;
     const list = W.sourcesOf(e);
+    const mine = W.threadsFor ? W.threadsFor({ expId: e.id }) : [];
     if (!list.length) return '<div class="cd-soft-empty">아직 출처가 없어요. 오늘의 질문에 답하거나 AI와 이어서 채우면 원문이 여기에 그대로 남아요.</div>';
     return `<ol class="cd-srcs">${list.map((s) => {
+      const tid = s.threadId && W.getThread && W.getThread(s.threadId) ? s.threadId : threadOfSource(e, s, mine);
       const top = `<div class="cd-src-top"><span class="cd-src-type">${esc(W.SOURCE_LABEL[s.type] || '기록')}</span>
         ${s.type === 'checkin' && LOG_TYPES[s.logType] ? `<span class="wk-srcchip">${LOG_TYPES[s.logType][1]} ${LOG_TYPES[s.logType][0]}</span>` : ''}
         <span class="subtle">${esc(fmtDate(s.date))}</span>
-        ${s.href ? `<a class="cd-src-link" href="${esc(s.href)}">${s.type === 'code' ? '코드 분석 보기' : '타임라인에서 보기'} →</a>` : ''}</div>`;
+        ${tid ? `<a class="cd-src-link" href="${esc(chatHref(tid))}">대화 원문 →</a>` : ''}
+        ${s.href ? `<a class="cd-src-link" href="${esc(s.href)}">${s.type === 'code' ? '코드 분석 보기' : '프로젝트에서 보기'} →</a>` : ''}</div>`;
       let body;
       if (s.type === 'code' && s.finding) {
         const f = s.finding; const ev = (f.evidence || [])[0];
@@ -216,6 +241,7 @@
 
         <section class="card card-pad cd-sec">
           <div class="section-title">출처 <span class="subtle cd-sec-sub">이 페이지를 만든 원문 기록 ${srcN}개</span>${p ? `<a class="more" href="#/projects/${encodeURIComponent(p.id)}">프로젝트 타임라인 →</a>` : ''}</div>
+          ${threadsLine(e)}
           ${sourcesHTML(e)}
         </section>
 
@@ -411,6 +437,7 @@
         gapTalk = App.talk.mount(box.querySelector('[data-cd-gap-slot]'), {
           ask: { text: g.text, label: '지금 채우면 좋은 부분' },
           src: { type: 'answer', expId: e.id, stage: g.stage, question: g.text },
+          thread: { source: 'coach' },
           onDone: (entry) => { setTimeout(() => { if (!gapTalk) return; closeGapTalk(); if (entry) App.ui.toast('이 페이지에 반영했어요'); if (App.store.get(st.id)) draw(true); }, 1400); },
         });
       }

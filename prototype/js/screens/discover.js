@@ -767,6 +767,17 @@
         if (i >= 0) log.splice(i, 1);
         const entry = App.wiki.recordEdit('chat', id, S.baseBefore, { text: last ? last.a : '', question: last ? last.q : '' });
         S.entryId = entry ? entry.id : i >= 0 ? null : S.entryId;
+        // 이 대화의 원문도 대화 기록(채팅방)에 남긴다 — 저장할 때마다 이번 대화분으로 다시 맞춘다
+        const turns = d.qa.slice(S.initialQa || 0);
+        if (turns.length) {
+          let t = S.threadId && App.wiki.getThread(S.threadId);
+          if (!t) { t = App.wiki.startThread({ source: 'chat', projectId: S.projectId || null, expId: id }); S.threadId = t.id; }
+          t.msgs = []; turns.forEach((x) => { t.msgs.push({ who: 'ai', text: x.q, at: t.at }); t.msgs.push({ who: 'me', text: x.a, at: t.at }); x.threadId = t.id; });
+          t.projectId = S.projectId || null;
+          const ex = App.store.get(id);
+          t.msgs.push({ who: 'ai', text: `「${String(ex ? ex.title : '').replace(/[「」]/g, '')}」에 반영했어요.`, at: t.at });
+          App.wiki.closeThread(t.id, { kind: 'applied', expId: id, entryId: S.entryId || null });
+        }
         S.dirty = false;
         return id;
       }

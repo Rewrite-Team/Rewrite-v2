@@ -28,7 +28,7 @@
     }
     if (q.targetProjectId) {
       const p = App.store.getProject(q.targetProjectId);
-      if (p) return { kind: 'project', text: `「${projName(p)}」 타임라인에 기록되고, 관련 경험에 반영돼요`, href: '#/projects/' + p.id };
+      if (p) return { kind: 'project', text: `「${projName(p)}」 대화로 남고, 관련 경험에 반영돼요`, href: '#/projects/' + p.id };
     }
     if (q.targetExpId) {
       const e = App.store.get(q.targetExpId);
@@ -40,15 +40,24 @@
     }
     return { kind: 'recall', text: '비슷한 경험이 있으면 거기에, 없으면 새 경험으로 반영돼요', href: '' };
   }
-  // 답한 뒤: 실제로 어디에 반영됐는지
+  // 이 질문으로 나눈 대화 (다시 답했으면 가장 최근 것)
+  function threadOf(q) {
+    if (!q || !App.wiki.threads) return null;
+    const list = App.wiki.threads().filter((t) => t.questionId === q.id);
+    return list.length ? list[list.length - 1] : null;
+  }
+  // 답한 뒤: 실제로 어디에 반영됐는지 + 대화 원문 링크
   function wentOf(q) {
     const out = [];
     if (!q || q.status !== 'answered') return out;
+    const t = threadOf(q);
+    const chat = t ? '#/chat?thread=' + encodeURIComponent(t.id) : '';
     const e = q.compiledTo && App.store.get(q.compiledTo);
     // 위키 이전에 답한 '깊이 파기' 질문도 그 경험의 출처로 들어가 있다
-    const ee = e || (q.targetExpId && App.store.get(q.targetExpId));
-    if (ee) out.push({ href: '#/card/' + ee.id, text: `「${title(ee.title, 28)}」에 반영됨` });
-    if (q.targetProjectId && !q.findingId) { const p = App.store.getProject(q.targetProjectId); if (p) out.push({ href: '#/projects/' + p.id, text: `「${projName(p)}」 타임라인에 기록됨` }); }
+    const ee = e || (t && t.outcome && t.outcome.kind === 'applied' && t.outcome.expId && App.store.get(t.outcome.expId)) || (q.targetExpId && App.store.get(q.targetExpId));
+    if (ee) out.push({ kind: 'applied', href: '#/card/' + ee.id, text: `「${title(ee.title, 28)}」에 반영됨` });
+    else if (t && t.outcome && t.outcome.kind === 'kept') out.push({ kind: 'kept', href: chat, text: '💬 대화에 보관됨' });
+    if (chat && !out.some((w) => w.kind === 'kept')) out.push({ kind: 'chat', href: chat, text: '대화 보기' });
     return out;
   }
   function destHTML(q) {
@@ -57,7 +66,9 @@
     return d.href ? `<a class="dy-dest" data-kind="${d.kind}" href="${esc(d.href)}">${inner}</a>` : `<div class="dy-dest" data-kind="${d.kind}">${inner}</div>`;
   }
   function wentHTML(q, cls = 'dy-target') {
-    return wentOf(q).map((w) => `<a class="${cls}" href="${esc(w.href)}"><span class="dy-target-ico">✓</span><span>${esc(w.text)}</span></a>`).join('');
+    return wentOf(q).map((w) => w.kind === 'chat'
+      ? `<a class="${cls} dy-chat-link" href="${esc(w.href)}"><span class="dy-target-ico">💬</span><span>${esc(w.text)} →</span></a>`
+      : `<a class="${cls} ${w.kind === 'kept' ? 'is-kept' : ''}" href="${esc(w.href)}">${w.kind === 'kept' ? '' : '<span class="dy-target-ico">✓</span>'}<span>${esc(w.text)}</span></a>`).join('');
   }
 
   // 설정된 시간 중 다음 질문 시각
@@ -232,7 +243,7 @@
             </div>
             <h2 class="dy-qtext">${esc(q.text)}</h2>
             <blockquote class="dy-quote">${esc(q.answer || '')}</blockquote>
-            ${wentOf(q).length ? `<div class="dy-went">${wentHTML(q)}</div>` : '<div class="dy-went subtle">위키 반영을 되돌린 답변이에요. 다시 답하면 새로 반영돼요.</div>'}
+            ${wentOf(q).length ? `<div class="dy-went">${wentHTML(q)}</div>` : '<div class="dy-went subtle">위키 반영을 되돌린 답변이에요. 다시 답하면 새로 정리돼요.</div>'}
             <div class="dy-qfoot">
               <div class="dy-qfoot-left"><button class="btn btn-ghost btn-sm" data-reask="${esc(q.id)}" type="button">다시 답하기</button></div>
               <button class="btn btn-primary" data-dy="next" type="button">${nx >= S.queue.length ? '마치기' : '남은 질문 보기 →'}</button>
@@ -274,8 +285,9 @@
         S.talk = App.talk.mount(box, {
           ask: { text: q.text, hint: q.hint || '' },
           src: srcOf(q),
-          commit: (text, d) => App.store.answer(q.id, text, { decision: d }),
+          commit: (text, d, tid) => App.store.answer(q.id, text, { decision: d, threadId: tid }),
           onDone: (entry) => onAnswered(q, entry),
+          room: true,
           next: { get label() { return hasOtherOpen(q.id) ? '다음 질문 →' : '마치기'; }, onClick: () => goNext() },
           noAutofocus: !window.matchMedia('(min-width: 901px)').matches,
         });
@@ -360,7 +372,7 @@
         const prev = q && q.wikiEntry ? App.wiki.get(q.wikiEntry) : null;
         if (prev && !prev.undone) {
           if (App.wiki.canUndo(prev)) App.wiki.undo(prev.id, true);
-          // 체크인 답이면 타임라인 기록도 지운다 — 다시 답하면 새 기록이 생기므로
+          // 체크인 답이면 프로젝트 기록도 지운다 — 다시 답하면 새 기록이 생기므로
           if (prev.source.logId && prev.source.projectId) App.store.removeLog(prev.source.projectId, prev.source.logId);
         }
         App.store.setQuestionStatus(id, 'pending');

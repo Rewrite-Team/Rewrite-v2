@@ -1,0 +1,45 @@
+/* ===== 대화 기록 (.ch-*) ===== */
+.ch-page { max-width: 880px; }
+.ch-head { margin-bottom: 14px; }
+.ch-counts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; font-size: 13px; color: var(--text-2); }
+.ch-counts b { color: var(--text); font-weight: 700; }
+.ch-dot { color: var(--text-3); }
+
+.ch-filters { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.ch-chip {
+  border: 1px solid var(--border); background: var(--surface); padding: 5px 12px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  color: var(--text-2); cursor: pointer; font-family: inherit; line-height: 1.4; transition: all .12s;
+}
+.ch-chip:hover { border-color: var(--border-strong); }
+.ch-chip.is-on { background: var(--text); border-color: var(--text); color: #fff; }
+.ch-proj { max-width: 220px; min-width: 0; text-overflow: ellipsis; padding-right: 10px; }
+.ch-proj option { color: var(--text); background: var(--surface); }
+
+/* 채팅방: 위는 대화 목록(스크롤), 아래는 입력창 */
+.ch-room { display: flex; flex-direction: column; height: min(78vh, 860px); min-height: 460px; overflow: hidden; padding: 0; min-width: 0; }
+.ch-body { position: relative; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 4px 16px 16px; background: var(--surface-2); }
+.ch-body .tk-thread { padding: 8px 0 10px; }
+.ch-body .tk-thread.is-hl { padding: 8px 10px 10px; margin: 0 -10px; box-shadow: inset 3px 0 0 var(--primary); }
+.ch-body .tk-rm-b { font-size: 14px; padding: 8px 12px; max-width: 78%; white-space: pre-wrap; }
+.ch-body .tk-thread-meta { font-size: 11.5px; }
+.ch-empty { padding: 56px 16px; }
+.ch-empty p + p { margin-top: 4px; font-size: 13px; }
+
+/* 그 자리에서 정리하는 대화 */
+.ch-org { margin: 2px 0 14px; padding: 10px 12px 12px; background: var(--surface); border: 1px solid var(--primary); border-radius: var(--radius); box-shadow: var(--shadow); min-width: 0; }
+.ch-org-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 700; color: var(--primary-ink); margin-bottom: 6px; }
+.ch-org .tk-msgs { max-height: min(48vh, 440px); }
+
+/* 입력창 (메신저 입력 바) */
+.ch-composer { border-top: 1px solid var(--border); background: var(--surface); padding: 10px 14px 12px; min-width: 0; }
+.ch-composer .tk-msgs { max-height: min(30vh, 260px); }
+.ch-composer .tk { gap: 8px; }
+
+@media (max-width: 900px) {
+  .ch-room { margin: 0 -16px; border-radius: 0; border-left: 0; border-right: 0; height: calc(100dvh - 170px); min-height: 420px; }
+  .ch-body { padding: 4px 12px 12px; }
+  .ch-body .tk-rm-b { max-width: 86%; }
+  .ch-body .tk-thread.is-hl { margin: 0 -6px; padding: 8px 6px 10px; }
+  .ch-composer { padding: 8px 12px 10px; }
+  .ch-proj { max-width: 100%; }
+}

@@ -1,7 +1,7 @@
 /* App core: store, router, ui helpers, mock AI. 모든 화면이 이 API만 사용한다. */
 window.App = window.App || {};
 (function (App) {
-  const LS_KEY = 'rewrite-proto-v6'; // v6: 경험 위키 (모든 기록 → ingest → 경험 페이지, 변경 기록·점검), v5: 깃허브 레포 분석 + 마스터 이력서, v2: 프로젝트와 경험 카드 분리 (1 프로젝트 : N 카드), v3: 완료 프로젝트 예시 추가, v4: 지난 질문 기록 시드 + 연속 기록을 답변 날짜에서 계산
+  const LS_KEY = 'rewrite-proto-v7'; // v7: 대화 기록(원문 채팅방) + 대화형 이전 체크인 정리, v6: 경험 위키 (모든 기록 → ingest → 경험 페이지, 변경 기록·점검), v5: 깃허브 레포 분석 + 마스터 이력서, v2: 프로젝트와 경험 카드 분리 (1 프로젝트 : N 카드), v3: 완료 프로젝트 예시 추가, v4: 지난 질문 기록 시드 + 연속 기록을 답변 날짜에서 계산
   const clone = (o) => JSON.parse(JSON.stringify(o));
 
   /* ---------------- Store ---------------- */
@@ -11,7 +11,7 @@ window.App = window.App || {};
       if (raw) return JSON.parse(raw);
     } catch (e) { /* ignore */ }
     const s = clone(window.SEED);
-    return { user: s.user, settings: s.settings, projects: s.projects, experiences: s.experiences, inbox: s.inbox, applications: s.applications, resume: s.resume, wikiLog: [], wikiMeta: { lastQueue: '' } };
+    return { user: s.user, settings: s.settings, projects: s.projects, experiences: s.experiences, inbox: s.inbox, applications: s.applications, resume: s.resume, wikiLog: [], wikiMeta: { lastQueue: '' }, threads: null };
   }
   function EMPTY_RESUME() { return { profile: { name: '', headline: '', email: '', phone: '', github: '', blog: '', intro: '' }, skills: [], entries: [], versions: [] }; }
   let state = load();
@@ -120,12 +120,13 @@ window.App = window.App || {};
         const p = this.getProject(q.targetProjectId);
         const log = { id: uid('l'), date: localDay(), type: t, text, keywords: opts.keywords || App.ai.extractKeywords(text), fromQuestion: q.checkinText || q.text };
         p.logs.push(log); p.updatedAt = localDay();
-        entry = App.wiki.ingest({ type: 'checkin', text, question: q.checkinText || q.text, questionId: q.id, projectId: p.id, logId: log.id, logType: t, keywords: log.keywords, decision: opts.decision });
+        entry = App.wiki.ingest({ type: 'checkin', text, question: q.checkinText || q.text, questionId: q.id, projectId: p.id, logId: log.id, logType: t, keywords: log.keywords, decision: opts.decision, threadId: opts.threadId });
+        const tid = opts.threadId || App.wiki.activeThread(); if (tid) log.threadId = tid;
       } else if (q.findingId) {
         // 코드 분석에서 나온 질문: 그 코드가 근거로 붙은 경험으로
-        entry = App.wiki.ingest({ type: 'answer', text, question: q.text, questionId: q.id, projectId: q.targetProjectId, findingId: q.findingId, decision: opts.decision });
+        entry = App.wiki.ingest({ type: 'answer', text, question: q.text, questionId: q.id, projectId: q.targetProjectId, findingId: q.findingId, decision: opts.decision, threadId: opts.threadId });
       } else {
-        entry = App.wiki.ingest({ type: 'answer', text, question: q.text, questionId: q.id, expId: q.targetExpId || null, stage: q.stage || null, decision: opts.decision });
+        entry = App.wiki.ingest({ type: 'answer', text, question: q.text, questionId: q.id, expId: q.targetExpId || null, stage: q.stage || null, decision: opts.decision, threadId: opts.threadId });
       }
       if (entry) q.wikiEntry = entry.id;
       emit(); return entry;
@@ -557,7 +558,7 @@ window.App = window.App || {};
   // 화면 등록: App.screens.<name> = { title, layout?: 'shell'|'full', render(params) => html, mount?(root, params) => cleanupFn? }
   App.screens = App.screens || {};
   App.routes = [
-    ['#/onboarding', 'onboarding'], ['#/home', 'home'], ['#/discover', 'discover'], ['#/daily', 'daily'],
+    ['#/onboarding', 'onboarding'], ['#/home', 'home'], ['#/chat', 'chat'], ['#/discover', 'discover'], ['#/daily', 'daily'],
     ['#/projects/:id', 'projects'], ['#/projects', 'projects'], ['#/vault', 'vault'], ['#/card/:id', 'card'],
     ['#/apply/:id/:tab', 'apply'], ['#/apply/:id', 'apply'], ['#/apply', 'apply'],
     ['#/competency', 'apply'], ['#/match', 'apply'], ['#/settings', 'settings'], ['#/resume', 'resume'],

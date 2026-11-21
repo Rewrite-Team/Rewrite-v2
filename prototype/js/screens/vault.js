@@ -207,8 +207,7 @@
   function issueHTML(i, st) {
     const acts = [];
     const open = st && st.talkFor === i.id;
-    if (i.action === 'compileLog') acts.push(open ? '' : `<button type="button" class="btn btn-sm btn-primary" data-issue-talk="${esc(i.id)}">바로 반영</button>`);
-    else if (i.action === 'link') acts.push(`<button type="button" class="btn btn-sm btn-primary" data-issue-fix="${esc(i.id)}">바로 연결</button>`);
+    if (i.action === 'link') acts.push(`<button type="button" class="btn btn-sm btn-primary" data-issue-fix="${esc(i.id)}">바로 연결</button>`);
     if (i.question) {
       if (!open) acts.push(`<button type="button" class="btn btn-sm btn-primary" data-issue-talk="${esc(i.id)}">바로 답하기</button>`);
       acts.push(askedFor(i)
@@ -222,26 +221,22 @@
   }
   // 점검 항목 → 그 자리에서 여는 기록 대화 설정
   function talkCfg(issue) {
-    if (issue.action === 'compileLog') {
-      const p = App.store.getProject(issue.projectId);
-      const log = p && (p.logs || []).find((l) => l.id === issue.logId);
-      if (!log) return null;
-      return { prefill: log.text, src: { type: 'checkin', projectId: issue.projectId, logId: log.id, logType: log.type, question: log.fromQuestion || '' } };
-    }
     const q = issue.question; if (!q) return null;
     const src = q.targetExpId && q.stage ? { type: 'answer', expId: q.targetExpId, stage: q.stage, question: q.text }
       : q.findingId ? { type: 'answer', projectId: q.targetProjectId, findingId: q.findingId, question: q.text }
       : { type: 'answer', question: q.text };
     return {
       ask: { text: q.text, hint: q.hint || '', label: '위키 점검' }, src,
-      commit: (text, d) => { const qq = App.wiki.askIssue(issue); return App.store.answer(qq.id, text, { decision: d }); },
+      thread: { source: 'check' },
+      commit: (text, d, tid) => { const qq = App.wiki.askIssue(issue); return App.store.answer(qq.id, text, { decision: d, threadId: tid }); },
     };
   }
   function lintHTML(st) {
     const issues = App.wiki.lint();
     const shown = st.allIssues ? issues : issues.slice(0, ISSUE_LIMIT);
     const fixed = st.fixed && App.wiki.get(st.fixed);
-    return `<div class="vt-panel-head"><h2>위키 점검</h2><span class="subtle">${issues.length ? `채우면 좋은 곳 ${issues.length}개` : ''}</span></div>
+    const kept = App.wiki.threadsFor ? App.wiki.threadsFor({ kind: 'kept' }).length : 0;
+    return `<div class="vt-panel-head"><h2>위키 점검</h2><span class="subtle">${issues.length ? `채우면 좋은 곳 ${issues.length}개` : ''}</span>${kept ? `<a class="vt-kept-link" href="#/chat">💬 보관 중인 대화 ${kept}개 → 대화 기록</a>` : ''}</div>
       ${fixed ? `<div class="vt-fixed">${App.wiki.reportHTML(fixed)}<button type="button" class="btn btn-sm btn-ghost vt-fixed-close" data-act="close-fixed">닫기</button></div>` : ''}
       ${issues.length ? `<ul class="wk-issues">${shown.map((i) => issueHTML(i, st)).join('')}</ul>
         ${issues.length > ISSUE_LIMIT ? `<button type="button" class="btn btn-sm btn-ghost vt-more" data-act="more-issues">${st.allIssues ? '접기' : `더 보기 (${issues.length - ISSUE_LIMIT}개)`}</button>` : ''}`

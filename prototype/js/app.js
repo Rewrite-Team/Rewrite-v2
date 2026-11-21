@@ -5,8 +5,9 @@
     { group: '① 기록하기' },
     { href: '#/home', name: 'home', ico: '⌂', label: '홈' },
     { href: '#/daily', name: 'daily', ico: '✉', label: '오늘의 질문', badge: () => App.store.pending().length },
+    { href: '#/chat', name: 'chat', ico: '💬', label: '대화 기록', badge: () => App.wiki.threadsFor({ kind: 'kept' }).length, badgeTone: 'soft', badgeTitle: '아직 경험으로 정리하지 않고 보관 중인 대화' },
     { group: '② 경험 위키' },
-    { href: '#/vault', name: 'vault', ico: '▦', label: '경험 위키', badge: () => App.wiki.lint().filter((i) => i.severity >= 3).length, badgeTone: 'soft' },
+    { href: '#/vault', name: 'vault', ico: '▦', label: '경험 위키', badge: () => App.wiki.lint().filter((i) => i.severity >= 3).length, badgeTone: 'soft', badgeTitle: '위키 점검: 꼭 채울 곳' },
     { href: '#/projects', name: 'projects', ico: '▤', label: '프로젝트' },
     { group: '③ 꺼내 쓰기' },
     { href: '#/resume', name: 'resume', ico: '☰', label: '마스터 이력서' },
@@ -34,7 +35,7 @@
       <a class="brand" href="#/home"><div class="brand-mark">R</div><div><div class="brand-name">Rewrite</div><div class="brand-sub">경험을 다시 쓰다</div></div></a>
       ${NAV.map((n) => n.group ? `<div class="nav-group-label">${n.group}</div>` : `
         <a class="nav-item ${active === n.name ? 'active' : ''}" href="${n.href}"><span class="ico">${n.ico}</span>${n.label}
-        ${n.badge && n.badge() ? `<span class="badge-count ${n.badgeTone === 'soft' ? 'badge-soft' : ''}" ${n.badgeTone === 'soft' ? 'title="위키 점검: 꼭 채울 곳"' : ''}>${n.badge()}</span>` : ''}${n.beta ? '<span class="beta">BETA</span>' : ''}</a>
+        ${n.badge && n.badge() ? `<span class="badge-count ${n.badgeTone === 'soft' ? 'badge-soft' : ''}" ${n.badgeTitle ? `title="${n.badgeTitle}"` : ''}>${n.badge()}</span>` : ''}${n.beta ? '<span class="beta">BETA</span>' : ''}</a>
         ${n.apps ? appSubnav(active === 'apply' ? params : null) : ''}`).join('')}
       <div class="sidebar-foot">
         <div class="avatar">${App.ui.esc(u.name.slice(0, 1))}</div>

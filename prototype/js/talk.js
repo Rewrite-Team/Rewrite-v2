@@ -6,11 +6,14 @@
      ask: { text, hint?, label? },      // AI 첫 질문 (prefill 이 있으면 생략 가능)
      prefill?: '원문',                   // 이미 적힌 기록(체크인 로그 등) → 바로 제안부터
      src: { type, question, questionId, expId, stage, projectId, logId, logType, findingId },
-     commit?: (text, decision) => entry, // 기본: App.wiki.ingest({ ...src, text, decision })
+     commit?: (text, decision) => entry, // 기본: App.wiki.ingest({ ...src, text, decision }) — 대화 id 는 자동으로 이어진다
+     thread?: { source, label },         // 대화 기록에 남길 출처 (생략하면 src 로 추정). threadId 를 주면 그 대화를 이어서 쓴다
+     room?: true,                         // 옆에 대화 기록(채팅방) 패널을 같이 보여 줄지
      onDone?: (entry) => void,
      next?: { label, onClick },          // 반영 뒤 보여 줄 다음 행동
      placeholder?, followup?: true
-   }) → { destroy() } */
+   }) → { destroy() }
+   모든 대화는 App.wiki 의 대화 기록(state.threads)에 원문 그대로 남는다 — 경험에 넣지 않고 '대화에만 보관'한 것도. */
 (function (App) {
   const esc = (s) => App.ui.esc(s);
   const FIELDS = [['situation', '상황'], ['task', '과제'], ['action', '행동'], ['result', '결과'], ['insights', '배운 점']];
@@ -22,6 +25,22 @@
     const st = { phase: cfg.prefill ? 'propose' : 'ask', msgs: [], answer: cfg.prefill || '', plan: null, follows: 0, busy: false, entry: null };
     const W = App.wiki; const S = App.store;
     let alive = true;
+    // ---------- 대화 기록 (원문 보관) ----------
+    // 같은 질문으로 하다 만 대화가 있으면 새로 시작하지 않고 그 대화를 이어 간다
+    const resume = !cfg.threadId && src.questionId ? W.threads().find((t) => t.questionId === src.questionId && t.outcome && t.outcome.kind === 'open' && t.msgs.some((m) => m.who === 'me')) : null;
+    let threadId = cfg.threadId || (resume ? resume.id : null);
+    const pending = []; // 사용자가 첫 말을 하기 전까지는 기록을 만들지 않는다 (열어 보기만 한 대화는 남기지 않음)
+    const sourceOf = () => (cfg.thread && cfg.thread.source) || (src.findingId ? 'code' : src.type === 'checkin' ? 'checkin' : src.questionId ? 'daily' : src.type === 'manual' ? 'capture' : src.expId ? 'coach' : 'capture');
+    function log(who, text) {
+      if (!text) return;
+      if (!threadId && who === 'ai') { pending.push(text); return; }
+      if (!threadId) {
+        const t = W.startThread({ source: sourceOf(), label: cfg.thread && cfg.thread.label, projectId: src.projectId || null, questionId: src.questionId || null, expId: src.expId || null, findingId: src.findingId || null });
+        threadId = t.id; pending.splice(0).forEach((x) => W.addMsg(threadId, 'ai', x));
+      }
+      W.addMsg(threadId, who, text);
+    }
+    const plain = (html) => String(html || '').replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, (m) => ({ '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" }[m] || ' ')).replace(/\s+/g, ' ').trim();
 
     function planFor(text, keep) {
       const p = W.plan(Object.assign({}, src, { text }));
@@ -33,24 +52,23 @@
       }
       return p;
     }
-    const ai = (html, extra = {}) => st.msgs.push(Object.assign({ who: 'ai', html }, extra));
-    const me = (text) => st.msgs.push({ who: 'me', html: esc(text) });
+    const ai = (html, extra = {}) => { st.msgs.push(Object.assign({ who: 'ai', html }, extra)); if (!extra.prop && !extra.report && !extra.nolog) log('ai', plain(html)); };
+    const me = (text) => { st.msgs.push({ who: 'me', html: esc(text) }); log('me', text); };
 
     // ---------- 제안 카드 ----------
     function proposalHTML(p, live) {
       const e = p.expId && S.get(p.expId);
       if (!live) {
-        const where = p.mode === 'update' && e ? `「${esc(W.short(bare(e.title), 26))}」 · ${FL[p.field]}` : p.mode === 'new' ? `새 경험 「${esc(W.short(bare(p.title), 26))}」` : p.mode === 'timeline' ? '타임라인에만' : '반영 안 함';
+        const where = p.mode === 'update' && e ? `「${esc(W.short(bare(e.title), 26))}」 · ${FL[p.field]}` : p.mode === 'new' ? `새 경험 「${esc(W.short(bare(p.title), 26))}」` : '대화에만 보관';
         return `<div class="tk-prop is-past"><span class="subtle">제안</span> ${where}</div>`;
       }
       const opts = [];
       if (e) opts.push([e.id, `「${W.short(bare(e.title), 26)}」`]);
       p.candidates.filter((id) => id !== p.expId).forEach((id) => { const c = S.get(id); if (c) opts.push([id, `「${W.short(bare(c.title), 26)}」`]); });
-      const sel = p.mode === 'update' ? p.expId : p.mode === 'new' ? '__new' : p.mode === 'timeline' ? '__timeline' : '__skip';
+      const sel = p.mode === 'update' ? p.expId : p.mode === 'new' ? '__new' : '__keep';
       const head = p.mode === 'update' ? `<b>「${esc(W.short(bare(e && e.title), 28))}」</b>의 <b>${FL[p.field]}</b> 칸에 이렇게 적을게요`
         : p.mode === 'new' ? '비슷한 경험이 없어서 <b>새 경험</b>으로 만들게요'
-        : p.mode === 'timeline' ? '아직 이야기라기보다 진행 기록 같아요. <b>타임라인에만</b> 남길게요'
-        : '위키에는 반영하지 않고 <b>답변만</b> 남길게요';
+        : '아직 경험이라기보다 근황 같아요. <b>대화 기록에 보관</b>해 둘게요<div class="tk-keep-note subtle">원문은 그대로 남아 있어서, 나중에 이야기가 이어지면 대화 기록에서 바로 경험으로 정리할 수 있어요.</div>';
       const editable = p.mode === 'update' || p.mode === 'new';
       return `<div class="tk-prop" data-tk-prop>
         <div class="tk-prop-head">${head}</div>
@@ -63,13 +81,17 @@
           <select class="input tk-target" data-tk-target>
             ${opts.map(([id, l]) => `<option value="${id}" ${sel === id ? 'selected' : ''}>${esc(l)}에 반영</option>`).join('')}
             <option value="__new" ${sel === '__new' ? 'selected' : ''}>＋ 새 경험으로 만들기</option>
-            ${src.type === 'checkin' ? `<option value="__timeline" ${sel === '__timeline' ? 'selected' : ''}>타임라인에만 기록</option>` : ''}
-            <option value="__skip" ${sel === '__skip' ? 'selected' : ''}>위키에 반영하지 않기</option>
+            <option value="__keep" ${sel === '__keep' ? 'selected' : ''}>💬 아직 경험으로 만들지 않고 대화에만 보관</option>
           </select>
-          <button type="button" class="btn btn-primary btn-sm" data-tk-ok>${p.mode === 'skip' ? '답변만 남기기' : p.mode === 'timeline' ? '타임라인에 기록' : '이렇게 반영'}</button>
+          <button type="button" class="btn btn-primary btn-sm" data-tk-ok>${p.mode === 'keep' ? '대화에만 보관' : '이렇게 반영'}</button>
         </div>
-        <div class="tk-tip subtle">고르기 어렵다면 아래에 말로 해도 돼요 — "새로 만들어 줘", "결과 칸에", "카페 알바 경험에"</div>
+        <div class="tk-tip subtle">말로 해도 돼요 — "새로 만들어 줘", "결과 칸에", "카페 알바 경험에 넣어 줘", "그냥 보관해 줘"</div>
       </div>`;
+    }
+
+    function propText(p) {
+      const e = p.expId && S.get(p.expId);
+      return p.mode === 'update' && e ? `제안: 「${bare(e.title)}」의 ${FL[p.field]} 칸에 "${p.text}"` : p.mode === 'new' ? `제안: 새 경험 「${bare(p.title)}」 (${FL[p.field]}: "${p.text}")` : '제안: 대화에만 보관';
     }
 
     // ---------- 그리기 ----------
@@ -77,7 +99,8 @@
       if (!alive) return;
       const last = st.msgs.length - 1;
       const inputOn = st.phase !== 'done' && !st.busy;
-      el.innerHTML = `<div class="tk">
+      const roomOn = !!cfg.room;
+      el.innerHTML = `${roomOn ? `<div class="tk-shell"><aside class="tk-room-pane">${roomPaneHTML()}</aside><div class="tk-main">` : ''}<div class="tk">
         <div class="tk-msgs">${st.msgs.map((m, i) => m.who === 'ai'
           ? `<div class="tk-msg ai"><span class="ai-dot">R</span><div class="tk-bubble">${m.prop ? proposalHTML(m.prop, i === last && st.phase === 'propose') : m.html}</div></div>`
           : `<div class="tk-msg me"><div class="tk-bubble">${m.html}</div></div>`).join('')}
@@ -91,8 +114,9 @@
             <button type="button" class="btn btn-primary tk-send" data-tk-send ${inputOn ? '' : 'disabled'} aria-label="보내기">↑</button>
           </div>
         </div>`}
-      </div>`;
+      </div>${roomOn ? '</div></div>' : ''}`;
       bind();
+      const rb = el.querySelector('.tk-room-body'); if (rb) rb.scrollTop = rb.scrollHeight;
       const box = el.querySelector('.tk-msgs'); if (box) box.scrollTop = box.scrollHeight;
     }
 
@@ -121,13 +145,20 @@
     function retarget(v) {
       const p = st.plan;
       if (v === '__new') { p.mode = 'new'; p.expId = null; if (!p.title || S.list().some((e) => e.title === p.title)) p.title = W.short(st.answer, 24); }
-      else if (v === '__timeline') p.mode = 'timeline';
-      else if (v === '__skip') p.mode = 'skip';
+      else if (v === '__keep' || v === '__skip') { p.mode = 'keep'; p.expId = null; }
       else { p.mode = 'update'; p.expId = v; p.title = (S.get(v) || {}).title; }
       p.current = p.mode === 'update' ? W.currentOf(S.get(p.expId), p.field) : '';
     }
 
     // ---------- 대화 진행 ----------
+    function roomPaneHTML() {
+      const list = W.threadsFor().filter((t) => t.id !== threadId).slice(-6);
+      return `<details class="tk-room" ${window.matchMedia && window.matchMedia('(min-width: 900px)').matches ? 'open' : ''}>
+        <summary class="tk-room-head"><span>💬 지난 대화</span><a href="#/chat" class="tk-room-all">전체 보기 →</a></summary>
+        <div class="tk-room-body">${list.length ? roomHTML(list, { compact: true }) : '<p class="subtle" style="font-size:12.5px;margin:8px 0">아직 대화가 없어요.</p>'}</div>
+      </details>`;
+    }
+
     async function think(ms = 550) { st.busy = true; render(); await App.ai.think(ms); st.busy = false; }
 
     function onSend() {
@@ -161,9 +192,9 @@
       const e = p.expId && S.get(p.expId);
       const lead = p.mode === 'update'
         ? (p.confidence === 'question' ? `이 답은 「${esc(W.short(bare(e.title), 26))}」 이야기죠.` : `「${esc(W.short(bare(e.title), 26))}」와 같은 이야기 같아요.`)
-        : p.mode === 'timeline' ? '프로젝트 진행 기록으로 남겨 둘게요.' : '처음 듣는 이야기예요.';
-      ai(`${lead} 이렇게 정리해 봤어요. 맞는지 봐 주세요.`);
-      ai('', { prop: p });
+        : p.mode === 'keep' ? '기록해 둘게요.' : '처음 듣는 이야기예요.';
+      ai(`${lead} ${p.mode === 'keep' ? '' : '이렇게 정리해 봤어요. 맞는지 봐 주세요.'}`);
+      ai('', { prop: p }); log('ai', propText(p));
       render();
     }
     // 제안 단계에서 사용자가 말로 고치기
@@ -176,8 +207,7 @@
         if (p.mode !== 'new') { retarget('__new'); changed.push('새 경험으로'); }
         p.title = titleM[1].trim(); changed.push(`제목을 「${W.short(p.title, 24)}」로`);
       } else if (/새로|새 경험|따로|새로운/.test(t)) { retarget('__new'); changed.push('새 경험으로'); }
-      else if (/반영\s*안|하지\s*마|원문만|안\s*넣|넣지\s*마|답변만/.test(t)) { retarget('__skip'); changed.push('답변만 남기기로'); }
-      else if (/타임라인/.test(t) && src.type === 'checkin') { retarget('__timeline'); changed.push('타임라인에만'); }
+      else if (/보관|반영\s*안|하지\s*마|원문만|안\s*넣|넣지\s*마|답변만|나중에|아직/.test(t)) { retarget('__keep'); changed.push('대화에만 보관하도록'); }
       else if (/(에|으로|로|쪽)\s*(넣|반영|붙|추가|합|옮)|경험(이야|이에요|에)|이야기(야|예요|에)/.test(t)) {
         // "카페 알바 경험에 넣어 줘" — 대상 경험을 가리킬 때만 바꾼다 (흔한 단어는 빼고 비교)
         const GENERIC = /^(경험|프로젝트|아르바이트|해결|개선|문제|버그|구현|운영|기록|중복|팀|수업)$/;
@@ -188,13 +218,13 @@
       const fm = [['result', /결과|성과|숫자/], ['action', /행동|한 일|내가 한/], ['situation', /상황|배경|계기/], ['task', /과제|역할|목표|맡은/], ['insights', /배운|느낀|교훈|배움/]].find(([, re]) => re.test(t) && !/제목/.test(t));
       if (fm && fm[0] !== p.field) { p.field = fm[0]; p.current = p.mode === 'update' ? W.currentOf(S.get(p.expId), p.field) : ''; changed.push(`${FL[fm[0]]} 칸에 적도록`); }
       await think(400);
-      if (changed.length) { p.userSet = true; ai(`알겠어요. ${esc(changed.join(', '))} 바꿨어요.`); ai('', { prop: p }); }
+      if (changed.length) { p.userSet = true; ai(`알겠어요. ${esc(changed.join(', '))} 바꿨어요.`); ai('', { prop: p }); log('ai', propText(p)); }
       else {
         // 지시가 아니면 내용을 보탠 것으로 본다
         st.answer = `${st.answer} ${t}`;
         const keep = { mode: p.mode, expId: p.expId, field: p.field, title: p.title };
         const np = planFor(st.answer, keep); np.userSet = p.userSet; st.plan = np;
-        ai('내용을 보태서 다시 정리했어요.'); ai('', { prop: np });
+        ai('내용을 보태서 다시 정리했어요.'); ai('', { prop: np }); log('ai', propText(np));
       }
       render();
     }
@@ -203,32 +233,69 @@
       if ((p.mode === 'update' || p.mode === 'new') && !String(p.text || '').trim()) return;
       const decision = { mode: p.mode, expId: p.mode === 'update' ? p.expId : null, field: p.field, text: p.text, title: p.mode === 'new' ? (p.title || W.short(st.answer, 24)) : undefined, projectId: p.projectId };
       st.phase = 'done';
-      me(p.mode === 'skip' ? '답변만 남겨 주세요' : p.mode === 'timeline' ? '타임라인에 기록해 주세요' : '이렇게 반영해 주세요');
+      me(p.mode === 'keep' ? '대화에만 보관해 주세요' : '이렇게 반영해 주세요');
       await think(350);
-      const entry = cfg.commit ? cfg.commit(st.answer, decision) : W.ingest(Object.assign({}, src, { text: st.answer, decision }));
+      const entry = W.withThread(threadId, () => (cfg.commit ? cfg.commit(st.answer, decision, threadId) : W.ingest(Object.assign({}, src, { text: st.answer, decision, threadId }))));
       st.entry = entry;
+      const tgt = entry && entry.target && S.get(entry.target);
+      if (p.mode === 'keep' || !tgt) { W.closeThread(threadId, { kind: 'kept', entryId: entry && entry.id }); log('ai', '대화 기록에 보관했어요.'); }
+      else { W.closeThread(threadId, { kind: 'applied', expId: tgt.id, entryId: entry.id, field: p.field, mode: p.mode }); log('ai', `「${bare(tgt.title)}」에 반영했어요.`); }
       ai(entry ? W.reportHTML(entry) : '반영했어요.', { report: true });
       render();
       if (cfg.onDone) cfg.onDone(entry);
     }
 
     // 시작
+    if (resume) {
+      resume.msgs.forEach((m) => st.msgs.push({ who: m.who, html: esc(m.text) }));
+      st.answer = W.threadText(resume);
+      st.msgs.push({ who: 'ai', html: '지난번에 하다 만 대화를 이어서 정리할게요.' });
+      propose(); return ctlOf();
+    }
     if (cfg.ask) ai(`${cfg.ask.label ? `<div class="tk-label">${esc(cfg.ask.label)}</div>` : ''}<div class="tk-q">${esc(cfg.ask.text)}</div>${cfg.ask.hint ? `<div class="tk-hint">💡 ${esc(cfg.ask.hint)}</div>` : ''}`);
-    if (cfg.prefill) { me(cfg.prefill); propose(); } else render();
-    return { destroy() { alive = false; el.innerHTML = ''; }, get phase() { return st.phase; } };
+    if (cfg.prefill) {
+      if (threadId) { st.msgs.push({ who: 'me', html: esc(cfg.prefill) }); } else me(cfg.prefill); // 이어 쓰는 대화면 원문은 이미 기록돼 있다
+      propose();
+    } else render();
+    return ctlOf();
+    function ctlOf() { return { destroy() { alive = false; el.innerHTML = ''; }, get phase() { return st.phase; }, get threadId() { return threadId; } }; }
+  }
+
+  /* 대화 기록(채팅방) 그리기 — talk 옆 패널과 #/chat 화면이 같이 쓴다
+     opts: { compact, organize (보관된 대화에 '경험으로 정리' 버튼), highlight: threadId } */
+  const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
+  function dayLabel(d) { const x = App.store.parseDay(d); const today = App.store.localDay(); return d === today ? '오늘' : `${x.getMonth() + 1}월 ${x.getDate()}일 (${WEEK[x.getDay()]})`; }
+  function outcomeHTML(t, opts) {
+    const o = t.outcome || {}; const S = App.store;
+    if (o.kind === 'applied') { const e = S.get(o.expId); return e ? `<a class="tk-out is-applied" href="#/card/${e.id}">→ 「${esc(App.wiki.short(bare(e.title), 24))}」에 반영</a>` : '<span class="tk-out is-applied">경험에 반영됨</span>'; }
+    if (o.kind === 'kept') return `<span class="tk-out is-kept">💬 대화에 보관 중</span>${opts.organize ? `<button type="button" class="btn btn-sm tk-organize" data-room-organize="${t.id}">경험으로 정리</button>` : ''}`;
+    return `<span class="tk-out is-open">정리 전 대화</span>${opts.organize ? `<button type="button" class="btn btn-sm tk-organize" data-room-organize="${t.id}">이어서 정리</button>` : ''}`;
+  }
+  function roomHTML(list, opts = {}) {
+    let last = '';
+    return list.map((t) => {
+      const sep = t.date !== last ? `<div class="tk-day"><span>${esc(dayLabel(t.date))}</span></div>` : ''; last = t.date;
+      const p = t.projectId && App.store.getProject(t.projectId);
+      const msgs = opts.compact ? t.msgs.filter((m, i) => m.who === 'me' || i === 0).slice(0, 3) : t.msgs;
+      return `${sep}<div class="tk-thread ${opts.highlight === t.id ? 'is-hl' : ''}" id="thread-${t.id}" data-thread="${t.id}">
+        <div class="tk-thread-meta"><span class="tk-thread-src">${esc(t.label || '대화')}</span>${p ? `<span>▤ ${esc(App.store.projectName(p))}</span>` : ''}<span>${esc(t.at || '')}</span></div>
+        ${msgs.map((m) => `<div class="tk-rm ${m.who}"><div class="tk-rm-b">${esc(opts.compact ? App.wiki.short(m.text, 70) : m.text)}</div></div>`).join('')}
+        <div class="tk-thread-foot">${outcomeHTML(t, opts)}</div>
+      </div>`;
+    }).join('');
   }
 
   // 모달로 띄우기 (위키 점검·홈·경험 페이지 등에서 그 자리에서 답하기)
   function open(cfg) {
     const root = document.getElementById('modal-root');
-    root.innerHTML = `<div class="modal-backdrop"><div class="modal tk-modal">
+    root.innerHTML = `<div class="modal-backdrop"><div class="modal tk-modal ${cfg.room === false ? '' : 'has-room'}">
       <div class="modal-head">${esc(cfg.title || 'AI와 대화하며 기록')}<button class="btn btn-ghost btn-sm tk-close" data-tk-close aria-label="닫기">✕</button></div>
       <div class="modal-body"><div class="tk-modal-body"></div>${cfg.footerHTML ? `<div class="tk-modal-foot">${cfg.footerHTML}</div>` : ''}</div></div></div>`;
     let changed = false;
     const close = () => { root.innerHTML = ''; ctl.destroy(); if (changed && cfg.onClose) cfg.onClose(); else if (changed) App.rerender(); };
     root.querySelector('[data-tk-close]').onclick = close;
     root.querySelector('.modal-backdrop').onclick = (ev) => { if (ev.target.classList.contains('modal-backdrop') || ev.target.closest('.tk-modal-foot a')) close(); };
-    const ctl = mount(root.querySelector('.tk-modal-body'), Object.assign({}, cfg, {
+    const ctl = mount(root.querySelector('.tk-modal-body'), Object.assign({ room: true }, cfg, {
       onFirstSend: () => { const f = root.querySelector('.tk-modal-foot'); if (f) f.remove(); },
       onDone: (e) => { changed = true; if (cfg.onDone) cfg.onDone(e); },
       next: cfg.next || { label: '닫기', onClick: close },
@@ -236,5 +303,14 @@
     return { close };
   }
 
-  App.talk = { mount, open };
+    // 보관된 대화를 나중에 경험으로 정리 — 같은 대화(thread)에 이어서 쓴다
+  function organize(el, threadId, cfg = {}) {
+    const t = App.wiki.getThread(threadId); if (!t) return null;
+    const text = App.wiki.threadText(t);
+    const q = (t.msgs.find((m) => m.who === 'ai') || {}).text || '';
+    const src = { type: t.source === 'checkin' ? 'checkin' : 'answer', question: q, questionId: t.questionId || null, projectId: t.projectId || null, findingId: t.findingId || null, expId: null };
+    return mount(el, Object.assign({ prefill: text, src, threadId, followup: false }, cfg));
+  }
+
+  App.talk = { mount, open, organize, roomHTML };
 })(window.App);

@@ -1,5 +1,6 @@
 /* 경험 위키 엔진 — 카파시의 "LLM 위키" 구조를 프로토타입으로 흉내 낸다.
-   ┌ 기록(원문, 바뀌지 않음) ─ 오늘의 질문 답변 · 프로젝트 체크인 · AI 대화 · 코드 분석 · 직접 작성
+   ┌ 대화 기록(원문, 바뀌지 않음) ─ AI와 나눈 모든 대화를 채팅방처럼 보관 (state.threads)
+   │                              오늘의 질문 · 위키 점검 · ＋기록하기 · 프로젝트 체크인 · 코드 질문 — 경험이 안 된 대화도 여기 남는다
    ├ 위키(AI가 정리·유지) ── 경험 페이지(state.experiences) + 프로젝트 페이지(state.projects)
    └ 꺼내 쓰기(질의) ────── 이력서 · 자소서 · 면접 — 위키 페이지를 근거로 인용
 
@@ -36,6 +37,7 @@
     const s = st();
     if (!Array.isArray(s.wikiLog)) s.wikiLog = [];
     if (!s.wikiMeta) s.wikiMeta = { lastQueue: '' };
+    if (!Array.isArray(s.threads)) { s.threads = []; seedThreads(); }
     s.experiences.forEach((e) => { if (!Array.isArray(e.codeRefs)) e.codeRefs = []; if (!Array.isArray(e.qa)) e.qa = []; if (!Array.isArray(e.sourceLogIds)) e.sourceLogIds = []; });
   }
 
@@ -92,8 +94,10 @@
     const tt = new Set(tokens(text));
     const kws = App.ai.extractKeywords(text);
     s += e.keywords.filter((k) => kws.includes(k)).length * 1.5;
-    if (ctx.projectId && e.projectId === ctx.projectId) s += 3;
-    const titleToks = tokens(e.title);
+    if (ctx.projectId && !ctx.projectOnly && e.projectId === ctx.projectId) s += 3; // 같은 프로젝트 안에서만 찾을 땐 가산점이 의미 없다
+    // 제목 속 프로젝트 이름(「모여봄」 등)은 그 프로젝트의 모든 경험에 있으니 매칭 근거에서 뺀다
+    const pj = e.projectId && S.getProject(e.projectId); const pnames = new Set(pj ? tokens(pj.title).concat(tokens(S.projectName(pj))) : []);
+    const titleToks = tokens(e.title).filter((w) => !pnames.has(w));
     s += titleToks.filter((w) => tt.has(w) || String(text).includes(w)).length * 2.5;
     const body = [e.summary, e.star.situation, e.star.action, e.star.result].join(' ');
     const bodyToks = new Set(tokens(body));
@@ -144,7 +148,7 @@
     const room = Math.max(0, Math.min(e.keywords.length ? 1 : 2, 5 - e.keywords.length));
     const kws = (opts.keywords || App.ai.extractKeywords(text)).filter((k) => !e.keywords.includes(k)).slice(0, room);
     if (kws.length) { e.keywords.push(...kws); changes.push({ kind: 'keyword', expId: e.id, after: kws }); }
-    if (opts.question || opts.source === 'answer' || opts.source === 'chat') e.qa.push({ q: opts.question || '(직접 기록)', a: text, date: S.localDay(), source: opts.source, qid: opts.questionId || null });
+    if (opts.question || opts.source === 'answer' || opts.source === 'chat') e.qa.push({ q: opts.question || '(직접 기록)', a: text, date: S.localDay(), source: opts.source, qid: opts.questionId || null, threadId: opts.threadId || null });
     if (opts.logId && !e.sourceLogIds.includes(opts.logId)) e.sourceLogIds.push(opts.logId);
     (opts.findingIds || []).forEach((f) => { if (!e.codeRefs.includes(f)) e.codeRefs.push(f); });
     if (opts.logId || (opts.findingIds || []).length) changes.push({ kind: 'evidence', expId: e.id, text: opts.logId ? '체크인 기록 연결' : '코드 근거 연결' });
@@ -189,10 +193,87 @@
       projectId = src.projectId || (detectProject(text) || {}).id || null;
       const m = match(text, { projectId, projectOnly: src.type === 'checkin' || src.type === 'code' });
       candidates = m.candidates.map((e) => e.id);
-      const threshold = src.type === 'checkin' ? 'high' : 'mid';
+      const threshold = 'mid';
       if (m.best && (m.confidence === 'high' || (threshold === 'mid' && m.confidence === 'mid'))) { target = m.best; decided = m.confidence; }
     }
     return { target, decided, candidates: candidates.filter((id) => !target || id !== target.id), projectId };
+  }
+
+  // 이야기가 있는 답인가 (행동·결정·결과·배움 신호) — 없으면 '대화에만 보관' 제안
+  function hasStory(t) {
+    t = String(t || '');
+    return t.replace(/\s/g, '').length >= 40 || /(했|만들었|만들어서|제안|바꿨|해결|줄었|늘었|찾았|결정|골랐|맡았|맡아서|이끌|설득|정리했|개선|배웠|알게|고쳤|도입|합의|조율|받았|통과|수상|문제|에러|오류|버그|실패|막혔|중복|장애|느려|느렸|갈렸|바꾼|바꿔)/.test(t);
+  }
+
+  /* ---------- 대화 기록 (원문 층) ----------
+     thread = { id, date:'YYYY-MM-DD', at:'HH:MM', source:'daily'|'check'|'capture'|'checkin'|'code'|'coach'|'chat', label, projectId?, questionId?, expId?, findingId?,
+                msgs:[{ who:'ai'|'me', text, at }], outcome:{ kind:'open'|'applied'|'kept', expId?, entryId?, field?, mode? } } */
+  const THREAD_LABEL = { daily: '오늘의 질문', check: '위키 점검', capture: '기록하기', checkin: '프로젝트 체크인', code: '코드 분석 질문', coach: 'AI 코치', chat: 'AI와 길게 대화' };
+  const nowHM = () => new Date().toTimeString().slice(0, 5);
+  function threads() { ensure(); return st().threads; }
+  function getThread(id) { return (st().threads || []).find((t) => t.id === id) || null; }
+  function startThread(meta = {}) {
+    ensure();
+    const t = Object.assign({ id: uid('t'), date: S.localDay(), at: nowHM(), source: 'capture', label: '', msgs: [], outcome: { kind: 'open' } }, meta);
+    if (!t.label) t.label = THREAD_LABEL[t.source] || '대화';
+    st().threads.push(t); persist(); return t;
+  }
+  function addMsg(threadId, who, text) {
+    const t = getThread(threadId); if (!t || !String(text || '').trim()) return;
+    t.msgs.push({ who, text: String(text).trim(), at: nowHM(), date: S.localDay() }); persist();
+  }
+  function closeThread(threadId, outcome) { const t = getThread(threadId); if (!t) return; t.outcome = Object.assign({}, outcome); persist(); }
+  // 대화에서 사용자가 한 말만 (보관된 대화를 나중에 경험으로 정리할 때)
+  function threadText(t) { return (t.msgs || []).filter((m) => m.who === 'me' && !/^(이렇게 반영해 주세요|대화에만 보관해 주세요|이대로 충분해요)$/.test(m.text)).map((m) => m.text).join(' '); }
+  function threadsFor(f = {}) {
+    return threads().filter((t) => (!f.projectId || t.projectId === f.projectId) && (!f.expId || t.outcome.expId === f.expId) && (!f.kind || t.outcome.kind === f.kind))
+      .slice().sort((a, b) => (a.date + a.at).localeCompare(b.date + b.at));
+  }
+  // 대화 기록이 없던 시절의 시드: 지난 질문·답변과 체크인을 대화 형태로 옮겨 둔다
+  function seedThreads() {
+    const s = st(); const bank = window.SEED.projectCheckins || [];
+    const usedBy = (logId) => s.experiences.find((e) => (e.sourceLogIds || []).includes(logId));
+    const linkedLog = new Set();
+    s.inbox.filter((q) => q.status === 'answered' && q.answer && !/트래커에서 직접 기록/.test(q.answer)).forEach((q) => {
+      const [date, at] = String(q.askedAt || '').split(' ');
+      const src = q.type === 'project' ? 'checkin' : q.type === 'code' ? 'code' : 'daily';
+      const t = { id: 't_' + q.id, date: q.answeredAt || date, at: at || '12:30', source: src, label: THREAD_LABEL[src], projectId: q.targetProjectId || null, questionId: q.id,
+        msgs: [{ who: 'ai', text: q.text, at: at || '12:30' }, { who: 'me', text: q.answer, at: at || '12:30' }], outcome: { kind: 'kept' } };
+      let exp = q.targetExpId && s.experiences.find((e) => e.id === q.targetExpId);
+      if (!exp && q.targetProjectId) {
+        const p = s.projects.find((x) => x.id === q.targetProjectId); const log = p && p.logs.find((l) => l.text === q.answer);
+        if (log) { log.threadId = t.id; linkedLog.add(log.id); exp = usedBy(log.id); }
+      }
+      if (exp) { t.outcome = { kind: 'applied', expId: exp.id }; q.compiledTo = exp.id; }
+      t.msgs.push({ who: 'ai', text: exp ? `「${bare(exp.title)}」에 반영했어요.` : '대화 기록에 보관해 둘게요.', at: at || '12:30' });
+      s.threads.push(t);
+    });
+    s.projects.forEach((p) => (p.logs || []).forEach((l) => {
+      if (linkedLog.has(l.id)) return;
+      const b = bank.find((x) => x.type === l.type) || bank[0];
+      const exp = usedBy(l.id);
+      const t = { id: 't_' + l.id, date: l.date, at: '21:30', source: 'checkin', label: THREAD_LABEL.checkin, projectId: p.id,
+        msgs: [{ who: 'ai', text: `「${S.projectName(p)}」 ${b ? b.text : '최근에 어떤 일이 있었나요?'}`, at: '21:30' }, { who: 'me', text: l.text, at: '21:30' }],
+        outcome: exp ? { kind: 'applied', expId: exp.id } : { kind: 'kept' } };
+      t.msgs.push({ who: 'ai', text: exp ? `「${bare(exp.title)}」에 반영했어요.` : '대화 기록에 보관해 둘게요.', at: '21:30' });
+      l.threadId = t.id; s.threads.push(t);
+    }));
+  }
+  const bare = (t) => String(t || '').replace(/[「」]/g, '');
+  // 프로젝트 타임라인 = 이 프로젝트에 대한 대화(원문) — 날짜순, 어디에 반영됐는지와 함께
+  function projectTimeline(projectId) {
+    const p = S.getProject(projectId); if (!p) return [];
+    const items = threadsFor({ projectId }).map((t) => {
+      const log = (p.logs || []).find((l) => l.threadId === t.id);
+      const me = t.msgs.filter((m) => m.who === 'me');
+      return { kind: 'thread', id: t.id, date: t.date, at: t.at, question: (t.msgs.find((m) => m.who === 'ai') || {}).text || '', text: threadText(t) || (me[0] || {}).text || '', type: log ? log.type : null, logId: log ? log.id : null, thread: t, outcome: t.outcome };
+    });
+    // 대화 없이 남은 로그(프로젝트 시작·마무리 같은 자동 기록)
+    (p.logs || []).filter((l) => !l.threadId || !getThread(l.threadId)).forEach((l) => {
+      const exp = st().experiences.find((e) => (e.sourceLogIds || []).includes(l.id));
+      items.push({ kind: 'log', id: l.id, date: l.date, at: '', question: l.fromQuestion || '', text: l.text, type: l.type, logId: l.id, thread: null, outcome: exp ? { kind: 'applied', expId: exp.id } : { kind: 'note' } });
+    });
+    return items.sort((a, b) => (a.date + (a.at || '')).localeCompare(b.date + (b.at || '')));
   }
 
   // 구어체 답변 → 경험 페이지용 문장 (모의 AI: 어미 정리 + 군더더기 제거). 사용자가 제안 단계에서 고칠 수 있다
@@ -204,7 +285,7 @@
   }
 
   /* plan: 반영하기 전에 "어디에 · 어떤 문장으로" 제안 (변경 없음). 대화 화면이 이걸 보여 주고 사용자가 고른 뒤 ingest({ ..., decision }) 한다
-     → { mode:'update'|'new'|'timeline', expId, field, text, title, current, candidates:[id], projectId, confidence } */
+     → { mode:'update'|'new'|'keep', expId, field, text, title, current, candidates:[id], projectId, confidence } */
   function plan(src) {
     ensure();
     const text = String(src.text || '').trim();
@@ -214,26 +295,38 @@
     const e = g.target;
     const project = g.projectId ? S.getProject(g.projectId) : null;
     let mode = e ? 'update' : 'new';
-    if (!e && src.type === 'checkin' && src.logType === 'milestone') mode = 'timeline';
+    // 이야기라기보다 근황·진행 메모면 경험을 억지로 만들지 않고 대화에만 보관하자고 제안
+    if (!hasStory(text) && (!e || g.decided === 'mid')) mode = 'keep';
     const title = e ? e.title : (finding ? finding.title : (project ? `「${S.projectName(project)}」 ` : '') + short(text, 24)).trim();
     const pool = g.candidates.length ? g.candidates : S.list().filter((x) => !e || x.id !== e.id).slice(0, 6).map((x) => x.id);
-    return { mode, expId: e ? e.id : null, field, text: polish(text), title, current: e ? currentOf(e, field) : '', candidates: pool.slice(0, 6), projectId: g.projectId, confidence: g.decided };
+    if (mode === 'keep' && e) pool.unshift(e.id); // 그래도 넣고 싶다면 가장 가까운 경험부터 고를 수 있게
+    return { mode, expId: mode === 'keep' ? null : (e ? e.id : null), field, text: polish(text), title, current: e && mode !== 'keep' ? currentOf(e, field) : '', candidates: [...new Set(pool)].slice(0, 6), projectId: g.projectId, confidence: g.decided };
   }
   function currentOf(e, field) { return field === 'insights' ? (e.insights || '') : ((e.star || {})[field] || ''); }
 
-  function done(source, changes, snap, extra) { const e = record(source, changes, snap, extra); persist(); return e; }
+  function done(source, changes, snap, extra) {
+    if (srcThread) source.threadId = srcThread;
+    const e = record(source, changes, snap, extra); persist(); return e;
+  }
+  let activeThread = null; // 기록 대화가 반영 중일 때 그 대화 id (store.answer 를 거쳐도 이어지도록)
+  function withThread(id, fn) { const prev = activeThread; activeThread = id; try { return fn(); } finally { activeThread = prev; } }
+  let srcThread = null; // ingest 중인 기록의 대화 id (변경 기록 → 대화 원문으로 이어 보기)
 
   /* ---------- ingest: 모든 기록이 들어오는 단 하나의 입구 ----------
      src = { type: 'answer'|'checkin'|'chat'|'code'|'manual', text, question?, questionId?, stage?, expId?, projectId?, logId?, logType?, findingId?, keywords?, forceNew? }
      반환: wikiLog entry (entry.changes 로 무엇이 바뀌었는지, entry.target 으로 최종 경험) */
   function ingest(src) {
+    srcThread = src.threadId || activeThread || null;
+    try { return ingestInner(src); } finally { srcThread = null; }
+  }
+  function ingestInner(src) {
     ensure();
     const text = String(src.text || '').trim();
     const snap = { exps: {}, projects: {} };
     const changes = [];
     let target = null; let decided = 'auto'; let candidates = [];
     const finding = src.findingId ? (S.findFinding(src.findingId) || {}).finding : null;
-    const opts = { question: src.question, questionId: src.questionId, stage: src.stage, source: src.type, keywords: src.keywords, logId: src.logId, projectId: src.projectId, findingIds: src.findingId ? [src.findingId] : [], finding, title: src.title };
+    const opts = { threadId: src.threadId, question: src.question, questionId: src.questionId, stage: src.stage, source: src.type, keywords: src.keywords, logId: src.logId, projectId: src.projectId, findingIds: src.findingId ? [src.findingId] : [], finding, title: src.title };
 
     if (src.type === 'checkin' && src.projectId) {
       changes.push({ kind: 'log', projectId: src.projectId, text: '타임라인에 기록' });
@@ -243,11 +336,10 @@
     // 1) 대상 경험 정하기 — 사용자가 대화로 정했으면(src.decision) 그대로, 아니면 AI 추정
     const d = src.decision || null;
     if (d) {
-      if (d.mode === 'skip') return done({ type: src.type, text, question: src.question, questionId: src.questionId, projectId: src.projectId, logId: src.logId }, changes, snap, { decided: 'skip' });
+      if (d.mode === 'skip' || d.mode === 'keep') return done({ type: src.type, text, question: src.question, questionId: src.questionId, projectId: src.projectId, logId: src.logId }, changes, snap, { decided: 'keep' });
       if (d.mode === 'update' && d.expId && S.get(d.expId)) { target = S.get(d.expId); decided = 'user'; }
       opts.field = d.field || null; opts.applyText = d.text || null; if (d.title) opts.title = d.title;
       opts.projectId = d.projectId !== undefined ? d.projectId : (src.projectId || (detectProject(text) || {}).id || null);
-      if (d.mode === 'timeline') return done({ type: src.type, text, question: src.question, questionId: src.questionId, projectId: src.projectId, logId: src.logId }, changes, snap, { decided: 'timeline' });
     } else {
       const g = decide(src, text, finding);
       target = g.target; decided = g.decided; candidates = g.candidates; opts.projectId = g.projectId;
@@ -258,10 +350,6 @@
       snapExp(snap, target.id);
       compileInto(target, text, opts, changes);
     } else {
-      // 체크인 중 '마일스톤'은 타임라인에만 — 경험 페이지는 이야기(결정·문제·협업·배움)가 있을 때 만든다
-      if (!d && src.type === 'checkin' && src.logType === 'milestone') {
-        return done({ type: src.type, text, question: src.question, questionId: src.questionId, projectId: src.projectId, logId: src.logId }, changes, snap, { candidates });
-      }
       const e = newCard(text, opts, changes);
       snap.exps[e.id] = null; target = e; decided = d ? 'user-new' : 'new';
     }
@@ -365,7 +453,7 @@
   }
 
   /* ---------- 위키 점검 (lint) ----------
-     issue = { id, kind, severity:1~3, text, expId?, projectId?, logId?, findingId?, question?:{ text, stage, ... }, action?:'compileLog'|'link' } */
+     issue = { id, kind, severity:1~3, text, expId?, projectId?, logId?, findingId?, question?:{ text, stage, ... }, action?:'link' } */
   function lint() {
     ensure();
     const out = [];
@@ -378,10 +466,6 @@
       if (!e.projectId && e.category === '프로젝트') { const p = detectProject(e.title + ' ' + e.summary); if (p) out.push({ id: 'lk_' + e.id, kind: 'unlinked', severity: 1, expId: e.id, projectId: p.id, action: 'link', text: `${brief}이 「${S.projectName(p)}」 이야기 같아요. 프로젝트에 연결할까요?` }); }
     });
     st().projects.forEach((p) => {
-      const used = new Set(exps.flatMap((e) => e.sourceLogIds || []));
-      (p.logs || []).filter((l) => l.type !== 'milestone' && !used.has(l.id)).forEach((l) => {
-        out.push({ id: 'ol_' + l.id, kind: 'orphan-log', severity: 2, projectId: p.id, logId: l.id, action: 'compileLog', text: `「${S.projectName(p)}」 체크인 "${short(l.text, 28)}"이 아직 경험에 반영되지 않았어요` });
-      });
       const linked = new Set(exps.flatMap((e) => e.codeRefs || []));
       ((p.repo && p.repo.findings) || []).filter((f) => f.status !== 'dismissed' && !linked.has(f.id)).forEach((f) => {
         out.push({ id: 'cf_' + f.id, kind: 'code-unlinked', severity: f.confidence === 'high' ? 2 : 1, projectId: p.id, findingId: f.id, text: `코드 분석 「${short(f.title, 28)}」을 뒷받침할 경험 이야기가 없어요`, question: codeQuestion(p, f) });
@@ -409,7 +493,6 @@
     st().inbox.unshift(q); persist(); return q;
   }
   function fixIssue(issue) {
-    if (issue.action === 'compileLog') return ingestLog(issue.projectId, issue.logId);
     if (issue.action === 'link') { const before = clone(S.get(issue.expId)); S.get(issue.expId).projectId = issue.projectId; return recordEdit('manual', issue.expId, before); }
     return null;
   }
@@ -432,9 +515,9 @@
   // 경험 페이지의 모든 출처를 한 줄로 (답변·대화·체크인·코드)
   function sourcesOf(e) {
     const out = [];
-    (e.qa || []).forEach((x) => out.push({ type: x.source || 'answer', date: x.date, q: x.q, text: x.a }));
+    (e.qa || []).forEach((x) => { const t = x.threadId ? getThread(x.threadId) : (x.qid ? (st().threads || []).find((th) => th.questionId === x.qid) : null); out.push({ type: x.source || 'answer', date: x.date, q: x.q, text: x.a, threadId: t ? t.id : null }); });
     const p = e.projectId && S.getProject(e.projectId);
-    (e.sourceLogIds || []).forEach((id) => { const l = p && p.logs.find((x) => x.id === id); if (l) out.push({ type: 'checkin', date: l.date, q: l.fromQuestion || '', text: l.text, logType: l.type, href: '#/projects/' + p.id }); });
+    (e.sourceLogIds || []).forEach((id) => { const l = p && p.logs.find((x) => x.id === id); if (l) out.push({ type: 'checkin', date: l.date, q: l.fromQuestion || '', text: l.text, logType: l.type, href: '#/projects/' + p.id, threadId: l.threadId || null }); });
     (e.codeRefs || []).forEach((fid) => { const ff = S.findFinding(fid); if (ff) out.push({ type: 'code', date: (ff.project.repo.analyzedAt || '').slice(0, 10), q: ff.finding.category, text: ff.finding.title, finding: ff.finding, href: '#/projects/' + ff.project.id + '?tab=code' }); });
     return out.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
   }
@@ -473,11 +556,10 @@
       : entry.decided === 'question' || entry.decided === 'edit' ? '이 경험 페이지에 반영했어요'
       : entry.decided === 'user' ? '고른 경험에 반영했어요'
       : entry.decided === 'user-new' ? '새 경험으로 위키에 추가했어요'
-      : entry.decided === 'skip' ? '위키에는 반영하지 않고 답변만 남겼어요'
-      : entry.decided === 'timeline' ? '타임라인에만 기록했어요'
+      : entry.decided === 'keep' || entry.decided === 'skip' ? '경험에는 아직 넣지 않고 대화 기록에 보관했어요'
       : tgt ? '비슷한 경험을 찾아 거기에 반영했어요'
       : entry.source.type === 'code' ? (entry.changes.length ? '코드 분석 결과를 위키에 반영했어요' : '새로 연결할 경험이 없어요 — 발견 항목은 코드 분석 탭에 그대로 있어요')
-      : entry.changes.some((c) => c.kind === 'log') ? '타임라인에 기록했어요 — 결정·문제·협업 이야기가 생기면 경험으로 정리돼요' : '위키에 기록했어요';
+      : '위키에 기록했어요';
     if (opts.compact) {
       return `<div class="wk-feed-item" ${tgt ? `data-href="#/card/${tgt.id}"` : ''}>
         <span class="wk-src" title="${esc(SOURCE_LABEL[entry.source.type] || '')}">${SOURCE_ICO[entry.source.type] || '•'}</span>
@@ -486,7 +568,7 @@
     }
     const alts = (entry.candidates || []).map((id) => S.get(id)).filter(Boolean).slice(0, 3);
     // AI 대화·직접 작성은 여러 칸을 한꺼번에 고친 것이라 옮기기 대신 되돌리기만
-    const canMove = canUndo(entry) && tgt && entry.source.text && entry.source.type !== 'chat' && !['edit', 'user', 'user-new', 'skip', 'timeline'].includes(entry.decided); // 대화로 직접 고른 반영은 다시 묻지 않는다
+    const canMove = canUndo(entry) && tgt && entry.source.text && entry.source.type !== 'chat' && !['edit', 'user', 'user-new', 'skip', 'keep'].includes(entry.decided); // 대화로 직접 고른 반영은 다시 묻지 않는다
     return `<div class="wk-report ${entry.undone ? 'is-undone' : ''}" data-wk-entry="${entry.id}">
       <div class="wk-report-head"><span class="wk-badge">위키 반영</span><b>${esc(head)}</b></div>
       ${entry.undone ? '' : `<ul class="wk-changes">${entry.changes.map(changeLine).join('')}</ul>`}
@@ -526,7 +608,7 @@
     });
   }
 
-  App.wiki = { canUndo, plan, polish, currentOf, ingest, ingestLog, ingestCode, recordEdit, undo, reroute, match, detectProject, inferField, lint, askIssue, fixIssue, autoQueue, entries, sourcesOf, cardsForFinding, stats, reportHTML, bindReport, codeQuestion, get: (id) => (st().wikiLog || []).find((w) => w.id === id) || null, SOURCE_LABEL, SOURCE_ICO, FIELD_LABEL, short };
+  App.wiki = { withThread, activeThread: () => activeThread, threads, getThread, startThread, addMsg, closeThread, threadText, threadsFor, projectTimeline, hasStory, THREAD_LABEL, canUndo, plan, polish, currentOf, ingest, ingestLog, ingestCode, recordEdit, undo, reroute, match, detectProject, inferField, lint, askIssue, fixIssue, autoQueue, entries, sourcesOf, cardsForFinding, stats, reportHTML, bindReport, codeQuestion, get: (id) => (st().wikiLog || []).find((w) => w.id === id) || null, SOURCE_LABEL, SOURCE_ICO, FIELD_LABEL, short };
   ensure();
   // 시드: 이미 분석된 레포의 발견 항목 중 같은 이야기를 하는 경험이 있으면 코드 근거로 조용히 연결
   if (!st().wikiMeta.seededCode) {

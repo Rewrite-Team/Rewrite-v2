@@ -147,6 +147,8 @@
 .vt-panel-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .vt-panel-head h2 { font-size: 16px; font-weight: 800; letter-spacing: -0.01em; }
 .vt-panel-head .subtle { font-size: 12.5px; }
+.vt-kept-link { margin-left: auto; font-size: 12.5px; font-weight: 600; color: var(--primary); text-decoration: none; white-space: nowrap; }
+.vt-kept-link:hover { text-decoration: underline; }
 .vt-more { align-self: flex-start; }
 .vt-asked { font-size: 12px; font-weight: 600; color: var(--success); white-space: nowrap; align-self: center; }
 .vt-soft { color: var(--text-3); font-size: 13.5px; background: var(--surface-2); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 12px 14px; }

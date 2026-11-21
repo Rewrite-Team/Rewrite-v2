@@ -1,5 +1,5 @@
 /* 프로젝트 — #/projects (목록), #/projects/:id (상세)
-   프로젝트 페이지는 위키의 허브: 이 프로젝트의 경험 페이지 + 타임라인(원문 체크인) + 코드 분석이 한곳에서 이어진다. */
+   프로젝트 페이지는 위키의 허브: 이 프로젝트의 경험 페이지 + 타임라인(이 프로젝트에 대한 대화 원문) + 코드 분석이 한곳에서 이어진다. */
 (function (App) {
   const esc = (s) => App.ui.esc(s);
 
@@ -66,7 +66,6 @@
     App.store.list().forEach((c) => (c.sourceLogIds || []).forEach((lid) => { if (ids.has(lid)) (m[lid] = m[lid] || []).push(c); }));
     return m;
   }
-  const orphanLogs = (p) => { const used = cardsByLog(p); return (p.logs || []).filter((l) => !used[l.id] && l.type !== 'milestone'); };
   const short = (t, n) => App.wiki.short(t, n);
   const shortName = (t) => { const m = String(t || '').match(/「[^」]+」/); return m ? m[0] : String(t || '').split(' — ')[0]; };
   const ghLink = (e) => (e.links || []).find((l) => /github/i.test(l)) || (e.links || [])[0] || '';
@@ -162,9 +161,9 @@
   // 화면 상태 (프로젝트별 질문 인덱스)
   // tab: 프로젝트별 'exp'|'timeline'|'code', gh: 레포 분석 화면 상태
   // report: { pid, id(위키 반영 entry), where:'code' } — 코드 분석을 위키에 반영한 결과를 그 자리에 보여 준다
-  // logTalk / codeTalk: 타임라인 기록·코드 항목 아래에 열어 둔 기록 대화 (logId / findingId)
+  // orgTalk / codeTalk: 타임라인의 보관된 대화·코드 항목 아래에 열어 둔 기록 대화 (threadId / findingId)
   // autoAnalyze: { pid, url } — 새 프로젝트를 만들며 레포를 넣었으면 상세 화면에 들어가자마자 분석
-  const ui = { qIndex: {}, type: {}, typeQ: {}, edit: null, tab: {}, gh: {}, ghView: null, report: null, logTalk: null, codeTalk: null, autoAnalyze: null };
+  const ui = { qIndex: {}, type: {}, typeQ: {}, edit: null, tab: {}, gh: {}, ghView: null, report: null, orgTalk: null, codeTalk: null, autoAnalyze: null };
   const reportAt = (pid, where) => {
     const r = ui.report; if (!r || r.pid !== pid || r.where !== where) return '';
     return App.wiki.reportHTML(App.wiki.get(r.id));
@@ -244,7 +243,7 @@
       <div data-pj-talk="ck"></div>
     </div>`;
   }
-  // 체크인 대화: 질문함에 온 체크인이면 그 질문에 답한 것으로, 아니면 타임라인에 기록을 남기고 위키에 반영
+  // 체크인 대화: 질문함에 온 체크인이면 그 질문에 답한 것으로, 아니면 프로젝트 기록을 남기고 위키에 반영 (대화 원문은 타임라인에 남는다)
   function checkinTalkCfg(e) {
     const q = currentQ(e); const oq = q.inbox; const pid = e.id;
     const typeOf = () => ui.type[pid] || (oq && oq.checkinType) || 'milestone';
@@ -253,11 +252,12 @@
       ask: { label: (TYPES[q.type] || TYPES.milestone).label, text: q.text, hint: whyQuestion(e, q) },
       placeholder: '한두 줄이면 충분해요. 예) JWT와 세션 중 고민하다가 모바일 확장 때문에 JWT로 결정했어요.',
       noAutofocus: true,
+      thread: { source: 'checkin' },
       src: oq ? { type: 'checkin', question: oq.checkinText || oq.text, questionId: oq.id, projectId: pid, logType: typeOf() }
         : { type: 'checkin', projectId: pid, logType: typeOf(), question: '(직접 기록)' },
       commit: oq ? (text, d) => App.store.answer(oq.id, text, { decision: d, type: typeOf() })
-        : (text, d) => {
-          const t = typeOf(); const log = App.store.addLog(pid, { type: t, text });
+        : (text, d, threadId) => {
+          const t = typeOf(); const log = App.store.addLog(pid, { type: t, text, threadId });
           return App.wiki.ingest({ type: 'checkin', text, projectId: pid, logId: log.id, logType: t, keywords: log.keywords, decision: d });
         },
       inbox: !!oq,
@@ -270,36 +270,50 @@
       <button type="button" class="pj-report-x" data-pj="close-report" aria-label="반영 결과 닫기">×</button></div>`;
   }
 
+  // 타임라인 = 이 프로젝트에 대한 대화 원문(App.wiki.projectTimeline) — 최근 것부터, 주 단위로
+  const keptCount = (pid) => App.wiki.projectTimeline(pid).filter((it) => it.outcome && it.outcome.kind === 'kept').length;
+  function outcomeChip(it) {
+    const o = it.outcome || {};
+    if (o.kind === 'applied') {
+      const c = o.expId && App.store.get(o.expId);
+      return c ? `<a class="pj-log-card" href="#/card/${esc(c.id)}" title="${esc(c.title)}">→ 「${esc(short(String(c.title).replace(/[「」]/g, ''), 24))}」에 반영</a>` : '<span class="pj-log-out">경험에 반영됨</span>';
+    }
+    if (!it.thread || ui.orgTalk === it.id) return '';
+    if (o.kind === 'kept') return `<span class="pj-log-out is-kept">💬 대화에 보관 중</span><button type="button" class="btn btn-sm pj-log-org" data-pj-log="organize" data-id="${esc(it.id)}">경험으로 정리</button>`;
+    if (o.kind === 'open') return `<span class="pj-log-out">정리 전 대화</span><button type="button" class="btn btn-sm pj-log-org" data-pj-log="organize" data-id="${esc(it.id)}">이어서 정리</button>`;
+    return '';
+  }
   function timeline(e) {
-    const logs = sortedLogs(e);
-    const used = cardsByLog(e);
-    if (!logs.length) return '<div class="card empty"><div class="big">✎</div>아직 기록이 없어요. 첫 체크인을 남겨 볼까요?</div>';
+    const items = App.wiki.projectTimeline(e.id).slice().reverse();
+    if (!items.length) return '<div class="card empty"><div class="big">✎</div>아직 기록이 없어요. 첫 체크인을 남겨 볼까요?</div>';
     const groups = [];
-    logs.forEach((l) => {
-      const ws = fmt(weekStart(l.date));
+    items.forEach((it) => {
+      const ws = fmt(weekStart(it.date));
       let g = groups.find((x) => x.key === ws);
       if (!g) { g = { key: ws, items: [] }; groups.push(g); }
-      g.items.push(l);
+      g.items.push(it);
     });
+    const logOf = (it) => it.logId && (e.logs || []).find((l) => l.id === it.logId);
     return `<div class="pj-tl">${groups.map((g) => {
       const [label, range] = weekLabel(toDate(g.key));
       return `<div class="pj-week"><div class="pj-week-head"><b>${label}</b><span>${range}</span><span class="pj-week-n">${g.items.length}개</span></div>
-        ${g.items.map((l) => {
-          const t = TYPES[l.type] || TYPES.milestone;
-          if (ui.edit && ui.edit.logId === l.id) return logEditor(l);
-          const cards = used[l.id] || [];
-          return `<div class="pj-log" data-type="${esc(l.type)}">
-            <div class="pj-log-ico">${t.ico}</div>
+        ${g.items.map((it) => {
+          const t = TYPES[it.type];
+          const l = it.kind === 'log' ? logOf(it) : null;
+          if (l && ui.edit && ui.edit.logId === l.id) return logEditor(l);
+          const kws = (logOf(it) || {}).keywords || [];
+          const chip = outcomeChip(it);
+          return `<div class="pj-log" data-type="${esc(it.type || 'talk')}">
+            <div class="pj-log-ico">${t ? t.ico : '💬'}</div>
             <div class="pj-log-body">
-              <div class="pj-log-meta"><span class="pj-log-type">${t.label}</span><span>${esc(md(l.date))}</span>
-                <span class="pj-log-acts"><button type="button" data-pj-log="edit" data-id="${esc(l.id)}">수정</button><button type="button" data-pj-log="del" data-id="${esc(l.id)}">삭제</button></span></div>
-              <div class="pj-log-text">${esc(l.text)}</div>
-              ${(l.keywords || []).length ? `<div class="exp-card-kws">${l.keywords.map((k) => App.ui.keywordChip(k)).join('')}</div>` : ''}
-              <div class="pj-log-wiki">
-                ${cards.length ? cards.map((c) => `<a class="pj-log-card" href="#/card/${esc(c.id)}" title="${esc(c.title)}">→ 「${esc(short(c.title, 24))}」</a>`).join('')
-                  : l.type === 'milestone' || ui.logTalk === l.id ? '' : `<span class="subtle">아직 경험에 반영되지 않았어요</span><button type="button" class="btn btn-sm pj-log-ingest" data-pj-log="ingest" data-id="${esc(l.id)}">경험에 반영</button>`}
-              </div>
-              ${ui.logTalk === l.id ? `<div data-pj-talk="log:${esc(l.id)}"></div>` : ''}
+              <div class="pj-log-meta">${t ? `<span class="pj-log-type">${t.label}</span>` : ''}<span>${esc(md(it.date))}${it.at ? ` ${esc(it.at)}` : ''}</span>
+                ${it.thread ? `<a class="pj-log-raw" href="#/chat?thread=${esc(it.id)}">대화 보기</a>` : ''}
+                ${l ? `<span class="pj-log-acts"><button type="button" data-pj-log="edit" data-id="${esc(l.id)}">수정</button><button type="button" data-pj-log="del" data-id="${esc(l.id)}">삭제</button></span>` : ''}</div>
+              ${it.question ? `<div class="pj-log-q"><span class="ai-dot">R</span>${esc(short(it.question, 90))}</div>` : ''}
+              <div class="pj-log-text">${esc(it.text)}</div>
+              ${kws.length ? `<div class="exp-card-kws">${kws.map((k) => App.ui.keywordChip(k)).join('')}</div>` : ''}
+              ${chip ? `<div class="pj-log-wiki">${chip}</div>` : ''}
+              ${ui.orgTalk === it.id ? `<div data-pj-talk="org:${esc(it.id)}"></div>` : ''}
             </div></div>`;
         }).join('')}</div>`;
     }).join('')}</div>`;
@@ -328,7 +342,7 @@
     const c = typeCounts(e);
     const missing = TYPE_ORDER.filter((t) => !c[t] && t !== 'milestone');
     const cards = App.store.cardsOf(e.id);
-    const unused = orphanLogs(e);
+    const kept = keptCount(e.id);
     return `<aside class="pj-side">
       <div class="card card-pad pj-cards-box">
         <div class="section-title">이 프로젝트의 경험 <span class="subtle">${cards.length}</span></div>
@@ -337,8 +351,7 @@
             <div class="pj-cardlink-title">${esc(x.title)}</div></a>`).join('')}</div>
             ${cards.length > 4 ? `<button class="pj-link" data-pj-tab="exp">경험 ${cards.length}개 모두 보기 →</button>` : ''}`
           : '<p class="subtle">아직 없어요. 체크인을 남기면 AI가 이야기마다 경험 페이지로 정리해요.</p>'}
-        ${unused.length ? `<p class="pj-side-hint"><span class="ai-dot">R</span>아직 경험에 반영되지 않은 체크인이 ${unused.length}개 있어요.</p>
-          <button class="btn btn-sm pj-full" data-pj-tab="timeline">타임라인에서 반영하기</button>` : ''}
+        ${kept ? `<p class="pj-side-hint"><span class="ai-dot">R</span><button class="pj-link" data-pj-tab="timeline">보관 중인 대화 ${kept}개 →</button></p>` : ''}
       </div>
       ${ghSideBox(e)}
       <div class="card card-pad">
@@ -518,13 +531,13 @@
   function expSection(e) {
     const cards = App.store.cardsOf(e.id);
     const feed = App.wiki.entries({ projectId: e.id }).filter((w) => w.target).slice(0, 5);
-    const unused = orphanLogs(e).length;
+    const kept = keptCount(e.id);
     return `<div class="pj-exp">
       <div class="pj-exp-head"><p class="subtle">체크인·AI와 대화·코드 분석에서 나온 이 프로젝트의 경험 페이지예요. 기록할수록 같은 페이지가 채워져요.</p>
         <button class="btn btn-sm btn-primary" data-capture data-capture-project="${esc(e.id)}">＋ 이 프로젝트 기록하기</button></div>
       ${cards.length ? `<div class="pj-exp-grid">${cards.map((x) => App.ui.expCard(x)).join('')}</div>`
         : `<div class="card empty"><div class="big">▣</div>아직 이 프로젝트의 경험이 없어요.<div class="subtle" style="margin-top:4px">체크인을 남기거나 코드를 분석하면 경험 페이지가 생겨요.</div></div>`}
-      ${unused ? `<p class="pj-side-hint"><span class="ai-dot">R</span>아직 경험에 반영되지 않은 체크인이 ${unused}개 있어요. <button class="pj-link" data-pj-tab="timeline">타임라인에서 반영하기 →</button></p>` : ''}
+      ${kept ? `<p class="pj-side-hint"><span class="ai-dot">R</span><button class="pj-link" data-pj-tab="timeline">보관 중인 대화 ${kept}개 →</button></p>` : ''}
       ${feed.length ? `<div class="section-title" style="margin-top:20px">최근 위키 반영</div><div class="card card-pad wk-feed">${feed.map((w) => App.wiki.reportHTML(w, { compact: true })).join('')}</div>` : ''}
     </div>`;
   }
@@ -559,7 +572,7 @@
           ${e.status !== 'done' ? checkinCard(e) : ''}
           <div class="pj-tabs" role="tablist">
             <button type="button" class="pj-tab ${tab === 'exp' ? 'on' : ''}" data-pj-tab="exp" role="tab" aria-selected="${tab === 'exp'}">경험 <span>${App.store.cardsOf(e.id).length}</span></button>
-            <button type="button" class="pj-tab ${tab === 'timeline' ? 'on' : ''}" data-pj-tab="timeline" role="tab" aria-selected="${tab === 'timeline'}">타임라인 <span>${(e.logs || []).length}</span></button>
+            <button type="button" class="pj-tab ${tab === 'timeline' ? 'on' : ''}" data-pj-tab="timeline" role="tab" aria-selected="${tab === 'timeline'}">타임라인 <span>${App.wiki.projectTimeline(e.id).length}</span></button>
             <button type="button" class="pj-tab ${tab === 'code' ? 'on' : ''}" data-pj-tab="code" role="tab" aria-selected="${tab === 'code'}">⌥ 코드 분석 <span>${e.repo ? liveFindings(e.repo).length : '＋'}</span></button>
           </div>
           ${tab === 'code' ? `<div id="pj-gh" class="pj-gh">${codeSection(e)}</div>` : tab === 'exp' ? expSection(e) : timeline(e)}
@@ -586,13 +599,13 @@
          다시 그려도 대화가 이어지도록, 대화 DOM(host)을 따로 들고 있다가 자리표시([data-pj-talk])에 끼운다 */
       const talks = {}; // key → { host, ctl, sig, done }
       const dropTalk = (key) => { const t = talks[key]; if (!t) return; t.ctl.destroy(); t.host.remove(); delete talks[key]; };
-      const closeTalk = (key) => () => { if (key.startsWith('log:')) ui.logTalk = null; else if (key.startsWith('code:')) ui.codeTalk = null; dropTalk(key); rerenderLocal(); };
+      const closeTalk = (key) => () => { if (key.startsWith('org:')) ui.orgTalk = null; else if (key.startsWith('code:')) ui.codeTalk = null; dropTalk(key); rerenderLocal(); };
       function talkCfg(key) {
         const e = App.store.getProject(id); if (!e) return null;
         if (key === 'ck') {
           const c = checkinTalkCfg(e);
           return Object.assign(c, {
-            onDone: () => { talks.ck.done = true; App.ui.toast(c.inbox ? '체크인 완료! 오늘의 질문에서도 답변 완료로 바뀌었어요' : '타임라인에 기록했어요'); rerenderLocal(); },
+            onDone: (entry) => { talks.ck.done = true; App.ui.toast(c.inbox ? '체크인 완료! 오늘의 질문에서도 답변 완료로 바뀌었어요' : entry && entry.target ? '경험에 반영했어요 · 대화는 타임라인에 남아요' : '대화 기록에 보관했어요 · 타임라인에서 볼 수 있어요'); rerenderLocal(); },
             next: { label: '다른 체크인 남기기', onClick: () => {
               const Q = window.SEED.projectCheckins;
               if (!App.store.openCheckin(id)) { ui.qIndex[id] = ((ui.qIndex[id] || 0) + 1) % Q.length; ui.type[id] = Q[ui.qIndex[id]].type; }
@@ -600,19 +613,17 @@
             } },
           });
         }
-        if (key.startsWith('log:')) {
-          const l = (e.logs || []).find((x) => x.id === key.slice(4)); if (!l) return null;
-          return {
-            sig: key, ask: { label: '타임라인 기록', text: '이 기록, 어느 경험에 어떻게 반영할까요?' }, prefill: l.text,
-            src: { type: 'checkin', projectId: id, logId: l.id, logType: l.type, question: l.fromQuestion || '', keywords: l.keywords },
-            onDone: () => rerenderLocal(), next: { label: '닫기', onClick: closeTalk(key) },
-          };
+        if (key.startsWith('org:')) {
+          // 보관된 대화를 이어서 경험으로 정리 — App.talk.organize 가 같은 대화에 이어 쓴다
+          const tid = key.slice(4); if (!App.wiki.getThread(tid)) return null;
+          return { sig: key, organize: tid, onDone: () => rerenderLocal(), next: { label: '닫기', onClick: closeTalk(key) } };
         }
         if (key.startsWith('code:')) {
           const fid = key.slice(5); const f = e.repo && e.repo.findings.find((x) => x.id === fid); if (!f) return null;
           const cq = openCodeQ(fid) || App.wiki.codeQuestion(e, f);
           return {
             sig: key, ask: { label: '코드 분석', text: cq.text, hint: cq.hint },
+            thread: { source: 'code' },
             src: { type: 'answer', projectId: id, findingId: fid, question: cq.text },
             // 오늘의 질문 기록에도 남도록, 질문함의 질문에 답한 것으로 처리
             commit: (text, d) => {
@@ -639,7 +650,8 @@
             if (!cfg) return;
             const host = document.createElement('div'); host.className = 'pj-talk';
             t = talks[key] = { host, sig: cfg.sig, done: false };
-            t.ctl = App.talk.mount(host, cfg);
+            t.ctl = cfg.organize ? App.talk.organize(host, cfg.organize, cfg) : App.talk.mount(host, cfg);
+            if (!t.ctl) { delete talks[key]; return; }
           }
           ph.replaceWith(t.host);
         });
@@ -787,10 +799,10 @@
         const logBtn = ev.target.closest('[data-pj-log]');
         if (logBtn) {
           const a = logBtn.getAttribute('data-pj-log'); const e = App.store.getProject(id); if (!e) return;
-          if (a === 'ingest') {
-            // 바로 반영하지 않고, 이 기록 아래에서 AI와 어디에 어떻게 넣을지 정한다
-            if (ui.logTalk) dropTalk('log:' + ui.logTalk);
-            ui.logTalk = logBtn.getAttribute('data-id'); rerenderLocal();
+          if (a === 'organize') {
+            // 보관된 대화 아래에서 AI와 어느 경험에 어떻게 넣을지 정한다
+            if (ui.orgTalk) dropTalk('org:' + ui.orgTalk);
+            ui.orgTalk = logBtn.getAttribute('data-id'); rerenderLocal();
           } else if (a === 'edit') {
             const l = e.logs.find((x) => x.id === logBtn.getAttribute('data-id')); if (!l) return;
             ui.edit = { logId: l.id, type: l.type, text: l.text, date: l.date, kw: kwNew(l.keywords || [], App.ai.extractKeywords(l.text)) };
@@ -808,7 +820,7 @@
             App.ui.modal({
               title: '이 기록을 삭제할까요?', confirmText: '삭제', danger: true,
               body: `<p>「${esc(l.text.length > 60 ? l.text.slice(0, 60) + '…' : l.text)}」</p><p style="margin-top:8px">삭제한 기록은 되돌릴 수 없어요.${usedBy.length ? ' 이 기록이 반영된 경험 페이지는 그대로 남아요.' : ''}</p>`,
-              onConfirm() { App.store.removeLog(id, l.id); if (ui.edit && ui.edit.logId === l.id) ui.edit = null; if (ui.logTalk === l.id) { ui.logTalk = null; dropTalk('log:' + l.id); } App.ui.toast('기록을 삭제했어요'); rerenderLocal(); return true; },
+              onConfirm() { App.store.removeLog(id, l.id); if (ui.edit && ui.edit.logId === l.id) ui.edit = null; App.ui.toast('기록을 삭제했어요'); rerenderLocal(); return true; },
             });
           }
           return;
@@ -855,7 +867,7 @@
         } else if (act === 'finish') {
           App.ui.modal({
             title: '프로젝트를 마무리할까요?', confirmText: '마무리하기',
-            body: `<p>상태가 <b>완성</b>으로 바뀌고 체크인 질문이 멈춰요. ${orphanLogs(e).length ? ` 아직 경험에 반영되지 않은 체크인 <b>${orphanLogs(e).length}개</b>를 타임라인에서 반영해 두면 면접 준비가 훨씬 쉬워져요.` : ''}</p>`,
+            body: `<p>상태가 <b>완성</b>으로 바뀌고 체크인 질문이 멈춰요. ${keptCount(id) ? ` 대화에 보관 중인 이야기 <b>${keptCount(id)}개</b>를 타임라인에서 경험으로 정리해 두면 면접 준비가 훨씬 쉬워져요.` : ''}</p>`,
             onConfirm() {
               const n = new Date();
               App.store.addLog(id, { type: 'milestone', text: '프로젝트 마무리.' });
@@ -911,7 +923,7 @@
       fitTas(); bindReports(); placeTalks();
       if (ui.autoAnalyze && ui.autoAnalyze.pid === id) { const u = ui.autoAnalyze.url; ui.autoAnalyze = null; setTimeout(() => runAnalyze(id, u), 0); }
       return () => {
-        clearTimeout(t); ui.edit = null; ui.logTalk = null; ui.codeTalk = null; alive = false;
+        clearTimeout(t); ui.edit = null; ui.orgTalk = null; ui.codeTalk = null; alive = false;
         Object.keys(talks).forEach(dropTalk);
         if (ui.report && ui.report.pid === id) ui.report = null; if (ui.ghView && ui.ghView.redraw === ghRedraw) ui.ghView = null;
         root.removeEventListener('click', onClick); root.removeEventListener('input', onInput); root.removeEventListener('keydown', onKey); root.removeEventListener('change', onChange);

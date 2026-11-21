@@ -55,9 +55,11 @@
   function feedBlock() {
     const list = App.wiki.entries().slice(0, 5);
     const st = App.wiki.stats();
+    const kept = App.wiki.threadsFor ? App.wiki.threadsFor({ kind: 'kept' }).length : 0;
     return `<section class="card card-pad home-feed">
       <div class="section-title">위키 최근 변경<a class="more" href="#/vault">경험 위키 →</a></div>
       <p class="subtle home-feed-sub">경험 ${st.pages}개 · 이번 주 반영 ${st.updatesThisWeek}번</p>
+      ${kept ? `<a class="home-kept" href="#/chat">💬 보관 중인 대화 ${kept}개 → 대화 기록</a>` : ''}
       ${list.length ? `<div class="wk-feed">${list.map((e) => App.wiki.reportHTML(e, { compact: true })).join('')}</div>`
         : '<p class="home-soft">아직 반영된 기록이 없어요. 오늘의 질문에 답하거나 ＋ 기록하기로 시작해 보세요.</p>'}
     </section>`;
@@ -95,7 +97,8 @@
       title: '위키 점검',
       ask: { text: qi.text, label: '위키 점검', hint },
       src: issueSrc(qi),
-      commit: (text, d) => { const q = App.wiki.askIssue(issue); return App.store.answer(q.id, text, { decision: d }); },
+      thread: { source: 'check' },
+      commit: (text, d, tid) => { const q = App.wiki.askIssue(issue); return App.store.answer(q.id, text, { decision: d, threadId: tid }); },
       onClose: () => App.rerender(),
     });
   }
