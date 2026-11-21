@@ -9,18 +9,9 @@
 .pj [data-type="learning"] { --pj-c: var(--pj-learning); --pj-s: var(--pj-learning-soft); }
 .pj [data-type="talk"] { --pj-c: var(--text-2); --pj-s: var(--surface-2); }
 
-.pj-head { display: flex; align-items: flex-end; gap: 16px; justify-content: space-between; flex-wrap: wrap; }
 .pj-link { color: var(--primary); font-weight: 600; }
 .pj-link:hover { text-decoration: underline; }
 
-.pj-value { display: flex; align-items: center; gap: 14px; padding: 16px 18px; margin-bottom: 28px; border-radius: var(--radius);
-  background: linear-gradient(100deg, var(--primary-soft), #f6f3fd 60%, var(--surface)); border: 1px solid #e0e0f7; }
-.pj-value-ico { width: 38px; height: 38px; border-radius: 11px; background: var(--primary); color: #fff; display: grid; place-items: center; font-size: 17px; flex-shrink: 0; }
-.pj-value-body { display: flex; flex-direction: column; gap: 2px; font-size: 14px; color: var(--text-2); }
-.pj-value-body b { color: var(--text); font-size: 15px; }
-.pj-value-pill { margin-left: auto; flex-shrink: 0; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 99px; }
-
-.pj-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
 .pj-card { padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; transition: box-shadow .15s, transform .15s, border-color .15s; }
 .pj-card:hover { box-shadow: var(--shadow); border-color: var(--border-strong); transform: translateY(-1px); }
 .pj-card-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; }
@@ -36,7 +27,6 @@
   font-weight: 600; font-size: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 180px; cursor: pointer; transition: all .15s; }
 .pj-card-new span { font-size: 24px; line-height: 1; }
 .pj-card-new:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
-.pj-empty { padding: 48px 20px; }
 
 /* modal form */
 .pj-form { display: flex; flex-direction: column; }
@@ -141,9 +131,6 @@
   .pj-side { position: static; }
 }
 @media (max-width: 600px) {
-  .pj-value { flex-wrap: wrap; }
-  .pj-value-pill { margin-left: 52px; }
-  .pj-grid { grid-template-columns: 1fr; }
   .pj-hero { flex-direction: column; padding: 18px; }
   .pj-hero-title { font-size: 20px; }
   .pj-hero-side { width: 100%; }

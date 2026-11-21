@@ -4,16 +4,14 @@
     // 하나의 흐름: 기록한다 → 위키가 정리한다 → 꺼내 쓴다
     { group: '① 기록하기' },
     { href: '#/home', name: 'home', ico: '⌂', label: '홈' },
-    { href: '#/daily', name: 'daily', ico: '✉', label: '오늘의 질문', badge: () => App.store.pending().length },
-    { href: '#/chat', name: 'chat', ico: '💬', label: '대화 기록', badge: () => App.wiki.threadsFor({ kind: 'kept' }).length, badgeTone: 'soft', badgeTitle: '아직 경험으로 정리하지 않고 보관 중인 대화' },
+    { href: '#/ask', name: 'ask', ico: '✉', label: '질문함', badge: () => App.store.pending().length, badgeTitle: '아직 답하지 않은 오늘의 질문' },
     { group: '② 경험 위키' },
     { href: '#/vault', name: 'vault', ico: '▦', label: '경험 위키', badge: () => App.wiki.lint().filter((i) => i.severity >= 3).length, badgeTone: 'soft', badgeTitle: '위키 점검: 꼭 채울 곳' },
-    { href: '#/projects', name: 'projects', ico: '▤', label: '프로젝트' },
     { group: '③ 꺼내 쓰기' },
     { href: '#/resume', name: 'resume', ico: '☰', label: '마스터 이력서' },
     { href: '#/apply', name: 'apply', ico: '◎', label: '지원 기업', apps: true },
   ];
-  const MOBILE = [['#/home', 'home', '⌂', '홈'], ['#/daily', 'daily', '✉', '질문'], ['#/vault', 'vault', '▦', '위키'], ['#/resume', 'resume', '☰', '이력서'], ['#/apply', 'apply', '◎', '지원']];
+  const MOBILE = [['#/home', 'home', '⌂', '홈'], ['#/ask', 'ask', '✉', '질문함'], ['#/vault', 'vault', '▦', '위키'], ['#/resume', 'resume', '☰', '이력서'], ['#/apply', 'apply', '◎', '지원']];
   const APP_STATUS_TONE = { preparing: '#4b4fd6', applied: '#f2994a', passed: '#2f9e6b', failed: '#b9b3a8' };
 
   // 지원 기업 하위 메뉴 (기업마다 하나씩)
@@ -25,7 +23,7 @@
   }
 
   // 메뉴에 없는 화면 → 어느 메뉴 탭에 속하는지 (사이드바 강조 + 상단 경로 표시)
-  const NAV_PARENT = { card: 'vault', discover: 'vault' };
+  const NAV_PARENT = { card: 'vault', discover: 'vault', projects: 'vault' };
 
   let cleanup = null;
 
@@ -65,9 +63,7 @@
       const crumb = crumbs.map((c) => `<a class="topbar-crumb" href="${c.href}">${App.ui.esc(c.label)}</a><span class="topbar-sep">›</span>`).join('');
       root.innerHTML = `<div class="shell">${sidebar(navName, params)}<main class="main">
         <div class="topbar"><div class="topbar-title">${crumb}${App.ui.esc(title)}</div>
-          <div class="topbar-actions">
-            <button class="btn btn-sm btn-primary" data-capture>＋ 기록하기</button>
-          </div></div>
+          <div class="topbar-actions"></div></div>
         <div id="screen">${body}</div></main>
         <nav class="mobile-nav">${MOBILE.map(([h, n, i, l]) => `<a href="${h}" class="${navName === n ? 'active' : ''}"><span class="ico">${i}</span>${l}</a>`).join('')}</nav>
       </div>`;
@@ -77,27 +73,14 @@
     window.scrollTo(0, 0);
   }
 
-  /* ＋ 기록하기 — 무엇을 넣든 입구는 하나. 한 줄을 말하면 AI가 어느 경험의 어느 칸에 넣을지 제안하고, 사용자가 정한다 */
+  /* 기록의 입구는 질문함 하나. 어디서 「기록하기」를 눌러도 질문함의 새 대화방이 열린다
+     preset: { projectId?, text? } — 새 대화방이 이 값을 한 번 꺼내 쓴다 (App.consumeCapturePreset) */
+  let capturePreset = null;
   function openCapture(preset = {}) {
-    const S = App.store;
-    const project = preset.projectId ? S.getProject(preset.projectId) : null;
-    App.talk.open({
-      title: '＋ 기록하기',
-      ask: { text: project ? `「${S.projectName(project)}」에서 어떤 일이 있었나요?` : '무엇을 기록해 둘까요?', hint: '한 줄이면 충분해요. 어느 경험에 어떻게 넣을지는 같이 정해요.' },
-      prefill: preset.text || '',
-      src: project ? { type: 'checkin', projectId: project.id, question: '(직접 기록)' } : { type: 'manual', question: '(직접 기록)' },
-      // 프로젝트를 정해 두고 기록하면 원문은 그 프로젝트 타임라인에도 남는다
-      commit: project ? (text, decision) => {
-        const t = /결정|선택/.test(text) ? 'decision' : /문제|에러|버그|오류/.test(text) ? 'issue' : /팀원|같이|의견/.test(text) ? 'collab' : /배웠|알게/.test(text) ? 'learning' : 'milestone';
-        const log = S.addLog(project.id, { text, type: t });
-        return App.wiki.ingest({ type: 'checkin', text, projectId: project.id, logId: log.id, logType: t, keywords: log.keywords, decision });
-      } : null,
-      footerHTML: `<div class="capture-more"><div class="subtle" style="font-size:12px;margin:4px 0 8px">더 깊게 — 결과는 모두 같은 위키에 쌓여요</div><div class="wk-add-modes">
-        <a class="wk-add-mode" href="#/discover${project ? '?project=' + project.id : ''}"><span class="wk-src">✦</span><div><b>AI와 길게 대화하며 기록</b><span class="subtle">상황→과제→행동→결과 순서로 질문을 따라가며 한 경험을 끝까지 정리</span></div></a>
-        <a class="wk-add-mode" href="${project ? `#/projects/${project.id}?tab=code` : '#/projects'}"><span class="wk-src">⌥</span><div><b>GitHub 레포 분석</b><span class="subtle">코드에서 찾은 기술 포인트가 근거로 붙고, 빈 이야기는 질문으로 와요</span></div></a>
-      </div></div>`,
-    });
+    capturePreset = { projectId: preset.projectId || '', text: preset.text || '' };
+    App.navigate('#/ask/new' + (preset.projectId ? '?project=' + encodeURIComponent(preset.projectId) : ''));
   }
+  App.consumeCapturePreset = () => { const p = capturePreset; capturePreset = null; return p; };
   App.capture = openCapture;
   document.addEventListener('click', (ev) => { const b = ev.target.closest('[data-capture]'); if (b) { ev.preventDefault(); openCapture({ projectId: b.getAttribute('data-capture-project') || '' }); } });
 
@@ -115,7 +98,7 @@
     // 데모: 서비스가 먼저 말을 거는 순간 시뮬레이션 (진입 8초 후 1회)
     setTimeout(() => {
       const p = App.store.pending()[0];
-      if (p && !location.hash.startsWith('#/daily') && !location.hash.startsWith('#/onboarding')) App.ui.pushToast('오늘의 질문이 도착했어요', p.text, '#/daily');
+      if (p && !location.hash.startsWith('#/ask') && !location.hash.startsWith('#/onboarding')) App.ui.pushToast('오늘의 질문이 도착했어요', p.text, '#/ask');
     }, 8000);
   });
 })(window.App);

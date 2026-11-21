@@ -105,12 +105,12 @@
     }
     return null;
   }
-  const chatHref = (id) => '#/chat?thread=' + encodeURIComponent(id);
+  const chatHref = (id) => '#/ask/' + encodeURIComponent(id);
   function threadsLine(e) {
     const list = App.wiki.threadsFor ? App.wiki.threadsFor({ expId: e.id }) : [];
     if (!list.length) return '';
     const last = list[list.length - 1];
-    return `<div class="cd-threads-line">💬 이 경험을 만든 대화 <b>${list.length}개</b><a href="${esc(chatHref(last.id))}">대화 기록에서 보기 →</a></div>`;
+    return `<div class="cd-threads-line">💬 이 경험을 만든 대화 <b>${list.length}개</b><a href="${esc(chatHref(last.id))}">질문함에서 보기 →</a></div>`;
   }
 
   // 출처: 답변·대화·체크인·코드 분석 — 이 페이지를 만든 원문 기록 그대로
@@ -195,8 +195,8 @@
       <div class="cd-head-main">
         <div class="cd-meta">${App.ui.statusTag(e.status)}<span class="cd-meta-cat">${esc(e.category)}</span><span class="cd-dot">·</span><span>${App.ui.period(e.period)}</span></div>
         ${p || codeN ? `<div class="cd-origin">
-          ${p ? `<a class="cd-proj-badge" href="#/projects/${encodeURIComponent(p.id)}">▤ ${esc(projShort(p))} 프로젝트의 경험</a>` : ''}
-          ${codeN ? `<a class="wk-srcchip cd-code-chip" href="#/projects/${encodeURIComponent(codeHits[0].project.id)}?tab=code">⌥ 코드 근거 ${codeN}</a>` : ''}
+          ${p ? `<a class="cd-proj-badge" href="#/vault/p/${encodeURIComponent(p.id)}">▤ ${esc(projShort(p))} 프로젝트의 경험</a>` : ''}
+          ${codeN ? `<a class="wk-srcchip cd-code-chip" href="#/vault/p/${encodeURIComponent(codeHits[0].project.id)}?tab=code">⌥ 코드 근거 ${codeN}</a>` : ''}
           <span class="wk-srcchip">출처 ${srcN}</span>
         </div>` : ''}
         <h1 class="cd-title">${esc(e.title || '제목 없는 경험')}</h1>
@@ -240,7 +240,7 @@
         </section>
 
         <section class="card card-pad cd-sec">
-          <div class="section-title">출처 <span class="subtle cd-sec-sub">이 페이지를 만든 원문 기록 ${srcN}개</span>${p ? `<a class="more" href="#/projects/${encodeURIComponent(p.id)}">프로젝트 타임라인 →</a>` : ''}</div>
+          <div class="section-title">출처 <span class="subtle cd-sec-sub">이 페이지를 만든 원문 기록 ${srcN}개</span>${p ? `<a class="more" href="#/vault/p/${encodeURIComponent(p.id)}?tab=timeline">프로젝트 원본 기록 →</a>` : ''}</div>
           ${threadsLine(e)}
           ${sourcesHTML(e)}
         </section>
@@ -352,7 +352,7 @@
           ${field('시작', `<input class="input" type="month" name="start" value="${esc(d.period.start)}">`)}
           ${field('종료', `<input class="input" type="month" name="end" value="${esc(d.period.end)}"><div class="cd-help">비워 두면 ‘진행중’으로 표시돼요</div>`)}
         </div>
-        ${field('프로젝트', `<select class="select" name="projectId"><option value="">없음 (단독 경험)</option>${App.store.projects().map((p) => `<option value="${esc(p.id)}" ${p.id === d.projectId ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}</select><div class="cd-help">한 프로젝트에 경험 페이지를 여러 개 둘 수 있어요. 진행 중인 일은 <a class="cd-link" href="#/projects">프로젝트</a>에서 체크인하세요.</div>`)}
+        ${field('프로젝트', `<select class="select" name="projectId"><option value="">없음 (단독 경험)</option>${App.store.projects().map((p) => `<option value="${esc(p.id)}" ${p.id === d.projectId ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}</select><div class="cd-help">한 프로젝트에 경험 페이지를 여러 개 둘 수 있어요. 진행 중인 일은 경험 위키의 <a class="cd-link" href="#/vault">프로젝트 페이지</a>에서 체크인하세요.</div>`)}
         ${field('역할', `<input class="input" name="role" placeholder="예) 백엔드 담당, 4인 팀" value="${esc(d.role)}">`)}
         ${field('한 줄 요약', `<input class="input" name="summary" placeholder="이 경험을 한 문장으로 소개한다면요?" value="${esc(d.summary)}">`)}
       </section>

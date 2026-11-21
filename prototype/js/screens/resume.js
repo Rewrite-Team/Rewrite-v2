@@ -109,8 +109,8 @@
             : '<div class="subtle">저장된 근거 위치가 없어요.</div>'}
           ${!f ? '<div class="rs-srcm-note">지금은 레포 분석 결과가 없어 파일 위치만 보여요. 프로젝트에서 다시 분석하면 코드도 함께 보여요.</div>' : ''}
         </div>`,
-        cancelText: '닫기', confirmText: p ? '프로젝트에서 보기 →' : '확인',
-        onConfirm() { if (p) App.navigate('#/projects/' + encodeURIComponent(p.id)); },
+        cancelText: '닫기', confirmText: p ? '프로젝트 코드 근거 보기 →' : '확인',
+        onConfirm() { if (p) App.navigate('#/vault/p/' + encodeURIComponent(p.id) + '?tab=code'); },
       });
     } else if (s.type === 'log') {
       const p = S().getProject(s.projectId);
@@ -122,8 +122,8 @@
           <div class="rs-srcm-lb">${p ? esc(projShort(p)) + ' 체크인 로그' : '체크인 로그'}</div>
           ${l ? `<div class="rs-log"><div class="rs-log-top"><span class="tag">${esc(LOG_LABEL[l.type] || '기록')}</span><span class="subtle">${esc(l.date)}</span></div><div>${esc(l.text)}</div></div>` : '<div class="subtle">원래 기록을 찾을 수 없어요. 삭제되었을 수 있어요.</div>'}
         </div>`,
-        cancelText: '닫기', confirmText: p ? '프로젝트 타임라인 →' : '확인',
-        onConfirm() { if (p) App.navigate('#/projects/' + encodeURIComponent(p.id)); },
+        cancelText: '닫기', confirmText: p ? '프로젝트 원본 기록 →' : '확인',
+        onConfirm() { if (p) App.navigate('#/vault/p/' + encodeURIComponent(p.id) + '?tab=timeline'); },
       });
     }
   }
@@ -275,7 +275,7 @@
       ${items.length ? `<div class="rs-inbox-list">${shown.map((it) => it.kind === 'github' ? `
         <div class="rs-mat" data-kind="github">
           <div class="rs-mat-top"><span class="rs-src rs-src-gh"><span class="rs-src-ico">&lt;/&gt;</span>GitHub 코드</span>
-            <a class="rs-mat-from" href="#/projects/${encodeURIComponent(it.p.id)}">${esc(projShort(it.p))}</a>
+            <a class="rs-mat-from" href="#/vault/p/${encodeURIComponent(it.p.id)}">${esc(projShort(it.p))}</a>
             ${it.f.category ? `<span class="subtle">· ${esc(it.f.category)}</span>` : ''}</div>
           <div class="rs-mat-text">${esc(it.f.bullet || it.f.title)}</div>
           <div class="rs-mat-foot">
@@ -297,7 +297,7 @@
         </div>`).join('')}</div>
         ${items.length > 3 ? `<button type="button" class="rs-inbox-more" data-act="inbox-more">${ui.inboxAll ? '접기' : `${items.length - 3}개 더 보기`}</button>` : ''}`
         : '<div class="rs-inbox-empty">새 재료를 모두 확인했어요. 체크인과 답변은 경험 위키의 경험이 되고, 경험을 완성하면 여기에 이력서 재료로 쌓여요.</div>'}
-      ${!gh ? `<div class="rs-inbox-cta"><span>${anyRepo ? '연결된 레포에서 새로 찾은 코드가 없어요.' : 'GitHub 레포를 연결하면 코드에서 이력서 한 줄을 찾아 드려요.'}</span><a class="cd-link rs-link" href="#/projects">프로젝트에서 코드 분석하기 →</a></div>` : ''}
+      ${!gh ? `<div class="rs-inbox-cta"><span>${anyRepo ? '연결된 레포에서 새로 찾은 코드가 없어요.' : 'GitHub 레포를 연결하면 코드에서 이력서 한 줄을 찾아 드려요.'}</span><a class="cd-link rs-link" href="#/vault">경험 위키의 프로젝트에서 코드 분석하기 →</a></div>` : ''}
     </section>`;
   }
 
@@ -390,7 +390,7 @@
         <label class="rs-switch" title="${e.included ? '이 항목을 이력서에서 빼기' : '이 항목을 이력서에 넣기'}"><input type="checkbox" data-act="entry-toggle" data-id="${esc(e.id)}" ${e.included ? 'checked' : ''}><span></span></label>
         <div class="rs-entry-main">
           <div class="rs-entry-title">${esc(e.title || '제목 없는 항목')}${e.included ? '' : '<span class="rs-pool-tag">풀에 보관</span>'}</div>
-          <div class="rs-entry-meta">${meta.map(esc).join(' · ') || '기간·역할을 적어 주세요'}${p ? ` · <a class="rs-proj-link" href="#/projects/${encodeURIComponent(p.id)}">▤ 프로젝트</a>` : ''}</div>
+          <div class="rs-entry-meta">${meta.map(esc).join(' · ') || '기간·역할을 적어 주세요'}${p ? ` · <a class="rs-proj-link" href="#/vault/p/${encodeURIComponent(p.id)}">▤ 프로젝트</a>` : ''}</div>
           ${e.bullets.length ? `<div class="rs-entry-count">한 줄 ${e.bullets.length}개 중 ${incB}개 포함</div>` : ''}
         </div>
         ${tools('entry', e.id, `data-id="${esc(e.id)}"`, i, n)}

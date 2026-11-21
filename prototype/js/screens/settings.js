@@ -194,7 +194,7 @@
           const list = window.SEED.recallPrompts;
           const rp = list[Math.floor(Math.random() * list.length)];
           App.store.pushQuestion({ text: rp.text, type: 'recall', targetExpId: null, hint: '떠오르는 장면 하나면 충분해요.' });
-          App.ui.pushToast('오늘의 질문이 도착했어요', rp.text, '#/daily');
+          App.ui.pushToast('오늘의 질문이 도착했어요', rp.text, '#/ask');
           const y = window.scrollY; App.rerender(); window.scrollTo(0, y); // 사이드바 배지 갱신
           return;
         }

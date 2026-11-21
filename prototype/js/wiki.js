@@ -222,6 +222,17 @@
     const t = getThread(threadId); if (!t || !String(text || '').trim()) return;
     t.msgs.push({ who, text: String(text).trim(), at: nowHM(), date: S.localDay() }); persist();
   }
+  /* 대화방 지우기: 대화 원문만 지운다. 이 대화로 반영된 경험·위키 변경 기록·프로젝트 타임라인 기록은 남고,
+     그쪽에서 이 대화를 가리키던 연결(threadId)만 끊는다 */
+  function deleteThread(id, silent) {
+    const s = st(); if (!Array.isArray(s.threads) || !getThread(id)) return false;
+    s.threads = s.threads.filter((t) => t.id !== id);
+    s.projects.forEach((p) => (p.logs || []).forEach((l) => { if (l.threadId === id) delete l.threadId; }));
+    s.experiences.forEach((e) => (e.qa || []).forEach((x) => { if (x.threadId === id) x.threadId = null; }));
+    (s.wikiLog || []).forEach((w) => { if (w.source && w.source.threadId === id) delete w.source.threadId; if (w.threadId === id) delete w.threadId; });
+    if (!silent) persist();
+    return true;
+  }
   function closeThread(threadId, outcome) { const t = getThread(threadId); if (!t) return; t.outcome = Object.assign({}, outcome); persist(); }
   // 대화에서 사용자가 한 말만 (보관된 대화를 나중에 경험으로 정리할 때)
   function threadText(t) { return (t.msgs || []).filter((m) => m.who === 'me' && !/^(이렇게 반영해 주세요|대화에만 보관해 주세요|이대로 충분해요)$/.test(m.text)).map((m) => m.text).join(' '); }
@@ -517,8 +528,8 @@
     const out = [];
     (e.qa || []).forEach((x) => { const t = x.threadId ? getThread(x.threadId) : (x.qid ? (st().threads || []).find((th) => th.questionId === x.qid) : null); out.push({ type: x.source || 'answer', date: x.date, q: x.q, text: x.a, threadId: t ? t.id : null }); });
     const p = e.projectId && S.getProject(e.projectId);
-    (e.sourceLogIds || []).forEach((id) => { const l = p && p.logs.find((x) => x.id === id); if (l) out.push({ type: 'checkin', date: l.date, q: l.fromQuestion || '', text: l.text, logType: l.type, href: '#/projects/' + p.id, threadId: l.threadId || null }); });
-    (e.codeRefs || []).forEach((fid) => { const ff = S.findFinding(fid); if (ff) out.push({ type: 'code', date: (ff.project.repo.analyzedAt || '').slice(0, 10), q: ff.finding.category, text: ff.finding.title, finding: ff.finding, href: '#/projects/' + ff.project.id + '?tab=code' }); });
+    (e.sourceLogIds || []).forEach((id) => { const l = p && p.logs.find((x) => x.id === id); if (l) out.push({ type: 'checkin', date: l.date, q: l.fromQuestion || '', text: l.text, logType: l.type, href: '#/vault/p/' + p.id + '?tab=timeline', threadId: l.threadId || null }); });
+    (e.codeRefs || []).forEach((fid) => { const ff = S.findFinding(fid); if (ff) out.push({ type: 'code', date: (ff.project.repo.analyzedAt || '').slice(0, 10), q: ff.finding.category, text: ff.finding.title, finding: ff.finding, href: '#/vault/p/' + ff.project.id + '?tab=code' }); });
     return out.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
   }
   function cardsForFinding(fid) { return st().experiences.filter((e) => (e.codeRefs || []).includes(fid)); }
@@ -608,7 +619,7 @@
     });
   }
 
-  App.wiki = { withThread, activeThread: () => activeThread, threads, getThread, startThread, addMsg, closeThread, threadText, threadsFor, projectTimeline, hasStory, THREAD_LABEL, canUndo, plan, polish, currentOf, ingest, ingestLog, ingestCode, recordEdit, undo, reroute, match, detectProject, inferField, lint, askIssue, fixIssue, autoQueue, entries, sourcesOf, cardsForFinding, stats, reportHTML, bindReport, codeQuestion, get: (id) => (st().wikiLog || []).find((w) => w.id === id) || null, SOURCE_LABEL, SOURCE_ICO, FIELD_LABEL, short };
+  App.wiki = { withThread, activeThread: () => activeThread, threads, getThread, startThread, addMsg, closeThread, deleteThread, threadText, threadsFor, projectTimeline, hasStory, THREAD_LABEL, canUndo, plan, polish, currentOf, ingest, ingestLog, ingestCode, recordEdit, undo, reroute, match, detectProject, inferField, lint, askIssue, fixIssue, autoQueue, entries, sourcesOf, cardsForFinding, stats, reportHTML, bindReport, codeQuestion, get: (id) => (st().wikiLog || []).find((w) => w.id === id) || null, SOURCE_LABEL, SOURCE_ICO, FIELD_LABEL, short };
   ensure();
   // 시드: 이미 분석된 레포의 발견 항목 중 같은 이야기를 하는 경험이 있으면 코드 근거로 조용히 연결
   if (!st().wikiMeta.seededCode) {

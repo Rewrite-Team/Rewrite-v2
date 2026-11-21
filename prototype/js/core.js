@@ -99,14 +99,25 @@ window.App = window.App || {};
     },
     // 질문 답변이 쌓일 곳: 프로젝트 로그 또는 경험 카드
     questionTarget(q) {
-      if (q && q.targetProjectId) { const p = this.getProject(q.targetProjectId); if (p) return { kind: 'project', id: p.id, title: p.title, href: '#/projects/' + p.id, place: '프로젝트 로그' }; }
+      if (q && q.targetProjectId) { const p = this.getProject(q.targetProjectId); if (p) return { kind: 'project', id: p.id, title: p.title, href: '#/vault/p/' + p.id, place: '프로젝트 로그' }; }
       if (q && q.targetExpId) { const e = this.get(q.targetExpId); if (e) return { kind: 'card', id: e.id, title: e.title, href: '#/card/' + e.id, place: '경험' }; }
       return null;
     },
 
     // 오늘의 질문 인박스
-    inbox() { return state.inbox.slice(); },
-    pending() { return state.inbox.filter((q) => q.status === 'pending'); },
+    // 지운 질문(deleted)은 목록에서 빠지지만, 같은 질문을 곧바로 다시 묻지 않도록 자리만 남는다
+    inbox() { return state.inbox.filter((q) => !q.deleted); },
+    pending() { return state.inbox.filter((q) => q.status === 'pending' && !q.deleted); },
+    getQuestion(qid) { return state.inbox.find((x) => x.id === qid && !x.deleted) || null; },
+    /* 질문함에서 질문(대화방) 지우기: 질문과 그 질문으로 나눈 대화 원문만 지운다.
+       이미 위키에 반영된 경험·변경 기록·프로젝트 타임라인 기록은 그대로 남는다. 연속 기록(답한 날)도 유지 */
+    deleteQuestion(qid) {
+      const q = state.inbox.find((x) => x.id === qid); if (!q) return false;
+      if (App.wiki && App.wiki.threads) App.wiki.threads().filter((t) => t.questionId === qid).map((t) => t.id).forEach((id) => App.wiki.deleteThread(id, true));
+      if (q.status === 'pending' || q.status === 'later') q.status = 'skipped'; // 체크인·코드 질문이 바로 다시 도착하지 않게
+      q.deleted = true; delete q.answer; delete q.hint;
+      emit(); return true;
+    },
     // opts (프로젝트 체크인일 때): { type, keywords } — 트래커에서 답하면 사용자가 고른 유형·키워드를 그대로 쓴다
     // opts.decision: 대화에서 사용자가 정한 반영 방법 { mode:'update'|'new'|'timeline'|'skip', expId, field, text, title } — App.wiki.plan 참고
     // 답변은 모두 경험 위키를 지난다 (App.wiki.ingest). 반환값: 위키 반영 결과 entry — 화면은 App.wiki.reportHTML(entry) 로 보여 준다
@@ -136,7 +147,7 @@ window.App = window.App || {};
     // 'YYYY-MM-DD' → 그날 도착한 질문 목록 (askedAt 기준, 도착 시각 순)
     dayHistory() {
       const map = {};
-      state.inbox.forEach((q) => { const d = (q.askedAt || '').slice(0, 10); if (!d) return; (map[d] = map[d] || []).push(q); });
+      state.inbox.forEach((q) => { const d = (q.askedAt || '').slice(0, 10); if (!d || q.deleted) return; (map[d] = map[d] || []).push(q); });
       Object.keys(map).forEach((d) => map[d].sort((a, b) => (a.askedAt || '').localeCompare(b.askedAt || '')));
       return map;
     },
@@ -558,8 +569,11 @@ window.App = window.App || {};
   // 화면 등록: App.screens.<name> = { title, layout?: 'shell'|'full', render(params) => html, mount?(root, params) => cleanupFn? }
   App.screens = App.screens || {};
   App.routes = [
-    ['#/onboarding', 'onboarding'], ['#/home', 'home'], ['#/chat', 'chat'], ['#/discover', 'discover'], ['#/daily', 'daily'],
-    ['#/projects/:id', 'projects'], ['#/projects', 'projects'], ['#/vault', 'vault'], ['#/card/:id', 'card'],
+    ['#/onboarding', 'onboarding'], ['#/home', 'home'], ['#/discover', 'discover'],
+    // 질문함: 질문 하나 = 대화방 하나. 옛 주소(#/daily, #/chat)도 질문함으로 연결
+    ['#/ask/:room', 'ask'], ['#/ask', 'ask'], ['#/daily', 'ask'], ['#/chat', 'ask'],
+    // 프로젝트는 경험 위키 안의 묶음 페이지 (#/projects/:id 는 옛 주소 호환)
+    ['#/vault/p/:id', 'projects'], ['#/projects/:id', 'projects'], ['#/projects', 'vault'], ['#/vault', 'vault'], ['#/card/:id', 'card'],
     ['#/apply/:id/:tab', 'apply'], ['#/apply/:id', 'apply'], ['#/apply', 'apply'],
     ['#/competency', 'apply'], ['#/match', 'apply'], ['#/settings', 'settings'], ['#/resume', 'resume'],
   ];

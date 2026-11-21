@@ -214,7 +214,7 @@
           App.store.pushQuestion({ type: 'recall', text: seedQuestion(d.seeds[0]), hint: '한두 줄이면 충분해요. 답하면 경험 위키에 반영돼요.' });
         }
         App.ui.toast(project ? '준비 완료! 레포를 분석해 볼까요?' : '준비 완료!');
-        App.navigate(project ? `#/projects/${project.id}?tab=code` : '#/home');
+        App.navigate(project ? `#/vault/p/${encodeURIComponent(project.id)}?tab=code` : '#/home');
         // 한 줄 첫 기록은 전역 "＋ 기록하기"로 위키에 반영 (결과 화면까지 그 안에서 보여 준다)
         if (text && App.capture) setTimeout(() => App.capture({ text }), 80);
       }

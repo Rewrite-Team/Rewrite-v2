@@ -1,4 +1,4 @@
-/* 홈: 하나의 흐름 — 오늘의 질문에 답하거나 ＋ 기록하기 → 위키에 반영된 변경 → 위키 점검 */
+/* 홈: 하나의 흐름 — 질문함에서 답하거나 새 대화 → 위키에 반영된 변경 → 위키 점검 */
 (function (App) {
   const esc = (s) => App.ui.esc(s);
   const TYPE_LABEL = { project: '프로젝트 체크인', deepen: '경험 깊이 파기', recall: '기억 떠올리기', code: '코드 분석에서 온 질문' };
@@ -15,9 +15,9 @@
     if (h < 17) return '좋은 오후예요';
     return '오늘 하루 수고했어요';
   }
-  const daily = () => App.screens.daily || {};
-  const destOf = (q) => (daily().destOf ? daily().destOf(q) : null);
-  const wentOf = (q) => (daily().wentOf ? daily().wentOf(q) : []);
+  const ask = () => App.screens.ask || {};
+  const destOf = (q) => (ask().destOf ? ask().destOf(q) : null);
+  const wentOf = (q) => (ask().wentOf ? ask().wentOf(q) : []);
 
   function todayCard() {
     const pending = App.store.pending();
@@ -26,26 +26,26 @@
       return `<section class="card home-today home-today-done">
         <div class="home-today-head"><span class="home-pill home-pill-done">✓ 오늘 질문 완료</span></div>
         <h2 class="home-today-q">오늘 도착한 질문에 모두 답했어요.</h2>
-        <p class="home-today-hint">떠오른 일이 있으면 ＋ 기록하기로 한 줄 남겨 두세요. 위키가 알아서 맞는 경험에 반영해요.</p>
+        <p class="home-today-hint">떠오른 일이 있으면 질문함의 ＋ 새 대화로 한 줄 남겨 두세요. 위키가 알아서 맞는 경험에 반영해요.</p>
         <div class="home-today-actions">
-          <a class="btn btn-ghost" href="#/daily">지난 답변 보기</a>
+          <a class="btn btn-ghost" href="#/ask">질문함 열기</a>
         </div>
       </section>`;
     }
     const d = destOf(q);
     // 답변은 오늘의 질문 화면 한 곳에서만 받는다. 홈은 미리보기 + 바로가기
-    return `<section class="card home-today" data-href="#/daily">
+    return `<section class="card home-today" data-href="#/ask/q_${esc(q.id)}">
       <div class="home-today-head">
         <span class="home-pill"><span class="home-pill-dot"></span>오늘의 질문</span>
         <span class="subtle">${q.type === 'code' ? '⌥ ' : ''}${esc(TYPE_LABEL[q.type] || '질문')} · ${esc((q.askedAt || '').slice(11) || '방금')} 도착</span>
-        <a class="home-today-count" href="#/daily">남은 질문 ${pending.length}개 →</a>
+        <a class="home-today-count" href="#/ask">남은 질문 ${pending.length}개 →</a>
       </div>
       <h2 class="home-today-q">${esc(q.text)}</h2>
       ${q.hint ? `<p class="home-today-hint">💡 ${esc(q.hint)}</p>` : ''}
       <div class="home-today-foot">
         <span class="subtle home-today-merge">${d ? `→ ${d.finding ? `코드 「${esc(App.wiki.short(d.finding, 30))}」 · ` : ''}${esc(d.text)}` : ''}</span>
         <div class="home-today-actions">
-          <a class="btn btn-primary" href="#/daily">답하러 가기 →</a>
+          <a class="btn btn-primary" href="#/ask/q_${esc(q.id)}">답하러 가기 →</a>
         </div>
       </div>
     </section>`;
@@ -59,9 +59,9 @@
     return `<section class="card card-pad home-feed">
       <div class="section-title">위키 최근 변경<a class="more" href="#/vault">경험 위키 →</a></div>
       <p class="subtle home-feed-sub">경험 ${st.pages}개 · 이번 주 반영 ${st.updatesThisWeek}번</p>
-      ${kept ? `<a class="home-kept" href="#/chat">💬 보관 중인 대화 ${kept}개 → 대화 기록</a>` : ''}
+      ${kept ? `<a class="home-kept" href="#/ask">💬 보관 중인 대화 ${kept}개 → 질문함</a>` : ''}
       ${list.length ? `<div class="wk-feed">${list.map((e) => App.wiki.reportHTML(e, { compact: true })).join('')}</div>`
-        : '<p class="home-soft">아직 반영된 기록이 없어요. 오늘의 질문에 답하거나 ＋ 기록하기로 시작해 보세요.</p>'}
+        : '<p class="home-soft">아직 반영된 기록이 없어요. 질문함에서 오늘의 질문에 답하거나 ＋ 새 대화로 시작해 보세요.</p>'}
     </section>`;
   }
 
@@ -137,7 +137,7 @@
           ${q.status === 'answered' && q.answer ? `<p class="home-cal-ans">“${esc(truncate(q.answer, 80))}”</p>` : ''}
           ${went.length || open ? `<div class="home-cal-links">
             ${went.map((w) => `<a class="home-cal-link" href="${esc(w.href)}">${esc(w.text)} →</a>`).join('')}
-            ${open ? `<a class="home-cal-link home-cal-go" href="#/daily">답하러 가기 →</a>` : ''}
+            ${open ? `<a class="home-cal-link home-cal-go" href="#/ask/q_${esc(q.id)}">답하러 가기 →</a>` : ''}
           </div>` : ''}
         </li>`;
       }).join('')}</ul>

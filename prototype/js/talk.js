@@ -154,7 +154,7 @@
     function roomPaneHTML() {
       const list = W.threadsFor().filter((t) => t.id !== threadId).slice(-6);
       return `<details class="tk-room" ${window.matchMedia && window.matchMedia('(min-width: 900px)').matches ? 'open' : ''}>
-        <summary class="tk-room-head"><span>💬 지난 대화</span><a href="#/chat" class="tk-room-all">전체 보기 →</a></summary>
+        <summary class="tk-room-head"><span>💬 지난 대화</span><a href="#/ask" class="tk-room-all">질문함에서 보기 →</a></summary>
         <div class="tk-room-body">${list.length ? roomHTML(list, { compact: true }) : '<p class="subtle" style="font-size:12.5px;margin:8px 0">아직 대화가 없어요.</p>'}</div>
       </details>`;
     }
@@ -261,7 +261,7 @@
     function ctlOf() { return { destroy() { alive = false; el.innerHTML = ''; }, get phase() { return st.phase; }, get threadId() { return threadId; } }; }
   }
 
-  /* 대화 기록(채팅방) 그리기 — talk 옆 패널과 #/chat 화면이 같이 쓴다
+  /* 대화 기록(채팅방) 그리기 — talk 옆 패널과 질문함(#/ask) 대화방이 같이 쓴다
      opts: { compact, organize (보관된 대화에 '경험으로 정리' 버튼), highlight: threadId } */
   const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
   function dayLabel(d) { const x = App.store.parseDay(d); const today = App.store.localDay(); return d === today ? '오늘' : `${x.getMonth() + 1}월 ${x.getDate()}일 (${WEEK[x.getDay()]})`; }
