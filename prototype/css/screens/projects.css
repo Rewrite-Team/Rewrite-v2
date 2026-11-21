@@ -42,6 +42,7 @@
 .pj-form .label { margin-top: 12px; }
 .pj-form-intro { font-size: 14px; color: var(--text-2); margin-bottom: 6px; }
 .pj-form-note { margin-top: 10px; }
+.pj-form-check { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13.5px; color: var(--text-2); cursor: pointer; }
 .pj-req { color: var(--danger); }
 
 /* detail */
@@ -52,7 +53,8 @@
 .pj-hero-main .pj-due { margin-left: 4px; }
 .pj-hero-title { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
 .pj-hero-main .pj-card-role { margin-top: -4px; }
-.pj-hero-side { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+.pj-hero-side { display: flex; gap: 8px; align-items: center; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+.pj-source-code .pj-source-v { color: var(--primary); }
 .pj-source { display: flex; flex-direction: column; padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-2);
   font-size: 13px; line-height: 1.35; max-width: 240px; cursor: pointer; text-align: left; }
 .pj-source:hover { border-color: var(--border-strong); }
@@ -183,7 +185,7 @@
 @media (hover: none) { .pj-log-acts { opacity: 1; } }
 @media (max-width: 900px) { .pj-log-acts { opacity: 1; } }
 
-/* ---------- 프로젝트 → 경험 카드 (1:N) ---------- */
+/* ---------- 프로젝트 → 경험 (1:N) ---------- */
 .pj-cards { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 .pj-cardlink { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); color: inherit; text-decoration: none; }
 .pj-cardlink:hover { border-color: var(--primary); background: var(--primary-soft); }
@@ -193,24 +195,11 @@
 .pj-cards-box .pj-side-hint { margin: 4px 0 12px; }
 .pj-log-card { font-size: 11.5px; font-weight: 700; color: var(--primary); background: var(--primary-soft); padding: 1px 7px; border-radius: 99px; text-decoration: none; }
 .pj-log-card:hover { background: var(--primary); color: #fff; }
-.pj-pickbar { display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: 14px; border-color: var(--primary); background: var(--primary-soft);
-  position: sticky; top: 12px; z-index: 3; flex-wrap: wrap; }
-.pj-pickbar > div:first-child { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 220px; font-size: 14px; }
-.pj-pickbar .subtle { font-size: 12.5px; }
-.pj-pickbar-acts { display: flex; gap: 8px; }
-.pj-log.is-picking { cursor: pointer; align-items: flex-start; }
-.pj-log.is-picking .pj-log-body { transition: border-color .15s, background .15s; }
-.pj-log.is-picking:hover .pj-log-body { border-color: var(--border-strong); }
-.pj-log.is-picked .pj-log-body { border-color: var(--primary); background: var(--primary-soft); }
-.pj-log-check { width: 20px; height: 20px; margin-top: 6px; flex-shrink: 0; border-radius: 6px; border: 1.5px solid var(--border-strong); background: var(--surface);
-  display: grid; place-items: center; font-size: 12px; font-weight: 800; color: #fff; }
-.pj-log.is-picked .pj-log-check { background: var(--primary); border-color: var(--primary); }
-.pj-log.is-picking:not(:last-child)::before { left: 47px; }
 .pj-ck-sync { display: inline-block; font-size: 12px; font-weight: 600; color: #b5651d; background: var(--accent-soft); padding: 4px 10px; border-radius: 99px; text-decoration: none; margin: 2px 0 12px; }
 .pj-ck-sync:hover { filter: brightness(.97); }
 .pj-ck-sync.is-quiet { color: var(--text-3); background: transparent; padding-left: 0; font-weight: 500; }
 
-/* ---------- 탭: 과정 타임라인 | 코드 분석 ---------- */
+/* ---------- 탭: 경험 | 타임라인 | 코드 분석 ---------- */
 .pj-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-top: 6px; }
 .pj-tab { border: 0; background: transparent; padding: 10px 14px; font-size: 14.5px; font-weight: 700; color: var(--text-3); cursor: pointer;
   border-bottom: 2px solid transparent; margin-bottom: -1px; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
@@ -375,4 +364,31 @@
   .pj-ev-path { flex-basis: 100%; }
   .pj-ev-link { margin-left: auto; }
   .pj-ev-n { width: 36px; padding-right: 8px; }
+}
+
+/* ---------- 위키 허브: 반영 결과 · 기록↔경험 연결 · 경험 탭 ---------- */
+.pj-report { position: relative; margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.pj-report-lead { font-size: 13px; font-weight: 700; color: var(--success); }
+.pj-report-x { position: absolute; top: 0; right: 0; border: 0; background: transparent; color: var(--text-3); font-size: 16px; line-height: 1; padding: 2px 6px; border-radius: 6px; cursor: pointer; }
+.pj-report-x:hover { background: var(--surface-2); color: var(--text); }
+.pj-report:not(:has(.pj-report-lead)) .pj-report-x { top: 10px; right: 10px; }
+.pj-log-body .pj-report { margin-top: 2px; }
+.pj-log-wiki { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; }
+.pj-log-wiki:empty { display: none; }
+.pj-log-wiki .pj-log-card { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pj-log-ingest { margin-left: auto; }
+.pj-gf-wiki { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; }
+.pj-gf-wiki.is-empty { padding: 8px 10px; border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); justify-content: space-between; }
+.pj-gf-exp { font-size: 12px; font-weight: 700; color: var(--success); background: var(--success-soft, #e9f6ee); padding: 2px 8px; border-radius: 99px; text-decoration: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pj-gf-exp:hover { filter: brightness(.96); }
+.pj-exp { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+.pj-exp-head { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
+.pj-exp-head p { margin: 0; font-size: 13px; }
+.pj-exp-head .btn { flex: none; }
+.pj-exp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+@media (max-width: 600px) {
+  .pj-exp-head { flex-direction: column; align-items: stretch; }
+  .pj-exp-grid { grid-template-columns: 1fr; }
+  .pj-log-ingest { margin-left: 0; }
+  .pj-gf-wiki.is-empty .btn { width: 100%; }
 }

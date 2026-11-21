@@ -1,5 +1,6 @@
 /* ===== Home ===== */
-.home-hello { margin: 14px 0 24px; }
+.home-hello { margin: 14px 0 24px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.home-capture { flex-shrink: 0; }
 .home-hello-sub { color: var(--text-3); font-size: 14px; font-weight: 600; }
 .home-hello-title { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; margin-top: 4px; }
 .home-hello-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
@@ -43,79 +44,9 @@
 .home-today-done .home-today-actions { margin: 16px 0 0; }
 .home-today-done { background: linear-gradient(180deg, var(--success-soft) 0%, var(--surface) 60%); border-color: #cbe9da; }
 
-/* 작성 중 카드 */
-.home-drafts { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
-.home-draft {
-  padding: 16px; display: flex; flex-direction: column; gap: 10px; cursor: pointer;
-  transition: box-shadow .15s, transform .15s, border-color .15s;
-}
-.home-draft:hover { box-shadow: var(--shadow); border-color: var(--border-strong); transform: translateY(-1px); }
-.home-draft-top { display: flex; align-items: center; gap: 6px; }
-.home-draft-pct { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--text-3); }
-.home-draft-title { font-weight: 700; font-size: 15px; line-height: 1.4; }
-.home-draft-next {
-  display: flex; flex-direction: column; gap: 3px; background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); padding: 10px 12px; font-size: 13.5px; color: var(--text);
-}
-.home-next-label { font-size: 11.5px; font-weight: 700; color: var(--primary); }
-.home-draft-cta { font-size: 13px; font-weight: 600; color: var(--primary); margin-top: auto; }
-
-/* 프로젝트 */
-.home-projects { padding: 4px 0; }
-.home-proj { display: flex; align-items: center; gap: 12px; padding: 14px 18px; cursor: pointer; }
-.home-proj + .home-proj { border-top: 1px solid var(--border); }
-.home-proj:hover { background: var(--surface-2); }
-.home-proj-ico { width: 36px; height: 36px; border-radius: 10px; background: var(--accent-soft); color: #b25d15; display: grid; place-items: center; flex-shrink: 0; }
-.home-proj-body { flex: 1; min-width: 0; }
-.home-proj-title { font-weight: 700; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.home-stale { color: #b25d15; }
-
-/* 통계 */
-.home-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.home-stat { padding: 14px 14px 12px; transition: border-color .15s; }
-.home-stat:hover { border-color: var(--border-strong); }
-.home-stat-num { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
-.home-stat-num small { font-size: 13px; font-weight: 600; color: var(--text-3); margin-left: 2px; }
-.home-stat-label { font-size: 12.5px; color: var(--text-3); margin-top: 4px; font-weight: 600; }
-
-/* 회상 위젯 */
-.home-recall { padding: 18px; background: #fffaf4; border-color: #f3e2cf; }
-.home-recall-head { display: flex; align-items: center; gap: 8px; font-size: 14px; }
-.home-recall-next { margin-left: auto; padding: 3px 8px; font-size: 15px; }
-.home-recall-body { margin: 12px 0 14px; min-height: 76px; animation: fade .3s; }
-.home-recall-theme { font-size: 11.5px; font-weight: 700; color: #b25d15; background: var(--accent-soft); padding: 2px 8px; border-radius: 6px; }
-.home-recall-text { margin-top: 8px; font-size: 15px; font-weight: 600; line-height: 1.5; }
-.home-recall-foot { display: flex; align-items: center; gap: 10px; }
-.home-recall-dots { display: flex; gap: 4px; flex: 1; }
-.home-recall-dots span { width: 5px; height: 5px; border-radius: 50%; background: #ead9c5; }
-.home-recall-dots span.on { width: 14px; border-radius: 3px; background: var(--accent); }
-
-/* 키워드 분포 */
-.home-bars { display: flex; flex-direction: column; gap: 4px; }
-.home-bar {
-  display: grid; grid-template-columns: 92px 1fr 22px; align-items: center; gap: 10px; padding: 5px 6px; margin: 0 -6px;
-  border-radius: 6px; cursor: pointer; font-size: 13px;
-}
-.home-bar:hover { background: var(--surface-2); }
-.home-bar:focus-visible { outline: 2px solid var(--primary); }
-.home-bar-name { font-weight: 600; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.home-bar-track { height: 8px; background: #f0eee9; border-radius: 99px; overflow: hidden; }
-.home-bar-fill { display: block; height: 100%; border-radius: 99px; background: #8f8a82; transition: width .4s; }
-.home-bar-n { text-align: right; font-weight: 700; color: var(--text-3); font-size: 12px; }
-.home-bar[data-tone="blue"] .home-bar-fill { background: #6f8fe0; }
-.home-bar[data-tone="green"] .home-bar-fill { background: #53b285; }
-.home-bar[data-tone="orange"] .home-bar-fill { background: #f0a463; }
-.home-bar[data-tone="purple"] .home-bar-fill { background: #9479d8; }
-.home-bar[data-tone="pink"] .home-bar-fill { background: #e07aa3; }
-.home-bar[data-tone="teal"] .home-bar-fill { background: #4fb0b0; }
-.home-bar[data-tone="yellow"] .home-bar-fill { background: #d9b53c; }
-
-.home-gap { margin-top: 16px; padding: 14px; border-radius: var(--radius-sm); background: var(--surface-2); border: 1px dashed var(--border-strong); }
-.home-gap-head { display: flex; flex-direction: column; gap: 8px; }
-.home-gap-label { font-size: 12px; font-weight: 700; color: var(--text-3); }
-.home-gap-kws { display: flex; flex-wrap: wrap; gap: 4px; }
-.home-gap-kws .kw { opacity: .7; }
-.home-gap-q { margin: 10px 0 6px; font-size: 14px; font-weight: 600; }
+/* 위키 최근 변경 · 위키 점검 */
+.home-feed-sub { margin: -4px 0 8px; font-size: 12.5px; }
+.home-feed .home-soft { margin: 4px 0 0; border: 1px dashed var(--border); border-radius: var(--radius-sm); }
 
 /* 답변 캘린더 */
 .home-cal { padding: 20px 20px 18px; }
@@ -200,8 +131,7 @@
   .home-today-count { margin-left: 0; }
   .home-today-actions { width: 100%; margin-left: 0; }
   .home-today-actions .btn-primary { flex: 1; }
-  .home-stat-num { font-size: 20px; }
-  .home-proj { padding: 12px 14px; }
+  .home-capture { width: 100%; }
   .home-cal { padding: 16px 14px 14px; }
   .home-cal-cell { height: 42px; }
   .home-cal-num { width: 26px; height: 26px; font-size: 12.5px; }

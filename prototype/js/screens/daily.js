@@ -6,30 +6,59 @@
     recall: { label: '기억 떠올리기', ico: '🌱' },
     deepen: { label: '경험 깊이 파기', ico: '🔍' },
     project: { label: '프로젝트 체크인', ico: '📌' },
+    code: { label: '코드 분석에서 온 질문', ico: '⌥' },
   };
   const HIST_TABS = [['answered', '답변함'], ['skipped', '건너뜀'], ['later', '나중에']];
-  const CAT_HINTS = [
-    ['아르바이트', ['알바', '아르바이트', '카페', '편의점', '매장', '손님']],
-    ['프로젝트', ['프로젝트', '개발', '서비스', '앱', '배포']],
-    ['동아리', ['동아리', '스터디', '모임', '학회']],
-    ['수업·과제', ['과제', '수업', '팀플', '교수', '발표']],
-    ['인턴·직장', ['인턴', '회사', '직장', '상사', '업무']],
-    ['대외활동', ['공모전', '해커톤', '봉사', '서포터즈', '대외활동']],
-  ];
   const DOW = ['일', '월', '화', '수', '목', '금', '토'];
 
   const pad = (n) => String(n).padStart(2, '0');
   const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  const today = () => new Date().toISOString().slice(0, 10);
-  const firstSentence = (t, n) => {
-    const s = String(t || '').trim().split(/[.!?\n]/)[0].trim();
-    return s.length > n ? s.slice(0, n).trim() + '…' : s;
-  };
-  function guessCategory(text) {
-    for (const [cat, words] of CAT_HINTS) if (words.some((w) => text.includes(w))) return cat;
-    return '일상';
-  }
   function typeInfo(t) { return TYPES[t] || TYPES.recall; }
+  const short = (t, n) => App.wiki.short(t, n);
+  const title = (t, n) => short(String(t || '').replace(/[「」]/g, ''), n); // 「」 안에 「」가 겹치지 않게
+  const projName = (p) => App.store.projectName(p);
+
+  // 답하기 전: 이 답이 위키의 어디로 가는지 (홈 미리보기도 같이 쓴다)
+  function destOf(q) {
+    if (!q) return null;
+    if (q.type === 'code' || q.findingId) {
+      const ff = q.findingId && App.store.findFinding(q.findingId);
+      const p = q.targetProjectId && App.store.getProject(q.targetProjectId);
+      return { kind: 'code', finding: ff ? ff.finding.title : '', text: '답하면 이 코드가 근거로 붙은 경험에 반영돼요', href: p ? `#/projects/${p.id}?tab=code` : '' };
+    }
+    if (q.targetProjectId) {
+      const p = App.store.getProject(q.targetProjectId);
+      if (p) return { kind: 'project', text: `「${projName(p)}」 타임라인에 기록되고, 관련 경험에 반영돼요`, href: '#/projects/' + p.id };
+    }
+    if (q.targetExpId) {
+      const e = App.store.get(q.targetExpId);
+      if (e) {
+        const f = App.wiki.inferField('', q.text, q.stage);
+        const cur = f === 'insights' ? e.insights : f === 'summary' ? e.summary : e.star[f];
+        return { kind: 'deepen', text: `답하면 「${title(e.title, 28)}」의 ${App.wiki.FIELD_LABEL[f] || f} 칸이 ${String(cur || '').trim() ? '보강돼요' : '채워져요'}`, href: '#/card/' + e.id };
+      }
+    }
+    return { kind: 'recall', text: '비슷한 경험이 있으면 거기에, 없으면 새 경험으로 반영돼요', href: '' };
+  }
+  // 답한 뒤: 실제로 어디에 반영됐는지
+  function wentOf(q) {
+    const out = [];
+    if (!q || q.status !== 'answered') return out;
+    const e = q.compiledTo && App.store.get(q.compiledTo);
+    // 위키 이전에 답한 '깊이 파기' 질문도 그 경험의 출처로 들어가 있다
+    const ee = e || (q.targetExpId && App.store.get(q.targetExpId));
+    if (ee) out.push({ href: '#/card/' + ee.id, text: `「${title(ee.title, 28)}」에 반영됨` });
+    if (q.targetProjectId && !q.findingId) { const p = App.store.getProject(q.targetProjectId); if (p) out.push({ href: '#/projects/' + p.id, text: `「${projName(p)}」 타임라인에 기록됨` }); }
+    return out;
+  }
+  function destHTML(q) {
+    const d = destOf(q); if (!d) return '';
+    const inner = `<span class="dy-dest-ico">→</span><span>${d.finding ? `<b>코드 「${esc(short(d.finding, 34))}」</b> · ` : ''}${esc(d.text)}</span>`;
+    return d.href ? `<a class="dy-dest" data-kind="${d.kind}" href="${esc(d.href)}">${inner}</a>` : `<div class="dy-dest" data-kind="${d.kind}">${inner}</div>`;
+  }
+  function wentHTML(q, cls = 'dy-target') {
+    return wentOf(q).map((w) => `<a class="${cls}" href="${esc(w.href)}"><span class="dy-target-ico">✓</span><span>${esc(w.text)}</span></a>`).join('');
+  }
 
   // 설정된 시간 중 다음 질문 시각
   function nextTime() {
@@ -64,6 +93,8 @@
 
   App.screens.daily = {
     title: '오늘의 질문',
+    destOf,
+    wentOf,
     render() {
       return `<div class="page dy-page">
         <div id="dy-head"></div>
@@ -95,7 +126,7 @@
       const S = {
         queue: App.store.pending().map((q) => q.id),
         pos: 0,
-        feedback: null, // { qid, text, kws, expId, created }
+        feedback: null, // { qid, text, entryId } — 위키 반영 결과
         done: [],       // 이번 방문에서 답한 것
         tab: 'answered',
         leaving: false,
@@ -191,7 +222,6 @@
 
       function answeredCard(q) {
         const t = typeInfo(q.type);
-        const exp = App.store.questionTarget(q);
         const nx = nextOpen(S.pos);
         return `
           <div class="dy-qcard dy-answered dy-slide-in" data-type="${esc(q.type)}">
@@ -202,7 +232,7 @@
             </div>
             <h2 class="dy-qtext">${esc(q.text)}</h2>
             <blockquote class="dy-quote">${esc(q.answer || '')}</blockquote>
-            ${exp ? `<a class="dy-target" href="${esc(exp.href)}"><span class="dy-target-ico">📎</span><span>「${esc(exp.title)}」</span><span class="dy-target-sub">${esc(exp.place)}에 쌓였어요</span></a>` : ''}
+            ${wentOf(q).length ? `<div class="dy-went">${wentHTML(q)}</div>` : '<div class="dy-went subtle">위키 반영을 되돌린 답변이에요. 다시 답하면 새로 반영돼요.</div>'}
             <div class="dy-qfoot">
               <div class="dy-qfoot-left"><button class="btn btn-ghost btn-sm" data-reask="${esc(q.id)}" type="button">다시 답하기</button></div>
               <button class="btn btn-primary" data-dy="next" type="button">${nx >= S.queue.length ? '마치기' : '남은 질문 보기 →'}</button>
@@ -212,7 +242,6 @@
 
       function questionCard(q) {
         const t = typeInfo(q.type);
-        const exp = App.store.questionTarget(q);
         return `
           <div class="dy-qcard dy-slide-in" data-type="${esc(q.type)}">
             <div class="dy-qtop">
@@ -220,9 +249,9 @@
               <span class="dy-asked">${esc(askedLabel(q.askedAt))} 도착</span>
             </div>
             ${q.status === 'skipped' || q.status === 'later' ? `<div class="dy-revisit">${q.status === 'skipped' ? '건너뛴' : '나중에로 미뤄 둔'} 질문이에요. 지금 답해도 괜찮아요.</div>` : ''}
-            ${exp ? `<a class="dy-target" href="${esc(exp.href)}"><span class="dy-target-ico">📎</span><span>「${esc(exp.title)}」</span><span class="dy-target-sub">${esc(exp.place)}에 쌓여요</span></a>` : ''}
             <h2 class="dy-qtext">${esc(q.text)}</h2>
             ${q.hint ? `<div class="dy-hint"><span>💡</span><span>${esc(q.hint)}</span></div>` : ''}
+            ${destHTML(q)}
             <div class="dy-answer-wrap">
               <textarea class="dy-answer" id="dy-answer" rows="3" maxlength="400" placeholder="한두 줄이면 충분해요">${esc(S.drafts[q.id] || '')}</textarea>
               <span class="dy-kbd">Enter 보내기 · Shift+Enter 줄바꿈</span>
@@ -240,61 +269,27 @@
       function feedbackCard() {
         const f = S.feedback;
         const q = getQ(f.qid);
-        const exp = f.expId ? App.store.get(f.expId) : null;
-        const proj = f.projectId ? App.store.getProject(f.projectId) : null;
+        const entry = f.entryId ? App.wiki.get(f.entryId) : null;
+        const tgt = entry && !entry.undone && entry.target ? App.store.get(entry.target) : null;
+        const gap = tgt ? App.ai.gapQuestion(tgt) : null;
+        const gapField = gap ? App.wiki.FIELD_LABEL[gap.stage === 'insight' ? 'insights' : gap.stage] : '';
         const isLast = nextOpen(S.pos) >= S.queue.length;
-        const merged = exp && !f.created;
         return `
           <div class="dy-qcard dy-feedback dy-slide-in">
             <div class="dy-fb-top">
               <span class="dy-fb-burst" aria-hidden="true">🎉</span>
               <div>
-                <h3>좋아요, 기록해 뒀어요!</h3>
+                <h3>좋아요, 기록했어요!</h3>
                 <div class="dy-fb-streak">🔥 ${App.store.streak()}일 연속 기록 중</div>
               </div>
             </div>
             <div class="dy-fb-q">${esc(q ? q.text : '')}</div>
             <blockquote class="dy-quote">${esc(f.text)}</blockquote>
-
-            ${proj ? `
-              <div class="dy-merge">
-                <div class="dy-merge-label">↳ 프로젝트 체크인 로그에 쌓였어요</div>
-                <a class="dy-merge-card" href="#/projects/${esc(proj.id)}">
-                  <div class="dy-merge-title">${esc(proj.title)}</div>
-                  <div class="dy-merge-meta"><span>기록 ${proj.logs.length}개</span><span>경험 카드 ${App.store.cardsOf(proj.id).length}장</span></div>
-                </a>
-                <p class="subtle" style="margin-top:8px">나중에 타임라인에서 이 기록을 골라 경험 카드로 만들 수 있어요.</p>
-              </div>` : merged ? `
-              <div class="dy-merge">
-                <div class="dy-merge-label">↳ 이 카드에 쌓였어요</div>
-                <a class="dy-merge-card" href="#/card/${esc(exp.id)}">
-                  <div class="dy-merge-title">${esc(exp.title)}</div>
-                  <div class="dy-merge-meta"><span>원문 기록 +1</span>${f.added.length ? `<span>키워드 +${f.added.length}</span>` : ''}<span class="dy-merge-pct">완성도 ${exp.completeness}%</span></div>
-                  ${App.ui.progress(exp.completeness)}
-                </a>
-              </div>` : f.created && exp ? `
-              <div class="dy-merge dy-seed">
-                <div class="dy-merge-label">🌱 새 경험 카드로 저장했어요</div>
-                <a class="dy-merge-card" href="#/card/${esc(exp.id)}">
-                  <div class="dy-merge-title">${esc(exp.title)}</div>
-                  <div class="dy-merge-meta"><span>작성중</span><span class="dy-merge-pct">완성도 ${exp.completeness}%</span></div>
-                  ${App.ui.progress(exp.completeness)}
-                </a>
-              </div>` : `
-              <div class="dy-merge dy-seed">
-                <div class="dy-merge-label">🌱 새로운 경험의 씨앗을 찾았어요</div>
-                <p class="subtle">조금만 더 이야기하면 경험 카드로 만들어 드릴게요.</p>
-              </div>`}
-
-            <div class="dy-fb-kws">
-              <div class="dy-fb-kws-label">${f.kws.length ? '✦ 답변에서 보이는 역량' : '✦ 역량 키워드'}</div>
-              <div class="dy-fb-chips">${f.kws.length ? f.kws.map((k) => App.ui.keywordChip(k, { ai: true })).join('') : '<span class="subtle">아직 뚜렷한 키워드는 안 보여요. 조금 더 이야기하면 찾아낼 수 있어요.</span>'}</div>
-            </div>
-
+            ${App.wiki.reportHTML(entry)}
             <div class="dy-fb-actions">
-              ${proj ? `<a class="btn btn-primary" href="#/projects/${esc(proj.id)}">프로젝트 타임라인 보기 →</a>` : '<button class="btn btn-primary" data-dy="deeper" type="button">이 이야기 더 해볼래요 →</button>'}
-              <button class="btn" data-dy="next" type="button">${isLast ? '마치기' : '다음 질문'}</button>
-              ${!exp && !proj ? '<button class="btn btn-ghost btn-sm" data-dy="save-seed" type="button">카드로만 저장해 둘게요</button>' : ''}
+              <button class="btn btn-primary" data-dy="next" type="button">${isLast ? '마치기' : '다음 질문 →'}</button>
+              ${gap ? `<a class="btn" href="#/discover?exp=${esc(tgt.id)}">AI와 이어서 채우기 →</a>
+              <span class="subtle dy-fb-gap">다음으로 채울 칸 · ${esc(gapField || '')}</span>` : ''}
             </div>
           </div>`;
       }
@@ -314,19 +309,22 @@
               </div>` : ''}
             <div class="dy-empty-actions">
               <button class="btn" data-dy="more" type="button">✉ 질문 하나 더 받기</button>
-              <a class="btn btn-primary" href="#/discover">✦ 집중 발굴 하러 가기</a>
+              <a class="btn btn-primary" href="#/discover">✦ AI와 대화하며 기록</a>
             </div>
           </div>`;
       }
 
-      function renderStage() {
+      function renderStage(still) {
         const el = root.querySelector('#dy-stage');
         const q = current();
         if (S.feedback) el.innerHTML = feedbackCard();
         else if (q && q.status === 'answered') el.innerHTML = answeredCard(q);
         else if (q) el.innerHTML = questionCard(q);
         else el.innerHTML = emptyCard();
-        if (S.dir === 'back') { const c = el.querySelector('.dy-slide-in'); if (c) { c.classList.remove('dy-slide-in'); c.classList.add('dy-slide-in-back'); } }
+        const card = el.querySelector('.dy-slide-in');
+        if (card && still) card.classList.remove('dy-slide-in');
+        else if (card && S.dir === 'back') { card.classList.remove('dy-slide-in'); card.classList.add('dy-slide-in-back'); }
+        if (S.feedback) App.wiki.bindReport(el, onReport);
         S.leaving = false;
         renderNav(); renderQueue();
         const ta = el.querySelector('#dy-answer');
@@ -358,33 +356,26 @@
         const ta = root.querySelector('#dy-answer');
         const text = (ta && ta.value.trim()) || '';
         if (!text) { if (ta) ta.focus(); return; }
-        App.store.answer(q.id, text);
-        delete S.drafts[q.id];
-        const kws = App.ai.extractKeywords(text);
-        let added = [];
-        const exp = q.targetExpId ? App.store.get(q.targetExpId) : null;
-        if (exp) {
-          added = kws.filter((k) => !exp.keywords.includes(k));
-          if (added.length) App.store.update(exp.id, { keywords: exp.keywords.concat(added) });
+        // 다시 답하기: 이전 답이 위키에 만든 변화(와 체크인 기록)를 먼저 되돌려 중복 반영을 막는다
+        const prev = q.wikiEntry ? App.wiki.get(q.wikiEntry) : null;
+        if (prev && !prev.undone) {
+          App.wiki.undo(prev.id, true);
+          if (prev.source.logId && prev.source.projectId) App.store.removeLog(prev.source.projectId, prev.source.logId);
         }
-        const proj = q.targetProjectId ? App.store.getProject(q.targetProjectId) : null;
-        S.feedback = { qid: q.id, text, kws, added, expId: exp ? exp.id : null, projectId: proj ? proj.id : null, created: false };
-        S.done.push({ qid: q.id, kws });
+        const entry = App.store.answer(q.id, text);
+        delete S.drafts[q.id];
+        S.feedback = { qid: q.id, text, entryId: entry ? entry.id : null };
+        S.done.push({ qid: q.id, kws: App.ai.extractKeywords(text) });
         transition(() => {});
         renderHead();
       }
 
-      function createSeed() {
-        const f = S.feedback; if (!f) return null;
-        if (f.expId) return f.expId;
-        const q = getQ(f.qid);
-        const e = App.store.create({
-          title: firstSentence(f.text, 28) || '새로 떠올린 경험', category: guessCategory(f.text), status: 'draft',
-          star: { situation: f.text, task: '', action: '', result: '' },
-          keywords: f.kws, qa: [{ q: q ? q.text : '', a: f.text, date: today() }],
-        });
-        f.expId = e.id; f.created = true;
-        return e.id;
+      // 반영 결과 카드에서 되돌리기/옮기기 했을 때
+      function onReport(r) {
+        if (!S.feedback) return;
+        const q = getQ(S.feedback.qid);
+        if (r && !r.undone) { S.feedback.entryId = r.id; if (q) { q.wikiEntry = r.id; App.store.touch(); } }
+        renderStage(true); renderHistory();
       }
 
       function goNext() { saveDraft(); const to = nextOpen(S.pos); transition(() => { S.feedback = null; S.pos = to; }, to < S.pos ? 'back' : 'fwd'); }
@@ -418,8 +409,8 @@
         const q = S.feedback ? null : current();
         const ch = (App.store.state.settings || {}).channels || {};
         const time = q && q.askedAt ? q.askedAt.split(' ')[1] : nextTime().time;
-        const lastAnswered = App.store.inbox().find((x) => x.status === 'answered' && x.targetExpId);
-        const lastExp = lastAnswered ? App.store.get(lastAnswered.targetExpId) : null;
+        const lastAnswered = App.store.inbox().find((x) => x.status === 'answered' && x.compiledTo && App.store.get(x.compiledTo));
+        const lastExp = lastAnswered ? App.store.get(lastAnswered.compiledTo) : null;
         root.querySelector('#dy-phone').innerHTML = `
           <div class="dy-phone-wrap">
             <div class="dy-phone-cap">알림은 이렇게 도착해요</div>
@@ -439,13 +430,13 @@
                   </div>` : `
                   <div class="dy-notif dy-notif-new">
                     <div class="dy-notif-head"><span class="dy-notif-icon">R</span><span class="dy-notif-app">REWRITE</span><span class="dy-notif-when">지금</span></div>
-                    <div class="dy-notif-title">${S.feedback ? '답변이 카드에 쌓였어요 ✓' : '오늘 질문은 모두 답했어요'}</div>
+                    <div class="dy-notif-title">${S.feedback ? '답변을 위키에 반영했어요 ✓' : '오늘 질문은 모두 답했어요'}</div>
                     <div class="dy-notif-body">다음 질문은 ${esc(nextTime().label)}에 보내 드릴게요.</div>
                   </div>`}
                   ${lastExp ? `
                   <div class="dy-notif dy-notif-old">
                     <div class="dy-notif-head"><span class="dy-notif-icon">R</span><span class="dy-notif-app">REWRITE</span><span class="dy-notif-when">어제</span></div>
-                    <div class="dy-notif-body">어제 답변이 「${esc(lastExp.title)}」 카드에 쌓였어요.</div>
+                    <div class="dy-notif-body">지난 답변이 「${esc(lastExp.title)}」에 반영됐어요.</div>
                   </div>` : ''}
                 </div>
                 <div class="dy-lock-bottom"><span>🔦</span><span>📷</span></div>
@@ -476,13 +467,12 @@
             </div>
             ${items.length ? `<ul class="dy-hist-list">${items.map((q) => {
               const t = typeInfo(q.type);
-              const exp = App.store.questionTarget(q);
               return `<li class="dy-hist-item">
                 <div class="dy-hist-meta"><span class="dy-type dy-type-sm" data-type="${esc(q.type)}">${t.ico} ${t.label}</span><span>${esc(askedLabel(q.askedAt))}</span></div>
                 <div class="dy-hist-q">${esc(q.text)}</div>
                 ${q.status === 'answered' && q.answer ? `<div class="dy-hist-a">${esc(q.answer)}</div>` : ''}
                 <div class="dy-hist-foot">
-                  ${exp ? `<a class="dy-hist-exp" href="${esc(exp.href)}">📎 ${esc(exp.title)}</a>` : ''}
+                  ${q.status === 'answered' ? wentHTML(q, 'dy-hist-exp') : `<span class="dy-hist-exp">→ ${esc((destOf(q) || {}).text || '')}</span>`}
                   ${q.status !== 'answered' ? `<button class="btn btn-sm" data-reask="${esc(q.id)}" type="button">다시 답하기</button>` : ''}
                 </div>
               </li>`;
@@ -515,14 +505,7 @@
           App.ui.toast(`${nextTime().label}에 다시 물어볼게요`);
           saveDraft(); { const to = nextOpen(S.pos); transition(() => { S.pos = to; }, to < S.pos ? 'back' : 'fwd'); }
         } else if (act === 'next') goNext();
-        else if (act === 'deeper') {
-          const id = createSeed();
-          if (id) App.navigate('#/discover?exp=' + id);
-        } else if (act === 'save-seed') {
-          createSeed();
-          App.ui.toast('작성 중인 경험 카드로 저장했어요');
-          renderStage();
-        } else if (act === 'more') pushDemo();
+        else if (act === 'more') pushDemo();
       }
       root.addEventListener('click', onClick);
       const onKey = (ev) => {

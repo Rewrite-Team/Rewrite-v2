@@ -1,4 +1,5 @@
-/* 프로젝트 트래커 — #/projects (목록), #/projects/:id (상세) */
+/* 프로젝트 — #/projects (목록), #/projects/:id (상세)
+   프로젝트 페이지는 위키의 허브: 이 프로젝트의 경험 페이지 + 타임라인(원문 체크인) + 코드 분석이 한곳에서 이어진다. */
 (function (App) {
   const esc = (s) => App.ui.esc(s);
 
@@ -59,12 +60,14 @@
     return m;
   }
   const topKeywords = (e, n) => logKeywordCounts(e).map(([k]) => k).slice(0, n);
-  // 로그 id → 그 로그로 만든 카드들
+  // 로그 id → 그 로그가 반영된 경험들
   function cardsByLog(p) {
-    const m = {};
-    App.store.cardsOf(p.id).forEach((c) => (c.sourceLogIds || []).forEach((lid) => { (m[lid] = m[lid] || []).push(c); }));
+    const m = {}; const ids = new Set((p.logs || []).map((l) => l.id));
+    App.store.list().forEach((c) => (c.sourceLogIds || []).forEach((lid) => { if (ids.has(lid)) (m[lid] = m[lid] || []).push(c); }));
     return m;
   }
+  const orphanLogs = (p) => { const used = cardsByLog(p); return (p.logs || []).filter((l) => !used[l.id] && l.type !== 'milestone'); };
+  const short = (t, n) => App.wiki.short(t, n);
   const shortName = (t) => { const m = String(t || '').match(/「[^」]+」/); return m ? m[0] : String(t || '').split(' — ')[0]; };
   const ghLink = (e) => (e.links || []).find((l) => /github/i.test(l)) || (e.links || [])[0] || '';
   const prettyLink = (u) => String(u).replace(/^https?:\/\//, '').replace(/\/$/, '');
@@ -81,7 +84,7 @@
         return `<a class="pj-card-gh" href="#/projects/${esc(e.id)}?tab=code" title="${esc(e.repo.owner + '/' + e.repo.name)} 코드 분석 결과"><span>⌥ 코드 분석 ${live.length}</span>${added ? `<span class="pj-card-gh-n">이력서에 ${added}개 담음</span>` : ''}</a>`; })() : ''}
       <div class="pj-card-stats">
         <div><b>${(e.logs || []).length}</b><span>기록</span></div>
-        <div><b>${App.store.cardsOf(e.id).length}</b><span>경험 카드</span></div>
+        <div><b>${App.store.cardsOf(e.id).length}</b><span>경험</span></div>
         <div><b>${last ? esc(md(last.date)) : '—'}</b><span>마지막 체크인${last ? ` · ${ago(last.date)}` : ''}</span></div>
       </div>
       <div class="exp-card-kws">${topKeywords(e, 4).map((k) => App.ui.keywordChip(k)).join('') || '<span class="subtle">체크인을 남기면 역량 키워드가 생겨요</span>'}</div>
@@ -95,7 +98,7 @@
     const dueCount = ongoing.filter((e) => nextCheckin(e).due).length;
     return `<div class="page pj">
       <div class="page-head pj-head">
-        <div><h1>프로젝트 트래커</h1><p>진행 중인 프로젝트에 짧게 체크인하면, 의사결정·이슈·협업 과정이 그대로 쌓여요.</p></div>
+        <div><h1>프로젝트</h1><p>짧게 체크인하면 타임라인에 기록되고, AI가 관련 경험 페이지에 반영해요. 코드 분석도 같은 경험에 근거로 붙어요.</p></div>
         <button class="btn btn-primary" data-pj="new">＋ 새 프로젝트 시작</button>
       </div>
       <div class="pj-value">
@@ -119,9 +122,9 @@
     const n = new Date(); const month = `${n.getFullYear()}-${pad(n.getMonth() + 1)}`;
     App.ui.modal({
       title: '새 프로젝트 시작하기',
-      confirmText: '트래킹 시작',
+      confirmText: '프로젝트 만들기',
       body: `<div class="pj-form">
-        <p class="pj-form-intro">진행하는 동안 체크인 질문을 보내 드릴게요. 쌓인 기록에서 에피소드를 골라 경험 카드를 여러 장 만들 수 있어요.</p>
+        <p class="pj-form-intro">진행하는 동안 체크인 질문을 보내 드릴게요. 답한 기록은 타임라인에 쌓이고, 이야기마다 경험 페이지로 정리돼요.</p>
         <label class="label" for="pj-f-title">프로젝트 이름 <span class="pj-req">*</span></label>
         <input class="input" id="pj-f-title" placeholder="예) 팀 프로젝트 「모여봄」" maxlength="60" />
         <label class="label" for="pj-f-role">내 역할</label>
@@ -130,7 +133,8 @@
         <input class="input" id="pj-f-start" type="month" value="${month}" />
         <label class="label" for="pj-f-gh">GitHub 레포 <span class="subtle">(선택)</span></label>
         <input class="input" id="pj-f-gh" placeholder="https://github.com/owner/repo" spellcheck="false" />
-        <p class="subtle pj-form-note">GitHub 레포 주소를 넣으면 코드에서 이력서에 쓸 기술 포인트도 찾아 드려요. 핵심은 여전히 과정 기록이에요.</p>
+        <label class="pj-form-check"><input type="checkbox" id="pj-f-analyze" checked /> 만들고 바로 코드 분석하기</label>
+        <p class="subtle pj-form-note">레포를 분석하면 코드에서 찾은 기술 포인트가 이 프로젝트의 경험에 근거로 붙고, 아직 이야기가 없는 코드는 오늘의 질문으로 여쭤봐요.</p>
       </div>`,
       onConfirm(root) {
         const v = (id) => (root.querySelector('#' + id).value || '').trim();
@@ -143,8 +147,10 @@
         });
         App.store.addLog(exp.id, { type: 'milestone', text: `프로젝트 시작!${role ? ' 역할: ' + role : ''}` });
         const isRepo = gh && App.github && App.github.parseUrl(gh);
+        const now = isRepo && root.querySelector('#pj-f-analyze').checked;
         if (isRepo) ui.tab[exp.id] = 'code';
-        App.ui.toast(isRepo ? '프로젝트 트래킹을 시작했어요 · 코드 분석 탭에서 레포를 분석해 보세요' : '프로젝트 트래킹을 시작했어요');
+        if (now) ui.autoAnalyze = { pid: exp.id, url: gh };
+        App.ui.toast(now ? '프로젝트를 만들었어요 · 레포 코드를 분석하고 있어요' : isRepo ? '프로젝트를 만들었어요 · 코드 분석 탭에서 레포를 분석할 수 있어요' : '프로젝트를 만들었어요');
         App.navigate('#/projects/' + exp.id);
         return true;
       },
@@ -154,7 +160,14 @@
 
   /* ---------- 상세 ---------- */
   // 화면 상태 (프로젝트별 질문 인덱스)
-  const ui = { qIndex: {}, type: {}, ck: {}, edit: null, pick: null, tab: {}, gh: {}, ghView: null }; // tab: 프로젝트별 'timeline'|'code', gh: 레포 분석 화면 상태 // pick: { pid, ids: [] } — 카드로 만들 로그 고르는 중
+  // tab: 프로젝트별 'exp'|'timeline'|'code', gh: 레포 분석 화면 상태
+  // report: { pid, id(위키 반영 entry), where:'checkin'|'log:<id>'|'code' } — 방금 반영한 결과를 그 자리에 보여 준다
+  // autoAnalyze: { pid, url } — 새 프로젝트를 만들며 레포를 넣었으면 상세 화면에 들어가자마자 분석
+  const ui = { qIndex: {}, type: {}, ck: {}, edit: null, tab: {}, gh: {}, ghView: null, report: null, autoAnalyze: null };
+  const reportAt = (pid, where) => {
+    const r = ui.report; if (!r || r.pid !== pid || r.where !== where) return '';
+    return App.wiki.reportHTML(App.wiki.get(r.id));
+  };
 
   /* ---------- 역량 키워드 편집기 (체크인·로그 수정 공용) ----------
      selected = 직접 고른 것(manual) ∪ (AI 추천(suggested) − 사용자가 뺀 것(rejected))
@@ -228,15 +241,21 @@
       </div>
       <textarea class="textarea pj-ta" id="pj-ta" rows="3" maxlength="400" placeholder="한두 줄이면 충분해요. 예) JWT와 세션 중 고민하다가 모바일 확장 때문에 JWT로 결정했어요."></textarea>
       <div id="pj-ck-kw">${kwEditor(ckState(e.id), 'ck')}</div>
-      <div class="pj-checkin-foot"><span class="subtle">⌘/Ctrl + Enter로 바로 기록</span>
+      <div class="pj-checkin-foot"><span class="subtle">⌘/Ctrl + Enter로 바로 기록 · 타임라인에 남고 관련 경험에 반영돼요</span>
         <button class="btn btn-primary" data-pj="save">기록하기</button></div>
+      ${reportBox(e.id, 'checkin', '타임라인에 기록하고, 관련 경험에 반영했어요')}
     </div>`;
+  }
+  // 방금 반영한 결과 (자리마다 하나)
+  function reportBox(pid, where, lead) {
+    const html = reportAt(pid, where); if (!html) return '';
+    return `<div class="pj-report" data-pj-report="${esc(where)}">${lead ? `<div class="pj-report-lead">✓ ${esc(lead)}</div>` : ''}${html}
+      <button type="button" class="pj-report-x" data-pj="close-report" aria-label="반영 결과 닫기">×</button></div>`;
   }
 
   function timeline(e) {
     const logs = sortedLogs(e);
     const used = cardsByLog(e);
-    const picking = ui.pick && ui.pick.pid === e.id;
     if (!logs.length) return '<div class="card empty"><div class="big">✎</div>아직 기록이 없어요. 첫 체크인을 남겨 볼까요?</div>';
     const groups = [];
     logs.forEach((l) => {
@@ -251,17 +270,19 @@
         ${g.items.map((l) => {
           const t = TYPES[l.type] || TYPES.milestone;
           if (ui.edit && ui.edit.logId === l.id) return logEditor(l);
-          const on = picking && ui.pick.ids.includes(l.id);
           const cards = used[l.id] || [];
-          return `<div class="pj-log ${picking ? 'is-picking' : ''} ${on ? 'is-picked' : ''}" data-type="${esc(l.type)}" ${picking ? `data-pj-pick="${esc(l.id)}"` : ''}>
-            ${picking ? `<span class="pj-log-check" aria-hidden="true">${on ? '✓' : ''}</span>` : ''}
+          return `<div class="pj-log" data-type="${esc(l.type)}">
             <div class="pj-log-ico">${t.ico}</div>
             <div class="pj-log-body">
               <div class="pj-log-meta"><span class="pj-log-type">${t.label}</span><span>${esc(md(l.date))}</span>
-                ${cards.map((c) => `<a class="pj-log-card" href="#/card/${esc(c.id)}" title="${esc(c.title)}">▣ 카드</a>`).join('')}
-                ${picking ? '' : `<span class="pj-log-acts"><button type="button" data-pj-log="edit" data-id="${esc(l.id)}">수정</button><button type="button" data-pj-log="del" data-id="${esc(l.id)}">삭제</button></span>`}</div>
+                <span class="pj-log-acts"><button type="button" data-pj-log="edit" data-id="${esc(l.id)}">수정</button><button type="button" data-pj-log="del" data-id="${esc(l.id)}">삭제</button></span></div>
               <div class="pj-log-text">${esc(l.text)}</div>
               ${(l.keywords || []).length ? `<div class="exp-card-kws">${l.keywords.map((k) => App.ui.keywordChip(k)).join('')}</div>` : ''}
+              <div class="pj-log-wiki">
+                ${cards.length ? cards.map((c) => `<a class="pj-log-card" href="#/card/${esc(c.id)}" title="${esc(c.title)}">→ 「${esc(short(c.title, 24))}」</a>`).join('')
+                  : l.type === 'milestone' ? '' : `<span class="subtle">아직 경험에 반영되지 않았어요</span><button type="button" class="btn btn-sm pj-log-ingest" data-pj-log="ingest" data-id="${esc(l.id)}">경험에 반영</button>`}
+              </div>
+              ${reportBox(e.id, 'log:' + l.id)}
             </div></div>`;
         }).join('')}</div>`;
     }).join('')}</div>`;
@@ -290,20 +311,17 @@
     const c = typeCounts(e);
     const missing = TYPE_ORDER.filter((t) => !c[t] && t !== 'milestone');
     const cards = App.store.cardsOf(e.id);
-    const used = cardsByLog(e);
-    const unused = (e.logs || []).filter((l) => !used[l.id] && l.type !== 'milestone');
-    const cardKws = new Set(cards.flatMap((x) => x.keywords));
-    const notOnCard = kc.map(([k]) => k).filter((k) => !cardKws.has(k));
+    const unused = orphanLogs(e);
     return `<aside class="pj-side">
       <div class="card card-pad pj-cards-box">
-        <div class="section-title">이 프로젝트에서 나온 경험 카드 <span class="subtle">${cards.length}</span></div>
-        ${cards.length ? `<div class="pj-cards">${cards.map((x) => `<a class="pj-cardlink" href="#/card/${esc(x.id)}">
+        <div class="section-title">이 프로젝트의 경험 <span class="subtle">${cards.length}</span></div>
+        ${cards.length ? `<div class="pj-cards">${cards.slice(0, 4).map((x) => `<a class="pj-cardlink" href="#/card/${esc(x.id)}">
             <div class="pj-cardlink-top">${App.ui.statusTag(x.status)}<span class="pj-cardlink-pct">${x.completeness}%</span></div>
-            <div class="pj-cardlink-title">${esc(x.title)}</div>
-            <div class="exp-card-kws">${x.keywords.slice(0, 3).map((k) => App.ui.keywordChip(k)).join('')}</div></a>`).join('')}</div>`
-          : '<p class="subtle">아직 없어요. 한 프로젝트에서도 에피소드마다 카드를 따로 만들면 자소서·면접에서 골라 쓰기 좋아요.</p>'}
-        ${unused.length ? `<p class="pj-side-hint"><span class="ai-dot">R</span>아직 카드로 만들지 않은 기록이 ${unused.length}개 있어요${notOnCard.length ? ` · ${notOnCard.slice(0, 3).map((k) => '#' + esc(k)).join(' ')} 에피소드가 비어 있어요` : ''}.</p>` : ''}
-        <button class="btn btn-primary pj-full" data-pj="pick" ${(e.logs || []).length ? '' : 'disabled'}>✦ 기록 골라 경험 카드 만들기</button>
+            <div class="pj-cardlink-title">${esc(x.title)}</div></a>`).join('')}</div>
+            ${cards.length > 4 ? `<button class="pj-link" data-pj-tab="exp">경험 ${cards.length}개 모두 보기 →</button>` : ''}`
+          : '<p class="subtle">아직 없어요. 체크인을 남기면 AI가 이야기마다 경험 페이지로 정리해요.</p>'}
+        ${unused.length ? `<p class="pj-side-hint"><span class="ai-dot">R</span>아직 경험에 반영되지 않은 체크인이 ${unused.length}개 있어요.</p>
+          <button class="btn btn-sm pj-full" data-pj-tab="timeline">타임라인에서 반영하기</button>` : ''}
       </div>
       ${ghSideBox(e)}
       <div class="card card-pad">
@@ -322,17 +340,7 @@
     </aside>`;
   }
 
-  function pickBar(e) {
-    if (!ui.pick || ui.pick.pid !== e.id) return '';
-    const n = ui.pick.ids.length;
-    return `<div class="card pj-pickbar">
-      <div><b>카드로 만들 기록을 골라 주세요</b><span class="subtle">한 에피소드(하나의 문제·결정·협업)에 해당하는 기록만 묶을수록 STAR가 선명해져요.</span></div>
-      <div class="pj-pickbar-acts"><button class="btn btn-sm" data-pj="pick-cancel">취소</button>
-        <button class="btn btn-sm btn-primary" data-pj="make-card" ${n ? '' : 'disabled'}>${n ? `${n}개로 카드 만들기` : '기록을 골라 주세요'}</button></div>
-    </div>`;
-  }
-
-  /* ---------- 코드에서 이력서 거리 찾기 (GitHub 레포 분석) ---------- */
+  /* ---------- 코드 분석 (GitHub 레포) — 찾은 기술 포인트는 경험의 근거가 되고, 이야기가 없으면 질문이 된다 ---------- */
   const GH_CATS = ['성능', '아키텍처', '인증·보안', '데이터', '테스트', '인프라·배포', '협업·품질'];
   const GH_CONF = { high: ['근거 확실', 'is-high', '코드에서 분명한 근거를 찾았어요'], mid: ['확인 필요', 'is-mid', '패턴은 보이지만 실제로 쓰였는지 한 번 확인해 주세요'] };
   const LANG_COLOR = { Java: '#b07219', Kotlin: '#a97bff', JavaScript: '#e8c930', TypeScript: '#3178c6', Python: '#3572a5', HTML: '#e34c26', CSS: '#563d7c',
@@ -346,9 +354,9 @@
   function ghEmpty(e, st) {
     const prefill = st.url || ghUrlOf(e);
     return `<div class="card pj-gh-empty">
-      <span class="ai-badge"><span class="ai-dot">R</span>코드에서 이력서 거리 찾기</span>
-      <div class="pj-gh-empty-title">GitHub 레포를 연결하면, 코드 속에서 이력서에 쓸 기술 포인트를 찾아 드려요</div>
-      <p class="pj-gh-empty-desc">캐시·인증·동시성 제어·테스트·CI 같은 구현을 찾아 이력서 문장으로 정리하고, <b>어느 파일 몇 번째 줄</b>에서 찾았는지 근거 코드도 함께 보여 드려요.</p>
+      <span class="ai-badge"><span class="ai-dot">R</span>코드 분석</span>
+      <div class="pj-gh-empty-title">${prefill ? '연결한 레포의 코드를 분석해 볼까요?' : 'GitHub 레포를 연결하면, 코드도 이 프로젝트의 기록이 돼요'}</div>
+      <p class="pj-gh-empty-desc">캐시·인증·동시성 제어·테스트·CI 같은 구현을 찾아 <b>어느 파일 몇 번째 줄</b>인지 근거와 함께 보여 드려요. 찾은 코드는 관련 경험에 근거로 붙고, 아직 이야기가 없는 코드는 오늘의 질문으로 "왜 이렇게 만들었는지" 여쭤봐요.</p>
       <div class="pj-gh-form">
         <input class="input" id="pj-gh-url" value="${esc(prefill)}" placeholder="https://github.com/owner/repo" spellcheck="false" autocomplete="off" />
         <button class="btn btn-primary" data-gh="analyze">코드 분석하기</button>
@@ -395,7 +403,7 @@
       ${repo.meta && repo.meta.description ? `<div class="pj-gh-desc">${esc(repo.meta.description)}</div>` : ''}
       ${langBar(repo.meta && repo.meta.languages)}
       ${(repo.stack || []).length ? `<div class="pj-gh-stack"><span class="pj-gh-k">기술 스택</span>${repo.stack.map((s) => `<span class="pj-gh-chip">${esc(s)}</span>`).join('')}</div>` : ''}
-      <div class="pj-gh-sum"><span class="ai-dot">R</span><span>${live.length ? `이력서에 쓸 만한 기술 포인트 <b>${live.length}개</b>를 찾았어요${added ? ` · 마스터 이력서에 <b>${added}개</b> 담았어요` : ''}. 문장은 담기 전에 고칠 수 있어요.` : '이력서에 쓸 만한 패턴을 아직 찾지 못했어요. 코드가 더 쌓이면 다시 분석해 보세요.'}</span></div>
+      <div class="pj-gh-sum"><span class="ai-dot">R</span><span>${live.length ? `기술 포인트 <b>${live.length}개</b>를 찾았어요 · 경험에 근거로 붙은 것 <b>${live.filter((f) => App.wiki.cardsForFinding(f.id).length).length}개</b>${added ? ` · 마스터 이력서에 <b>${added}개</b> 담았어요` : ''}.` : '쓸 만한 패턴을 아직 찾지 못했어요. 코드가 더 쌓이면 다시 분석해 보세요.'}</span></div>
       ${st.error ? ghErrorBox(st) : ''}
     </div>`;
   }
@@ -426,6 +434,7 @@
       ${!added && /○○|○/.test(f.bullet) ? '<div class="pj-gf-fill">○○ 자리는 코드만으로 알 수 없는 수치예요. 직접 잰 값으로 바꿔 주세요.</div>' : ''}
       ${(f.tags || []).length ? `<div class="pj-gf-tags">${f.tags.map((t) => `<span class="pj-gh-chip">${esc(t)}</span>`).join('')}</div>` : ''}
       <div class="pj-gf-detail"><b>면접 포인트</b> ${esc(f.detail)}</div>
+      ${findingWiki(f)}
       <div class="pj-gf-foot">
         <button type="button" class="pj-gf-evtoggle ${open ? 'on' : ''}" data-gh="toggle-ev" data-id="${esc(f.id)}" aria-expanded="${open}"><span class="pj-gf-evlabel">${open ? '▾' : '▸'} 근거 코드 ${ev.length}곳</span> <span class="pj-gf-evfiles">${esc(ev.map((x) => x.path.split('/').pop() + ':' + x.start).slice(0, 2).join(', '))}</span></button>
         <span class="pj-gf-acts">
@@ -435,6 +444,14 @@
       </div>
       ${open ? `<div class="pj-gf-evs">${ev.map(codeBlock).join('')}</div>` : ''}
     </div>`;
+  }
+  // 이 코드가 근거로 붙은 경험 / 없으면 이야기를 받으러 가기
+  function findingWiki(f) {
+    const exps = App.wiki.cardsForFinding(f.id);
+    if (exps.length) return `<div class="pj-gf-wiki">${exps.map((x) => `<a class="pj-gf-exp" href="#/card/${esc(x.id)}">↳ 「${esc(short(x.title, 28))}」 근거</a>`).join('')}</div>`;
+    const queued = App.store.state.inbox.some((q) => q.findingId === f.id && (q.status === 'pending' || q.status === 'later'));
+    return `<div class="pj-gf-wiki is-empty"><span class="subtle">${queued ? '오늘의 질문에 이 코드 이야기가 와 있어요' : '이 코드를 뒷받침할 경험이 아직 없어요'}</span>
+      <button type="button" class="btn btn-sm" data-gh="ask" data-id="${esc(f.id)}">${queued ? '오늘의 질문에서 답하기 →' : '이 코드로 경험 만들기'}</button></div>`;
   }
   function codeSection(e) {
     const st = ghState(e.id);
@@ -449,6 +466,7 @@
     st.sel = st.sel.filter((id) => live.some((f) => f.id === id && f.status === 'new'));
     const allOn = selectable.length && selectable.every((f) => st.sel.includes(f.id));
     return `${ghHead(e, repo, st)}
+      ${reportBox(e.id, 'code', '코드 분석 결과를 위키에 반영했어요')}
       ${live.length ? `<div class="pj-gh-filter">
         <div class="pj-gh-cats" role="tablist" aria-label="분류">${['전체'].concat(GH_CATS.filter((c) => counts[c])).map((c) => `<button type="button" class="pj-gh-cat ${st.cat === c ? 'on' : ''}" data-gh="cat" data-cat="${esc(c)}">${esc(c)} <span>${c === '전체' ? live.length : counts[c]}</span></button>`).join('')}</div>
         ${selectable.length ? `<button type="button" class="pj-link pj-gh-all" data-gh="select-all">${allOn ? '선택 해제' : `담을 수 있는 ${selectable.length}개 모두 고르기`}</button>` : ''}
@@ -464,15 +482,31 @@
   function ghSideBox(e) {
     const repo = e.repo;
     if (!repo) {
-      return `<div class="card card-pad pj-gh-side"><div class="section-title">코드에서 이력서 거리 찾기</div>
-        <p class="subtle">GitHub 레포를 연결하면 캐시·인증·테스트 같은 구현을 찾아 이력서 문장으로 정리해 드려요.</p>
-        <button class="btn btn-sm pj-full" data-pj-tab="code">⌥ 레포 연결하기</button></div>`;
+      const url = ghUrlOf(e);
+      return `<div class="card card-pad pj-gh-side"><div class="section-title">코드 분석</div>
+        <p class="subtle">${url ? '연결한 레포를 아직 분석하지 않았어요. 코드에서 찾은 구현이 경험의 근거가 돼요.' : 'GitHub 레포를 연결하면 캐시·인증·테스트 같은 구현을 찾아 경험의 근거로 붙여 드려요.'}</p>
+        <button class="btn btn-sm pj-full" data-pj-tab="code">⌥ ${url ? '레포 분석하기' : '레포 연결하기'}</button></div>`;
     }
-    const live = liveFindings(repo); const added = live.filter((f) => f.status === 'added').length;
-    return `<div class="card card-pad pj-gh-side"><div class="section-title">코드에서 찾은 이력서 거리 <span class="subtle">${live.length}</span></div>
-      <div class="pj-gh-side-row"><span>마스터 이력서에 담음</span><b>${added} / ${live.length}</b></div>
-      ${App.ui.progress(live.length ? Math.round((added / live.length) * 100) : 0)}
+    const live = liveFindings(repo); const linked = live.filter((f) => App.wiki.cardsForFinding(f.id).length).length;
+    return `<div class="card card-pad pj-gh-side"><div class="section-title">코드 분석 <span class="subtle">${live.length}</span></div>
+      <div class="pj-gh-side-row"><span>경험에 근거로 붙음</span><b>${linked} / ${live.length}</b></div>
+      ${App.ui.progress(live.length ? Math.round((linked / live.length) * 100) : 0)}
       <button class="btn btn-sm pj-full" data-pj-tab="code" style="margin-top:12px">⌥ 코드 분석 결과 보기</button></div>`;
+  }
+
+  // 경험 탭: 이 프로젝트의 경험 페이지 + 최근 위키 반영
+  function expSection(e) {
+    const cards = App.store.cardsOf(e.id);
+    const feed = App.wiki.entries({ projectId: e.id }).filter((w) => w.target).slice(0, 5);
+    const unused = orphanLogs(e).length;
+    return `<div class="pj-exp">
+      <div class="pj-exp-head"><p class="subtle">체크인·AI와 대화·코드 분석에서 나온 이 프로젝트의 경험 페이지예요. 기록할수록 같은 페이지가 채워져요.</p>
+        <button class="btn btn-sm btn-primary" data-capture data-capture-project="${esc(e.id)}">＋ 이 프로젝트 기록하기</button></div>
+      ${cards.length ? `<div class="pj-exp-grid">${cards.map((x) => App.ui.expCard(x)).join('')}</div>`
+        : `<div class="card empty"><div class="big">▣</div>아직 이 프로젝트의 경험이 없어요.<div class="subtle" style="margin-top:4px">체크인을 남기거나 코드를 분석하면 경험 페이지가 생겨요.</div></div>`}
+      ${unused ? `<p class="pj-side-hint"><span class="ai-dot">R</span>아직 경험에 반영되지 않은 체크인이 ${unused}개 있어요. <button class="pj-link" data-pj-tab="timeline">타임라인에서 반영하기 →</button></p>` : ''}
+      ${feed.length ? `<div class="section-title" style="margin-top:20px">최근 위키 반영</div><div class="card card-pad wk-feed">${feed.map((w) => App.wiki.reportHTML(w, { compact: true })).join('')}</div>` : ''}
+    </div>`;
   }
 
   function renderDetail(id) {
@@ -482,7 +516,8 @@
         <div style="margin-top:14px"><a class="btn" href="#/projects">← 프로젝트 목록으로</a></div></div></div>`;
     }
     const gh = ghLink(e); const nx = nextCheckin(e);
-    const tab = ui.pick && ui.pick.pid === e.id ? 'timeline' : (ui.tab[e.id] || 'timeline');
+    const tab = ui.tab[e.id] || (App.store.cardsOf(e.id).length ? 'exp' : 'timeline');
+    const ghUrl = ghUrlOf(e);
     return `<div class="page pj">
       <a class="pj-back" href="#/projects">← 프로젝트 목록</a>
       <div class="card pj-hero">
@@ -495,92 +530,30 @@
         <div class="pj-hero-side">
           ${gh ? `<a class="pj-source" href="${esc(gh)}" target="_blank" rel="noopener noreferrer"><span class="pj-source-k">결과물</span><span class="pj-source-v">${esc(prettyLink(gh))} ↗</span></a>`
             : '<button class="pj-source pj-source-add" data-pj="add-link"><span class="pj-source-k">결과물</span><span class="pj-source-v">＋ GitHub 링크 연결</span></button>'}
+          ${e.repo ? `<button class="pj-source pj-source-code" data-pj-tab="code"><span class="pj-source-k">코드 분석</span><span class="pj-source-v">⌥ 기술 포인트 ${liveFindings(e.repo).length}개 보기</span></button>`
+            : ghUrl ? '<button class="pj-source pj-source-add" data-pj-tab="code"><span class="pj-source-k">코드 분석</span><span class="pj-source-v">⌥ 이 레포 분석하기</span></button>' : ''}
         </div>
       </div>
       <div class="pj-layout">
         <div class="pj-main">
-          ${e.status !== 'done' && !(ui.pick && ui.pick.pid === e.id) ? checkinCard(e) : ''}
+          ${e.status !== 'done' ? checkinCard(e) : ''}
           <div class="pj-tabs" role="tablist">
-            <button type="button" class="pj-tab ${tab === 'timeline' ? 'on' : ''}" data-pj-tab="timeline" role="tab" aria-selected="${tab === 'timeline'}">과정 타임라인 <span>${(e.logs || []).length}</span></button>
+            <button type="button" class="pj-tab ${tab === 'exp' ? 'on' : ''}" data-pj-tab="exp" role="tab" aria-selected="${tab === 'exp'}">경험 <span>${App.store.cardsOf(e.id).length}</span></button>
+            <button type="button" class="pj-tab ${tab === 'timeline' ? 'on' : ''}" data-pj-tab="timeline" role="tab" aria-selected="${tab === 'timeline'}">타임라인 <span>${(e.logs || []).length}</span></button>
             <button type="button" class="pj-tab ${tab === 'code' ? 'on' : ''}" data-pj-tab="code" role="tab" aria-selected="${tab === 'code'}">⌥ 코드 분석 <span>${e.repo ? liveFindings(e.repo).length : '＋'}</span></button>
           </div>
-          ${tab === 'code' ? `<div id="pj-gh" class="pj-gh">${codeSection(e)}</div>` : `${pickBar(e)}${timeline(e)}`}
+          ${tab === 'code' ? `<div id="pj-gh" class="pj-gh">${codeSection(e)}</div>` : tab === 'exp' ? expSection(e) : timeline(e)}
         </div>
         ${sidePanel(e)}
       </div>
     </div>`;
   }
 
-  /* ---------- 고른 로그 → 경험 카드 초안 ---------- */
-  const sentence = (t) => { const s = String(t || '').trim(); return s && !/[.!?。]$/.test(s) ? s + '.' : s; };
-  function draftFromLogs(p, ids) {
-    const logs = (p.logs || []).filter((l) => ids.includes(l.id)).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-    const of = (...ts) => logs.filter((l) => ts.includes(l.type));
-    const acts = of('decision', 'issue', 'collab');
-    const main = acts[0] || logs[0];
-    const numeric = logs.filter((l) => /\d/.test(l.text) && /→|->|개선|단축|줄|초/.test(l.text));
-    const ms = of('milestone');
-    const learn = of('learning');
-    const name = shortName(p.title);
-    // 로그 한 줄을 상황(앞) / 행동(뒤)으로 나눠 보기: 화살표가 있으면 화살표 기준, 없으면 첫 문장 기준
-    const split = (t) => {
-      const str = String(t).trim();
-      const arrow = str.split(/\s*(?:→|->)\s*/);
-      if (arrow.length > 1) return [arrow[0], arrow.slice(1).join(' ')];
-      const sens = str.split(/(?<=[.。!?])\s+/);
-      return sens.length > 1 ? [sens[0], sens.slice(1).join(' ')] : [str, ''];
-    };
-    const strip = (t) => String(t).replace(/[.。]$/, '');
-    const star = {
-      situation: sentence(`${name} 프로젝트 진행 중, ${strip(split(main.text)[0])}`),
-      task: '',
-      action: acts.map((l) => sentence(split(l.text)[1] || l.text)).join(' '),
-      result: [...numeric.map((l) => sentence(l.text.split(/[.。]/).filter((x) => /\d/.test(x)).pop() || l.text)), ...ms.map((l) => sentence(l.text))].join(' '),
-    };
-    const kwc = {}; logs.forEach((l) => (l.keywords || []).forEach((k) => { kwc[k] = (kwc[k] || 0) + 1; }));
-    const keywords = Object.entries(kwc).sort((a, b) => b[1] - a[1]).map(([k]) => k).slice(0, 4);
-    const head = strip(split(main.text)[0]).slice(0, 28);
-    const months = logs.map((l) => (l.date || '').slice(0, 7)).filter(Boolean);
-    return {
-      title: `${name} ${head}`, star, insights: learn.map((l) => sentence(l.text)).join(' '), keywords, logs,
-      period: { start: months[0] || '', end: months[months.length - 1] || '' },
-    };
-  }
-  function openCardModal(p, ids) {
-    const d = draftFromLogs(p, ids);
-    const rows = [['situation', 'S', '상황'], ['task', 'T', '과제'], ['action', 'A', '행동'], ['result', 'R', '결과']];
-    App.ui.modal({
-      title: '경험 카드 초안을 만들었어요',
-      confirmText: '카드 만들기',
-      body: `<div class="pj-star-prev">
-        <p class="pj-form-intro">고른 기록 ${d.logs.length}개로 만든 초안이에요. 원문 로그는 프로젝트에 그대로 남고, 카드에서 언제든 고칠 수 있어요.</p>
-        <label class="label" for="pj-f-ctitle">카드 제목</label>
-        <input class="input" id="pj-f-ctitle" value="${esc(d.title)}" maxlength="60" />
-        ${rows.map(([k, l, name]) => `<div class="pj-star-row"><div class="pj-star-k">${l}<span>${name}</span></div>
-          <div class="pj-star-v">${d.star[k] ? esc(d.star[k]) : '<span class="subtle">비어 있어요 — 카드에서 AI 질문으로 채울 수 있어요</span>'}</div></div>`).join('')}
-        ${d.insights ? `<div class="pj-star-row"><div class="pj-star-k">+<span>배운 점</span></div><div class="pj-star-v">${esc(d.insights)}</div></div>` : ''}
-        ${d.keywords.length ? `<div class="pj-star-kws">역량 키워드 ${d.keywords.map((k) => App.ui.keywordChip(k, { ai: true })).join('')}</div>` : ''}
-      </div>`,
-      onConfirm(root) {
-        const title = (root.querySelector('#pj-f-ctitle').value || '').trim() || d.title;
-        const card = App.store.create({
-          title, category: '프로젝트', status: 'draft', projectId: p.id, sourceLogIds: d.logs.map((l) => l.id),
-          period: d.period, role: p.role, summary: '', star: d.star, insights: d.insights, keywords: d.keywords,
-          jobs: [App.store.state.user.targetJob].filter(Boolean), links: (p.links || []).slice(0, 1),
-        });
-        ui.pick = null;
-        App.ui.toast(`경험 카드를 만들었어요 · 완성도 ${card.completeness}%`);
-        App.navigate('#/card/' + card.id);
-        return true;
-      },
-    });
-  }
-
   /* ---------- 화면 등록 ---------- */
   App.screens.projects = {
-    title: '프로젝트 트래커',
+    title: '프로젝트',
     render(params) {
-      if (params && params.id && params.tab) ui.tab[params.id] = params.tab === 'code' ? 'code' : 'timeline';
+      if (params && params.id && params.tab) ui.tab[params.id] = ['code', 'exp', 'timeline'].includes(params.tab) ? params.tab : 'timeline';
       return params && params.id ? renderDetail(params.id) : renderList();
     },
     mount(root, params) {
@@ -589,8 +562,13 @@
         const ck = root.querySelector('#pj-ta'); const draft = ck ? ck.value : '';
         root.innerHTML = params && params.id ? renderDetail(id) : renderList();
         const ck2 = root.querySelector('#pj-ta'); if (ck2 && draft) ck2.value = draft;
-        fitTas();
+        fitTas(); bindReports();
       };
+      // 방금 반영한 결과 카드: 되돌리기·옮기기 후 새 entry 로 다시 그린다
+      const bindReports = () => root.querySelectorAll('[data-pj-report]').forEach((box) => {
+        App.wiki.bindReport(box, (n) => { if (n && ui.report) ui.report.id = n.id; rerenderLocal(); });
+      });
+      const showReport = (where, entry) => { ui.report = entry ? { pid: id, id: entry.id, where } : null; };
       // 이력서 문장 입력칸은 내용 길이에 맞춰 높이 조절
       const fitTa = (ta) => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 2 + 'px'; };
       const fitTas = () => root.querySelectorAll('.pj-gf-ta').forEach(fitTa);
@@ -615,9 +593,10 @@
         try {
           const repo = await App.github.analyze(url, { onProgress: (pr) => { st.progress = pr; const v = view(pid); if (v) v.redraw(); } });
           st.running = false; st.sel = []; st.open = {}; st.cat = '전체';
-          applyRepo(pid, repo);
+          const entry = applyRepo(pid, repo);
+          if (entry) ui.report = { pid, id: entry.id, where: 'code' };
           const n = liveFindings(App.store.getProject(pid).repo).length;
-          App.ui.toast(n ? `이력서에 쓸 만한 기술 포인트 ${n}개를 찾았어요` : '분석은 끝났는데, 이력서에 쓸 만한 패턴을 찾지 못했어요');
+          App.ui.toast(n ? `기술 포인트 ${n}개를 찾아 위키에 반영했어요` : '분석은 끝났는데, 쓸 만한 패턴을 찾지 못했어요');
         } catch (err) {
           st.running = false; st.error = { code: err.code || 'network', message: err.message || '분석하지 못했어요' }; st.sample = err.sample || null;
         }
@@ -632,6 +611,8 @@
         const key = App.github.keyOf(repo.owner, repo.name);
         const links = p.links || [];
         if (!links.some((l) => { const x = App.github.parseUrl(l); return x && App.github.keyOf(x.owner, x.name) === key; })) App.store.updateProject(pid, { links: links.concat([repo.url]) });
+        // 코드 분석도 기록: 맞는 경험엔 코드 근거로 붙고, 이야기가 없는 코드는 오늘의 질문으로
+        return App.wiki.ingestCode(pid, App.store.getProject(pid).repo.findings);
       }
       const draftOf = (fid) => { const ta = root.querySelector(`[data-gh-bullet="${CSS.escape(fid)}"]`); return ta ? ta.value.trim() : ''; };
       function addFindings(ids) {
@@ -656,7 +637,7 @@
         else if (a === 'fill') { const inp = root.querySelector('#pj-gh-url'); if (inp) { inp.value = btn.getAttribute('data-url'); inp.focus(); } }
         else if (a === 'retry') runAnalyze(id, st.url || (e.repo && e.repo.url) || ghUrlOf(e));
         else if (a === 'reanalyze') runAnalyze(id, e.repo.url);
-        else if (a === 'use-sample' && st.sample) { const s2 = st.sample; Object.assign(st, { error: null, sample: null, sel: [], open: {} }); applyRepo(id, s2); App.ui.toast('저장해 둔 예시 데이터를 불러왔어요'); rerenderLocal(); }
+        else if (a === 'use-sample' && st.sample) { const s2 = st.sample; Object.assign(st, { error: null, sample: null, sel: [], open: {} }); showReport('code', applyRepo(id, s2)); App.ui.toast('저장해 둔 예시 데이터를 불러와 위키에 반영했어요'); rerenderLocal(); }
         else if (a === 'disconnect') {
           App.ui.modal({
             title: '레포 연결을 해제할까요?', confirmText: '연결 해제', danger: true,
@@ -684,6 +665,15 @@
         else if (a === 'dismiss') { App.store.updateFinding(id, fid, { status: 'dismissed' }); st.sel = st.sel.filter((x) => x !== fid); App.ui.toast('이 항목은 제외했어요 · 아래에서 되살릴 수 있어요'); rerenderLocal(); }
         else if (a === 'restore') { App.store.updateFinding(id, fid, { status: 'new' }); rerenderLocal(); }
         else if (a === 'show-dismissed') { st.showDismissed = !st.showDismissed; ghRedraw(); }
+        else if (a === 'ask') {
+          // 이 코드 이야기를 오늘의 질문으로 받아 답하면, 코드가 근거로 붙은 경험이 생긴다
+          const f = e.repo && e.repo.findings.find((x) => x.id === fid); if (!f) return;
+          if (!App.store.state.inbox.some((q) => q.findingId === fid && (q.status === 'pending' || q.status === 'later'))) {
+            const { id: _i, status: _s, askedAt: _a, ...q } = App.wiki.codeQuestion(e, f);
+            App.store.pushQuestion(q);
+          }
+          App.navigate('#/daily');
+        }
       }
 
       const focusEdit = () => { const ta = root.querySelector('#pj-edit-ta'); if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } };
@@ -691,7 +681,7 @@
       const onClick = (ev) => {
         const tabBtn = ev.target.closest('[data-pj-tab]');
         if (tabBtn && id) {
-          ui.tab[id] = tabBtn.getAttribute('data-pj-tab'); ui.pick = null; rerenderLocal();
+          ui.tab[id] = tabBtn.getAttribute('data-pj-tab'); rerenderLocal();
           if (tabBtn.closest('.pj-side')) { const t = root.querySelector('.pj-tabs'); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
           return;
         }
@@ -716,17 +706,13 @@
         }
         const eType = ev.target.closest('[data-pj-etype]');
         if (eType && ui.edit) { ui.edit.type = eType.getAttribute('data-pj-etype'); rerenderLocal(); focusEdit(); return; }
-        const pickEl = ev.target.closest('[data-pj-pick]');
-        if (pickEl && ui.pick) {
-          if (ev.target.closest('a')) return;
-          const lid = pickEl.getAttribute('data-pj-pick');
-          ui.pick.ids = ui.pick.ids.includes(lid) ? ui.pick.ids.filter((x) => x !== lid) : ui.pick.ids.concat([lid]);
-          rerenderLocal(); return;
-        }
         const logBtn = ev.target.closest('[data-pj-log]');
         if (logBtn) {
           const a = logBtn.getAttribute('data-pj-log'); const e = App.store.getProject(id); if (!e) return;
-          if (a === 'edit') {
+          if (a === 'ingest') {
+            const entry = App.wiki.ingestLog(id, logBtn.getAttribute('data-id'));
+            showReport('log:' + logBtn.getAttribute('data-id'), entry); rerenderLocal();
+          } else if (a === 'edit') {
             const l = e.logs.find((x) => x.id === logBtn.getAttribute('data-id')); if (!l) return;
             ui.edit = { logId: l.id, type: l.type, text: l.text, date: l.date, kw: kwNew(l.keywords || [], App.ai.extractKeywords(l.text)) };
             rerenderLocal(); focusEdit();
@@ -742,7 +728,7 @@
             const usedBy = cardsByLog(e)[l.id] || [];
             App.ui.modal({
               title: '이 기록을 삭제할까요?', confirmText: '삭제', danger: true,
-              body: `<p>「${esc(l.text.length > 60 ? l.text.slice(0, 60) + '…' : l.text)}」</p><p style="margin-top:8px">삭제한 기록은 되돌릴 수 없어요.${usedBy.length ? ' 이 기록으로 만든 경험 카드는 그대로 남아요.' : ''}</p>`,
+              body: `<p>「${esc(l.text.length > 60 ? l.text.slice(0, 60) + '…' : l.text)}」</p><p style="margin-top:8px">삭제한 기록은 되돌릴 수 없어요.${usedBy.length ? ' 이 기록이 반영된 경험 페이지는 그대로 남아요.' : ''}</p>`,
               onConfirm() { App.store.removeLog(id, l.id); if (ui.edit && ui.edit.logId === l.id) ui.edit = null; App.ui.toast('기록을 삭제했어요'); rerenderLocal(); return true; },
             });
           }
@@ -777,20 +763,18 @@
           const kws = kwSelected(ckState(id));
           const oq = App.store.openCheckin(id);
           // 오늘의 질문함에 온 체크인이면 그 질문에 답한 것으로 처리 (질문함에서도 답변 완료)
-          if (oq) App.store.answer(oq.id, text, { type: ui.type[id] || oq.checkinType, keywords: kws });
-          else App.store.addLog(id, { type: ui.type[id] || 'milestone', text, keywords: kws });
+          // 원문은 타임라인에, 이야기는 위키의 경험 페이지에 — 결과는 체크인 카드 아래에 보여 준다
+          let entry;
+          if (oq) entry = App.store.answer(oq.id, text, { type: ui.type[id] || oq.checkinType, keywords: kws });
+          else { const log = App.store.addLog(id, { type: ui.type[id] || 'milestone', text, keywords: kws }); entry = log && App.wiki.ingestLog(id, log.id); }
           delete ui.ck[id];
-          App.ui.toast(oq ? '체크인 완료! 오늘의 질문함에서도 답변 완료로 바뀌었어요' : kws.length ? `기록했어요 · ${kws.map((k) => '#' + k).join(' ')}` : '기록했어요. 과정이 하나 더 쌓였어요');
+          showReport('checkin', entry);
+          if (oq) App.ui.toast('체크인 완료! 오늘의 질문에서도 답변 완료로 바뀌었어요');
           const Q = window.SEED.projectCheckins;
           ui.qIndex[id] = ((ui.qIndex[id] || 0) + 1) % Q.length; ui.type[id] = Q[ui.qIndex[id]].type;
           rerenderLocal();
-        } else if (act === 'pick') {
-          ui.edit = null; ui.pick = { pid: id, ids: [] }; ui.tab[id] = 'timeline'; rerenderLocal();
-          const bar = root.querySelector('.pj-pickbar'); if (bar) bar.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        } else if (act === 'pick-cancel') {
-          ui.pick = null; rerenderLocal();
-        } else if (act === 'make-card') {
-          if (ui.pick && ui.pick.ids.length) openCardModal(e, ui.pick.ids);
+        } else if (act === 'close-report') {
+          ui.report = null; rerenderLocal();
         } else if (act === 'add-link') {
           App.ui.modal({
             title: '결과물 링크 연결', confirmText: '연결하기',
@@ -798,13 +782,17 @@
             onConfirm(r) {
               const v = (r.querySelector('#pj-f-link').value || '').trim();
               if (!v) { App.ui.toast('링크를 입력해 주세요'); return false; }
-              App.store.updateProject(id, { links: (e.links || []).concat([v]) }); App.ui.toast('결과물 링크를 연결했어요'); rerenderLocal(); return true;
+              App.store.updateProject(id, { links: (e.links || []).concat([v]) });
+              // GitHub 레포면 같은 레포를 코드 분석 탭으로 이어서 분석
+              if (isGh(v) && !e.repo) { ui.tab[id] = 'code'; App.ui.toast('결과물 링크를 연결했어요 · 레포 코드를 분석할게요'); setTimeout(() => runAnalyze(id, v), 0); }
+              else { App.ui.toast('결과물 링크를 연결했어요'); rerenderLocal(); }
+              return true;
             },
           });
         } else if (act === 'finish') {
           App.ui.modal({
             title: '프로젝트를 마무리할까요?', confirmText: '마무리하기',
-            body: `<p>상태가 <b>완성</b>으로 바뀌고 체크인 질문이 멈춰요. 마무리 전에 아직 카드로 만들지 않은 기록을 <b>경험 카드</b>로 정리해 두면 면접 준비가 훨씬 쉬워져요.</p>`,
+            body: `<p>상태가 <b>완성</b>으로 바뀌고 체크인 질문이 멈춰요. ${orphanLogs(e).length ? ` 아직 경험에 반영되지 않은 체크인 <b>${orphanLogs(e).length}개</b>를 타임라인에서 반영해 두면 면접 준비가 훨씬 쉬워져요.` : ''}</p>`,
             onConfirm() {
               const n = new Date();
               App.store.addLog(id, { type: 'milestone', text: '프로젝트 마무리.' });
@@ -858,9 +846,11 @@
       root.addEventListener('input', onInput);
       root.addEventListener('keydown', onKey);
       root.addEventListener('change', onChange);
-      fitTas();
+      fitTas(); bindReports();
+      if (ui.autoAnalyze && ui.autoAnalyze.pid === id) { const u = ui.autoAnalyze.url; ui.autoAnalyze = null; setTimeout(() => runAnalyze(id, u), 0); }
       return () => {
-        clearTimeout(t); ui.edit = null; ui.pick = null; alive = false; if (ui.ghView && ui.ghView.redraw === ghRedraw) ui.ghView = null;
+        clearTimeout(t); ui.edit = null; alive = false;
+        if (ui.report && ui.report.pid === id) ui.report = null; if (ui.ghView && ui.ghView.redraw === ghRedraw) ui.ghView = null;
         root.removeEventListener('click', onClick); root.removeEventListener('input', onInput); root.removeEventListener('keydown', onKey); root.removeEventListener('change', onChange);
       };
     },

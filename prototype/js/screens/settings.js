@@ -132,7 +132,7 @@
         </div>
         <div class="set-row">
           <div class="set-row-label">초기화</div>
-          <div class="set-row-ctrl set-danger-row"><span class="subtle">경험 카드·답변·설정을 처음 상태로 되돌려요.</span>
+          <div class="set-row-ctrl set-danger-row"><span class="subtle">경험·답변·설정을 처음 상태로 되돌려요.</span>
             <button type="button" class="btn btn-sm btn-danger" data-set-act="reset">프로토타입 데이터 초기화</button></div>
         </div>
       </section>
@@ -201,7 +201,7 @@
         if (ds.setAct === 'reset') {
           App.ui.modal({
             title: '프로토타입 데이터를 초기화할까요?',
-            body: '<p>지금까지 추가하거나 수정한 경험 카드, 답변, 설정이 모두 처음 상태로 돌아가요. 되돌릴 수 없어요.</p>',
+            body: '<p>지금까지 추가하거나 수정한 경험, 답변, 설정이 모두 처음 상태로 돌아가요. 되돌릴 수 없어요.</p>',
             confirmText: '초기화', danger: true,
             onConfirm: () => { App.store.reset(); App.rerender(); App.ui.toast('처음 상태로 되돌렸어요'); },
           });

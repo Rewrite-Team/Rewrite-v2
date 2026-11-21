@@ -1,4 +1,5 @@
-/* 집중 발굴 — "앉은 자리에서" AI가 꼬리질문으로 경험을 끌어내고, 실시간으로 카드 초안을 채운다. */
+/* AI와 대화하며 기록 — "앉은 자리에서" AI가 꼬리질문으로 경험을 끌어내고, 실시간으로 경험 페이지 초안을 채운다.
+   대화가 끝나거나(저장·그만하기·나중에) 화면을 떠나면 경험 위키에 반영하고, 반영 결과(App.wiki.reportHTML)를 보여 준다. */
 (function (App) {
   const esc = (s) => App.ui.esc(s);
 
@@ -53,9 +54,13 @@
     return null;
   }
   function hasNum(t) { return /\d/.test(t || ''); }
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  // 프로젝트 이름: 「모여봄」 처럼 짧게
+  const projLabel = (p) => (p.title.match(/「[^」]+」/) || [p.title.split(' — ')[0]])[0];
+  const projectsSorted = () => App.store.projects().filter((p) => p.status === 'ongoing').concat(App.store.projects().filter((p) => p.status !== 'ongoing'));
 
   App.screens.discover = {
-    title: '집중 발굴',
+    title: 'AI와 대화하며 기록',
     render() {
       return '<div class="page dc-page"><div class="dc-root" id="dc-root"></div></div>';
     },
@@ -82,7 +87,7 @@
         return {
           id: null, title: '', titleSource: null, category: '일상', status: 'draft',
           star: { situation: '', task: '', action: '', result: '' }, insights: '', summary: '',
-          keywords: [], suggested: [], dismissed: [], qa: [],
+          keywords: [], suggested: [], dismissed: [], qa: [], codeRefs: [],
         };
       }
 
@@ -92,6 +97,10 @@
         const P = window.SEED.recallPrompts;
         const cats = window.SEED.categories;
         const activeCat = opts.cat || '';
+        // 어느 프로젝트 이야기인지: '' = AI가 대화에서 찾기, 'none' = 프로젝트 밖 경험, 그 외 = 프로젝트 id
+        const proj = opts.projectId && opts.projectId !== 'none' ? App.store.getProject(opts.projectId) : null;
+        const projChoice = proj ? proj.id : opts.projectId === 'none' ? 'none' : '';
+        const projects = projectsSorted();
         const list = P.map((p, i) => ({ p, i })).filter((x) => !activeCat || x.p.theme === activeCat);
         const user = App.store.state.user;
         const drafts = App.store.list().filter((e) => e.status === 'draft');
@@ -108,21 +117,36 @@
               <span class="dc-seed-go">이 질문으로 시작 <span aria-hidden="true">→</span></span>
             </button>`;
 
+        const projSeed = proj ? `
+            <button class="dc-seed dc-seed-proj" data-project-seed="${esc(proj.id)}">
+              <span class="dc-seed-theme">▤ ${esc(projLabel(proj))}</span>
+              <span class="dc-seed-text">${esc(projectFirstQ(proj))}</span>
+              <span class="dc-seed-go">이 질문으로 시작 <span aria-hidden="true">→</span></span>
+            </button>` : '';
         root.innerHTML = `
           <div class="dc-picker">
-            ${opts.onboarding ? `<div class="dc-welcome"><span class="ai-dot">R</span><div><b>환영해요, ${esc(user.name)}님!</b> 첫 경험 카드를 함께 만들어 볼까요? 거창한 경험이 아니어도 괜찮아요.</div></div>` : ''}
+            ${opts.onboarding ? `<div class="dc-welcome"><span class="ai-dot">R</span><div><b>환영해요, ${esc(user.name)}님!</b> 첫 경험을 AI와 대화하며 기록해 볼까요? 거창한 경험이 아니어도 괜찮아요.</div></div>` : ''}
             <div class="dc-picker-head">
-              <div class="ai-badge"><span class="ai-dot">R</span>집중 발굴</div>
+              <div class="ai-badge"><span class="ai-dot">R</span>AI와 대화하며 기록</div>
               <h1>어떤 경험부터 떠올려 볼까요?</h1>
               <p>질문 하나에 답하다 보면 경험이 저절로 정리돼요. 마음에 드는 질문을 골라 주세요.</p>
             </div>
+
+            ${projects.length ? `<div class="dc-proj">
+              <div class="dc-proj-q">어느 프로젝트 이야기인가요?</div>
+              <div class="dc-cats">
+                <button class="dc-cat-chip ${!projChoice ? 'is-on' : ''}" data-proj="">잘 모르겠어요 <span class="dc-proj-hint">AI가 찾기</span></button>
+                ${projects.map((p) => `<button class="dc-cat-chip ${projChoice === p.id ? 'is-on' : ''}" data-proj="${esc(p.id)}">▤ ${esc(projLabel(p))}</button>`).join('')}
+                <button class="dc-cat-chip ${projChoice === 'none' ? 'is-on' : ''}" data-proj="none">프로젝트 밖 경험</button>
+              </div>
+            </div>` : ''}
 
             <div class="dc-cats" role="tablist">
               <button class="dc-cat-chip ${!activeCat ? 'is-on' : ''}" data-cat="">전체</button>
               ${cats.map((c) => `<button class="dc-cat-chip ${activeCat === c ? 'is-on' : ''}" data-cat="${esc(c)}">${esc(c)}</button>`).join('')}
             </div>
 
-            <div class="dc-seeds">${recallCards}</div>
+            <div class="dc-seeds">${projSeed}${recallCards}</div>
 
             <div class="card dc-free">
               <div class="dc-free-title">✍️ 이미 생각난 경험이 있어요</div>
@@ -133,16 +157,19 @@
               </form>
             </div>
 
-            ${drafts.length ? `<a class="dc-to-vault" href="#/vault">작성 중인 카드 ${drafts.length}개는 <b>경험 보관함</b>에서 이어서 채울 수 있어요 →</a>` : ''}
+            ${drafts.length ? `<a class="dc-to-vault" href="#/vault">작성 중인 경험 ${drafts.length}개는 <b>경험 위키</b>에서 이어서 채울 수 있어요 →</a>` : ''}
           </div>`;
-        S.picker = { cat: activeCat, onboarding: !!opts.onboarding };
+        S.picker = { cat: activeCat, onboarding: !!opts.onboarding, projectId: projChoice };
         const input = root.querySelector('#dc-free-input');
         root.querySelector('#dc-free-form').addEventListener('submit', (ev) => {
           ev.preventDefault();
           const v = input.value.trim();
           if (!v) { input.focus(); App.ui.toast('어떤 경험인지 한 줄만 적어 주세요'); return; }
-          startChat({ type: 'free', text: v, cat: activeCat });
+          startChat({ type: 'free', text: v, cat: activeCat, projectId: projChoice });
         });
+      }
+      function projectFirstQ(p) {
+        return `${projLabel(p)}에서 ${p.role ? `'${p.role}' 역할을 맡으며 ` : ''}가장 오래 붙잡고 있었던 문제는 무엇이었나요?`;
       }
 
       /* ================= CHAT ================= */
@@ -152,7 +179,14 @@
           d: blankDraft(), src, stage: 'situation', asked: {}, idx: {}, altTurn: 0,
           currentQ: '', busy: false, wrap: false, answers: 0, kwCooldown: 0, crossedHalf: false, sheet: false,
           startComp: 0, initialQa: 0, edits: [],
+          // 프로젝트: 'set' = 사용자가 골랐음, 'auto' = 반영할 때 대화에서 찾기
+          projectId: null, projectMode: 'auto',
+          mergeChecked: false, mergeInto: null, pendingTarget: null, merged: false,
+          dirty: false, finished: false, codeOffered: false, entryId: null, baseBefore: undefined,
         });
+        if (src.type === 'exp') { S.projectId = src.exp.projectId || null; S.projectMode = src.exp.projectId ? 'set' : 'auto'; }
+        else if (src.projectId === 'none') S.projectMode = 'set';
+        else if (src.projectId && App.store.getProject(src.projectId)) { S.projectId = src.projectId; S.projectMode = 'set'; }
         ORDER.forEach((k) => { S.asked[k] = 0; S.idx[k] = 0; });
 
         let intro = '', firstQ = '', firstStage = 'situation';
@@ -162,6 +196,7 @@
             id: e.id, title: e.title, titleSource: 'user', category: e.category, status: e.status,
             star: Object.assign({ situation: '', task: '', action: '', result: '' }, JSON.parse(JSON.stringify(e.star || {}))),
             insights: e.insights || '', summary: e.summary || '', keywords: (e.keywords || []).slice(), qa: JSON.parse(JSON.stringify(e.qa || [])),
+            codeRefs: (e.codeRefs || []).slice(),
           });
           S.initialQa = S.d.qa.length;
           let g = App.ai.gapQuestion(e);
@@ -169,7 +204,7 @@
             const F = window.SEED.followups;
             g = { stage: src.stage, text: src.stage === 'insight' ? '이 경험 이후 당신이 다르게 하게 된 것이 있나요?' : F[src.stage][0] };
           }
-          intro = `「${esc(e.title)}」 카드를 이어서 채워 볼게요. 지금 완성도는 <b>${App.ai.completeness(e)}%</b>예요.`;
+          intro = `「${esc(e.title)}」 경험 페이지를 이어서 채워 볼게요. 지금 완성도는 <b>${App.ai.completeness(e)}%</b>예요.`;
           const cur = src.stage && STAGE[src.stage] ? (src.stage === 'insight' ? e.insights : (e.star || {})[src.stage]) : '';
           if (cur && cur.trim()) {
             // 이미 채운 칸을 다듬기
@@ -203,6 +238,10 @@
           intro = '좋아요, 이 질문으로 시작해 볼게요. 떠오르는 장면을 편하게 적어 주세요.';
           firstQ = src.text;
         }
+        const proj = S.projectId && App.store.getProject(S.projectId);
+        if (proj) S.d.category = '프로젝트';
+        // 고른 프로젝트의 맥락(이름·역할)을 첫 질문에 같이 보여 준다
+        const ctx = proj && src.type !== 'exp' ? `▤ ${esc(projLabel(proj))}${proj.role ? ` · ${esc(proj.role)}` : ''} 이야기로 기록할게요` : '';
         S.stage = firstStage;
         S.startComp = comp();
         renderChatShell();
@@ -213,7 +252,7 @@
           if (!(await typing(500, sid))) return;
           addAi(`<div class="dc-ack">${intro}</div>`);
           if (!(await typing(800, sid))) return;
-          ask(firstQ, firstStage);
+          ask(firstQ, firstStage, '', ctx);
           focusInput();
         })();
       }
@@ -224,7 +263,7 @@
             <section class="card dc-chat">
               <header class="dc-chat-head">
                 <ol class="dc-stepper" id="dc-stepper"></ol>
-                <button class="dc-draft-toggle" data-act="sheet" type="button"><span>카드 초안</span><b id="dc-toggle-pct">0%</b></button>
+                <button class="dc-draft-toggle" data-act="sheet" type="button"><span>경험 초안</span><b id="dc-toggle-pct">0%</b></button>
               </header>
               <div class="dc-msgs" id="dc-msgs" aria-live="polite"></div>
               <div class="dc-composer">
@@ -270,7 +309,7 @@
         const sug = d.suggested.filter((k) => !d.keywords.includes(k));
         el.innerHTML = `
           <div class="dc-draft-head">
-            <span class="ai-badge"><span class="ai-dot">R</span>실시간 카드 초안</span>
+            <span class="ai-badge"><span class="ai-dot">R</span>실시간 경험 페이지</span>
             <span class="dc-live"><i></i>답변할 때마다 채워져요</span>
             <button class="btn btn-ghost btn-sm dc-sheet-close" data-act="sheet" type="button">닫기</button>
           </div>
@@ -281,6 +320,10 @@
           <div class="dc-meta-row">
             <select class="dc-cat" id="dc-cat" aria-label="경험 유형">
               ${window.SEED.categories.map((cat) => `<option ${cat === d.category ? 'selected' : ''}>${esc(cat)}</option>`).join('')}
+            </select>
+            <select class="dc-cat dc-proj-sel" id="dc-proj" aria-label="어느 프로젝트 이야기인가요?">
+              <option value="">${S.projectMode === 'set' ? '프로젝트 밖 경험' : '프로젝트: AI가 찾기'}</option>
+              ${projectsSorted().map((p) => `<option value="${esc(p.id)}" ${S.projectId === p.id ? 'selected' : ''}>▤ ${esc(projLabel(p))}</option>`).join('')}
             </select>
             ${App.ui.statusTag(d.status)}
             <span class="dc-qa-count">답변 ${d.qa.length - S.initialQa}개</span>
@@ -307,17 +350,22 @@
             ${sug.length ? '<div class="dc-kw-tip">점선은 AI 추천이에요. 누르면 확정, ×로 뺄 수 있어요.</div>' : ''}
           </div>
           <div class="dc-draft-foot">
-            <button class="btn btn-primary dc-save" data-act="save" type="button">${d.id ? '카드에 저장하기' : '카드로 저장하기'}</button>
-            <p class="subtle">질문과 답변 원문은 카드의 ‘원문 기록’에 그대로 보관돼요.</p>
+            <button class="btn btn-primary dc-save" data-act="save" type="button">${d.id ? '이 경험에 반영하기' : '위키에 반영하기'}</button>
+            <p class="subtle">질문과 답변 원문은 경험 페이지의 출처에 그대로 남아요.</p>
           </div>`;
         el.querySelectorAll('.dc-field-ta').forEach((ta) => autoGrow(ta, 400));
         el.querySelector('#dc-title').addEventListener('input', (ev) => {
-          S.d.title = ev.target.value; S.d.titleSource = 'user';
+          S.d.title = ev.target.value; S.d.titleSource = 'user'; S.dirty = true;
           const m = el.querySelector('.dc-ai-mini'); if (m) m.remove();
         });
-        el.querySelector('#dc-cat').addEventListener('change', (ev) => { S.d.category = ev.target.value; });
+        el.querySelector('#dc-cat').addEventListener('change', (ev) => { S.d.category = ev.target.value; S.dirty = true; });
+        el.querySelector('#dc-proj').addEventListener('change', (ev) => {
+          S.projectId = ev.target.value || null; S.projectMode = 'set'; S.dirty = true;
+          if (S.projectId) S.d.category = '프로젝트';
+          renderDraft(); updateMeta();
+        });
         el.querySelectorAll('.dc-field-ta').forEach((ta) => ta.addEventListener('input', () => {
-          setField(ta.dataset.ta, ta.value); autoGrow(ta, 400);
+          setField(ta.dataset.ta, ta.value); autoGrow(ta, 400); S.dirty = true;
           ta.closest('.dc-field').classList.toggle('is-filled', !!ta.value.trim());
           updateMeta();
         }));
@@ -362,10 +410,11 @@
         S.busy = false; syncBusy();
         return true;
       }
-      function ask(text, stage, ack) {
+      function ask(text, stage, ack, ctx) {
         S.currentQ = text; S.stage = stage; S.wrap = false;
         const st = STAGE[stage];
         addAi(`${ack ? `<div class="dc-ack">${ack}</div>` : ''}
+          ${ctx ? `<div class="dc-ctx">${ctx}</div>` : ''}
           <div class="dc-stage-pill"><b>${st.short}</b>${st.label}</div>
           <div class="dc-q">${esc(text)}</div>`);
         renderDraft(); updateMeta();
@@ -407,25 +456,50 @@
       function showWrap(ack) {
         S.wrap = true; S.currentQ = '';
         if (S.src.type === 'exp') {
-          // 기존 카드 다듬기 → 저장하거나 다른 칸을 골라 계속
+          // 기존 경험 다듬기 → 반영하거나 다른 칸을 골라 계속
           addAi(`${ack ? `<div class="dc-ack">${ack}</div>` : ''}
-            <div class="dc-q">이 부분은 꽤 단단해졌어요. 지금 카드에 저장할까요?</div>
+            <div class="dc-q">이 부분은 꽤 단단해졌어요. 지금 위키에 반영할까요?</div>
             <div class="dc-sub">다른 부분도 다듬고 싶으면 골라 주세요. 그냥 이어서 적으면 가장 얇은 칸에 덧붙일게요.</div>
             <div class="dc-inline-acts">
-              <button class="btn btn-primary btn-sm" data-act="save" type="button">카드에 저장하기</button>
+              <button class="btn btn-primary btn-sm" data-act="save" type="button">이 경험에 반영하기</button>
               ${STAGES.map((x) => `<button class="btn btn-sm" data-act="goto" data-stage="${x.key}" type="button">${x.label}</button>`).join('')}
             </div>`);
           renderDraft(); updateMeta(); syncBusy();
+          offerCode();
           return;
         }
         addAi(`${ack ? `<div class="dc-ack">${ack}</div>` : ''}
-          <div class="dc-q">와, 상황부터 배운 점까지 한 바퀴 다 돌았어요! 지금 카드로 저장해 둘까요?</div>
+          <div class="dc-q">와, 상황부터 배운 점까지 한 바퀴 다 돌았어요! 지금 경험 위키에 반영해 둘까요?</div>
           <div class="dc-sub">더 이야기하고 싶다면 계속 적어도 좋아요. 가장 얇은 부분을 더 물어볼게요.</div>
           <div class="dc-inline-acts">
-            <button class="btn btn-primary btn-sm" data-act="save" type="button">카드로 저장하기</button>
+            <button class="btn btn-primary btn-sm" data-act="save" type="button">위키에 반영하기</button>
             <button class="btn btn-sm" data-act="more" type="button">조금 더 이야기할래요</button>
           </div>`);
         renderDraft(); updateMeta(); syncBusy();
+        offerCode();
+      }
+
+      /* ---------- 코드 분석과 잇기: 이 프로젝트에 아직 이야기가 없는 코드 발견이 있으면 한 번만 물어본다 ---------- */
+      function codeCandidate() {
+        resolveProject();
+        const p = S.projectId && App.store.getProject(S.projectId);
+        const fs = ((p && p.repo && p.repo.findings) || []).filter((f) => f.status !== 'dismissed'
+          && App.wiki.cardsForFinding(f.id).length === 0 && !(S.d.codeRefs || []).includes(f.id));
+        if (!fs.length) return null;
+        const text = convoText().toLowerCase();
+        const score = (f) => String(f.title + ' ' + (f.tags || []).join(' ')).toLowerCase().split(/[\s·,()/]+/).filter((w) => w.length >= 2 && text.includes(w)).length;
+        return fs.map((f) => ({ f, sc: score(f) })).sort((a, b) => b.sc - a.sc)[0].f;
+      }
+      function offerCode() {
+        if (S.codeOffered) return;
+        const f = codeCandidate(); if (!f) return;
+        S.codeOffered = true;
+        addAi(`<div class="dc-q">코드에서 「${esc(App.wiki.short(f.title, 40))}」도 찾았어요. 이 경험과 관련 있나요?</div>
+          <div class="dc-sub">관련 있다면 이 코드를 경험의 근거로 붙여 둘게요. 이력서·면접에서 같이 쓸 수 있어요.</div>
+          <div class="dc-inline-acts" data-code-acts>
+            <button class="btn btn-primary btn-sm" data-act="code-yes" data-finding="${esc(f.id)}" type="button">네, 관련 있어요</button>
+            <button class="btn btn-sm" data-act="code-no" type="button">아니에요</button>
+          </div>`);
       }
 
       function acceptKeywords(text) {
@@ -449,7 +523,8 @@
           S.stage = weakestStage(); S.wrap = false;
         }
         const stage = S.stage;
-        S.d.qa.push({ q: S.currentQ || '(자유롭게 덧붙인 이야기)', a: text, date: today() });
+        S.d.qa.push({ q: S.currentQ || '(자유롭게 덧붙인 이야기)', a: text, date: today(), source: 'chat' });
+        S.dirty = true;
         const prev = field(stage).trim();
         setField(stage, prev ? prev + ' ' + text : text);
         if (prev) {
@@ -478,7 +553,7 @@
         } else if (stage === 'result' && hasNum(text)) {
           note = '숫자가 들어가니 훨씬 설득력 있어요 👍';
         } else if (!S.crossedHalf && before < 50 && after >= 50) {
-          note = '카드가 벌써 절반 넘게 채워졌어요. 이 페이스 좋아요!';
+          note = '경험 페이지가 벌써 절반 넘게 채워졌어요. 이 페이스 좋아요!';
         }
         if (after >= 50) S.crossedHalf = true;
 
@@ -520,7 +595,7 @@
         // 덧붙인 뒤 사용자가 초안을 직접 고쳤으면 해당 부분만 바꾼다
         if (mode === 'replaced') setField(ed.stage, curVal.includes(appended) ? curVal.replace(appended, ed.text) : ed.text);
         else setField(ed.stage, curVal.includes(appended) ? curVal.replace(appended, ed.prev) : curVal.replace(' ' + ed.text, ''));
-        ed.state = mode;
+        ed.state = mode; S.dirty = true;
         const box = root.querySelector(`[data-edit="${eid}"]`);
         if (box) box.innerHTML = mode === 'replaced' ? `<span>↳ <b>${STAGE[ed.stage].label}</b> 칸을 이 답변으로 바꿨어요</span>` : `<span>↳ <b>${STAGE[ed.stage].label}</b> 칸은 원래대로 두었어요 <span class="subtle">(답변은 원문 기록에 남아요)</span></span>`;
         renderDraft(); updateMeta(); flashField(ed.stage);
@@ -562,28 +637,32 @@
 
       function onLater() {
         if (S.busy || S.wrap || !S.currentQ) return;
+        if (S.pendingTarget) { App.ui.toast('먼저 위에서 같은 이야기인지 골라 주세요'); scrollDown(); return; }
         addUser('나중에 다시 물어봐 줘', true);
-        const hasContent = S.answers > 0 || !!S.d.id;
-        const id = hasContent ? persist() : null;
-        App.store.pushQuestion({
-          text: S.currentQ, type: id ? 'deepen' : 'recall', targetExpId: id,
-          hint: '집중 발굴에서 잠시 미뤄둔 질문이에요. 한두 줄이면 충분해요.',
+        const qText = S.currentQ;
+        withTarget(() => {
+          const hasContent = sessionAnswers() > 0 || !!S.d.id;
+          const id = hasContent ? persist() : null;
+          App.store.pushQuestion({
+            text: qText, type: id ? 'deepen' : 'recall', targetExpId: id,
+            hint: 'AI와 대화하며 기록하다 잠시 미뤄둔 질문이에요. 한두 줄이면 충분해요.',
+          });
+          App.ui.toast('오늘의 질문으로 보내둘게요');
+          const sid = session;
+          (async () => {
+            await advance('알겠어요, 이 질문은 오늘의 질문으로 보내둘게요. 편할 때 한두 줄만 답해 주세요. 다른 걸 물어볼게요.', sid);
+            focusInput();
+          })();
         });
-        App.ui.toast('오늘의 질문으로 보내둘게요');
-        const sid = session;
-        (async () => {
-          await advance('알겠어요, 이 질문은 오늘의 질문으로 보내둘게요. 편할 때 한두 줄만 답해 주세요. 다른 걸 물어볼게요.', sid);
-          focusInput();
-        })();
       }
 
       function onStop() {
         if (S.busy) return;
-        const n = S.d.qa.length - S.initialQa;
+        const n = sessionAnswers();
         if (!n && !S.d.id) {
           App.ui.modal({
             title: '오늘은 여기까지 할까요?',
-            body: '<p>아직 저장할 답변이 없어요. 괜찮아요, 다음에 오늘의 질문으로 먼저 말 걸게요.</p>',
+            body: '<p>아직 반영할 답변이 없어요. 괜찮아요, 다음에 오늘의 질문으로 먼저 말 걸게요.</p>',
             confirmText: '나가기', cancelText: '조금 더 할래요',
             onConfirm: () => { App.navigate('#/home'); },
           });
@@ -595,7 +674,7 @@
           title: '오늘은 여기까지 할까요?',
           body: `
             <div class="dc-sum">
-              <p>오늘 이야기한 내용을 카드에 저장해 둘게요. 언제든 이어서 채울 수 있어요.</p>
+              <p>오늘 이야기한 내용을 경험 위키에 반영해 둘게요. 언제든 이어서 채울 수 있어요.</p>
               <div class="dc-sum-stats">
                 <div><b>${n}</b><span>답변</span></div>
                 <div><b>${done.length}/5</b><span>채운 칸</span></div>
@@ -604,56 +683,136 @@
               <div class="dc-sum-steps">${STAGES.map((s) => `<span class="${filled(s.key) ? 'on' : ''}">${s.label}</span>`).join('')}</div>
               ${allKw().length ? `<div class="dc-sum-kws">${allKw().map((k) => App.ui.keywordChip(k)).join('')}</div>` : ''}
             </div>`,
-          confirmText: '저장하고 마치기', cancelText: '조금 더 할래요',
+          confirmText: '반영하고 마치기', cancelText: '조금 더 할래요',
           onConfirm: () => { save(); },
         });
       }
 
+      /* ---------- 위키에 반영 ---------- */
+      const sessionAnswers = () => S.d.qa.length - S.initialQa;
+      // 이번 대화에서 나온 이야기 (매칭·프로젝트 찾기에 쓴다)
+      const convoText = () => [S.d.title].concat(S.d.qa.slice(S.initialQa).map((x) => x.a)).join(' ');
+      function resolveProject() {
+        if (S.projectMode !== 'auto' || S.projectId) return;
+        const p = App.wiki.detectProject(convoText());
+        if (p) { S.projectId = p.id; S.d.category = '프로젝트'; }
+      }
+      // 새 대화를 처음 반영할 때, 이미 있는 경험과 같은 이야기 같으면 먼저 물어본다
+      function withTarget(cb) {
+        if (S.pendingTarget) { App.ui.toast('먼저 위에서 같은 이야기인지 골라 주세요'); scrollDown(); return; }
+        if (S.d.id || S.mergeChecked || S.src.type === 'exp' || sessionAnswers() === 0) { cb(); return; }
+        S.mergeChecked = true;
+        resolveProject();
+        const m = App.wiki.match(convoText(), { projectId: S.projectId });
+        if (m.confidence !== 'high' || !m.best) { cb(); return; }
+        S.pendingTarget = cb;
+        const t = esc(App.wiki.short(m.best.title, 30));
+        addAi(`<div class="dc-q">「${t}」와 같은 이야기 같아요. 거기에 반영할까요?</div>
+          <div class="dc-sub">같은 이야기는 한 페이지에 모아 두어야 이력서·면접에서 근거가 흩어지지 않아요.</div>
+          <div class="dc-inline-acts" data-merge-acts>
+            <button class="btn btn-primary btn-sm" data-act="merge-yes" data-exp-id="${esc(m.best.id)}" type="button">「${t}」에 반영</button>
+            <button class="btn btn-sm" data-act="merge-no" type="button">새 경험으로</button>
+          </div>`);
+      }
+      const joinText = (a, b) => { a = String(a || '').trim(); b = String(b || '').trim(); return !b || a.includes(b) ? a : a ? a + ' ' + b : b; };
+      // 대화 초안을 기존 경험 페이지에 합친다. 이후 대화는 그 페이지를 이어서 채운다
+      function mergeInto(e) {
+        const d = S.d;
+        S.baseBefore = clone(e); S.merged = true;
+        const newQa = d.qa.slice(S.initialQa);
+        const star = {};
+        ['situation', 'task', 'action', 'result'].forEach((k) => { star[k] = joinText(e.star[k], d.star[k]); });
+        const kws = e.keywords.concat(allKw().filter((k) => !e.keywords.includes(k))).slice(0, Math.max(5, e.keywords.length));
+        App.store.update(e.id, {
+          star, insights: joinText(e.insights, d.insights), summary: e.summary || d.summary || autoSummary(), keywords: kws,
+          qa: (e.qa || []).concat(newQa), codeRefs: [...new Set((e.codeRefs || []).concat(d.codeRefs || []))],
+          projectId: e.projectId || S.projectId || null,
+        });
+        const u = App.store.get(e.id);
+        Object.assign(d, {
+          id: u.id, title: u.title, titleSource: 'user', category: u.category, status: u.status, star: clone(u.star), insights: u.insights || '',
+          summary: u.summary || '', keywords: u.keywords.slice(), suggested: [], qa: clone(u.qa), codeRefs: (u.codeRefs || []).slice(),
+        });
+        S.initialQa = u.qa.length - newQa.length;
+        S.projectId = u.projectId || null; S.projectMode = u.projectId ? 'set' : S.projectMode; S.mergeInto = null;
+        if (root.querySelector('#dc-draft')) { renderDraft(); updateMeta(); }
+        return u.id;
+      }
+
       function persist() {
         const d = S.d;
-        const data = {
-          title: d.title.trim() || '제목 없는 경험', category: d.category,
-          star: d.star, insights: d.insights, summary: d.summary || autoSummary(),
-          keywords: allKw(), qa: d.qa,
-        };
-        if (d.id && App.store.get(d.id)) App.store.update(d.id, data);
-        else { const e = App.store.create(Object.assign({ status: 'draft' }, data)); d.id = e.id; }
-        return d.id;
+        resolveProject();
+        const proj = S.projectId && App.store.getProject(S.projectId);
+        const last = d.qa.length > S.initialQa ? d.qa[d.qa.length - 1] : null;
+        let id = d.id && App.store.get(d.id) ? d.id : null;
+        if (!id && S.mergeInto && App.store.get(S.mergeInto)) id = mergeInto(App.store.get(S.mergeInto));
+        else {
+          const cur = id ? App.store.get(id) : null;
+          const data = {
+            title: d.title.trim() || '제목 없는 경험', category: d.category,
+            star: d.star, insights: d.insights, summary: d.summary || autoSummary(),
+            keywords: allKw(), qa: d.qa, projectId: S.projectId || null,
+            codeRefs: [...new Set(((cur && cur.codeRefs) || []).concat(d.codeRefs || []))],
+          };
+          if (cur) { if (S.baseBefore === undefined) S.baseBefore = clone(cur); App.store.update(id, data); }
+          else {
+            S.baseBefore = null;
+            const e = App.store.create(Object.assign({ status: 'draft', role: proj ? proj.role || '' : '' }, data));
+            d.id = id = e.id;
+          }
+        }
+        // 한 번의 대화는 변경 기록 하나로: 앞서 남긴 기록을 지우고, 대화 전 상태를 기준으로 다시 남긴다
+        const log = App.store.state.wikiLog || [];
+        const i = S.entryId ? log.findIndex((w) => w.id === S.entryId && !w.undone) : -1;
+        if (i >= 0) log.splice(i, 1);
+        const entry = App.wiki.recordEdit('chat', id, S.baseBefore, { text: last ? last.a : '', question: last ? last.q : '' });
+        S.entryId = entry ? entry.id : i >= 0 ? null : S.entryId;
+        S.dirty = false;
+        return id;
       }
 
       function save() {
         if (S.busy) { App.ui.toast('AI가 질문을 준비 중이에요. 잠시만요!'); return; }
-        const id = persist();
-        showDone(id);
+        withTarget(() => { persist(); showDone(); });
       }
 
-      function showDone(id) {
+      function showDone() {
         session++;
-        const e = App.store.get(id);
-        const n = S.d.qa.length - S.initialQa;
-        const g = App.ai.gapQuestion(e);
-        const delta = e.completeness - S.startComp;
-        const updated = S.src.type === 'exp';
+        S.finished = true;
+        paintDone(S.entryId ? App.wiki.get(S.entryId) : null);
+        window.scrollTo(0, 0);
+      }
+
+      function paintDone(entry) {
+        const id = entry && entry.target ? entry.target : S.d.id;
+        const e = id ? App.store.get(id) : null;
+        const n = sessionAnswers();
+        const undone = !!(entry && entry.undone);
+        const head = !entry ? '경험 페이지는 그대로예요'
+          : undone ? '위키 반영을 되돌렸어요'
+          : entry.decided === 'new' ? '새 경험이 위키에 추가됐어요'
+          : entry.decided === 'user' ? '고른 경험으로 옮겼어요'
+          : S.merged ? '같은 이야기를 하던 경험에 반영했어요'
+          : '경험 페이지가 더 단단해졌어요';
+        const delta = e && entry && entry.decided !== 'new' ? e.completeness - S.startComp : 0;
+        const g = e && !undone ? App.ai.gapQuestion(e) : null;
         root.innerHTML = `
           <div class="dc-done">
             <div class="dc-done-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
-            <h1>${updated ? '경험 카드가 더 단단해졌어요' : '경험 카드가 만들어졌어요'}</h1>
-            <p class="dc-done-sub">답변 ${n}개로 ${STAGES.filter((s) => filled(s.key)).length}칸을 채웠어요.
-              ${delta > 0 ? `완성도가 <b>+${delta}%</b> 올랐어요.` : ''} 언제든 이어서 더 채울 수 있어요.</p>
-            <div class="dc-done-card">${App.ui.expCard(e)}</div>
-            ${e.keywords.length ? `
-            <div class="dc-done-kws">
-              <div class="dc-done-label">이번 이야기에서 찾은 역량</div>
-              <div class="dc-done-chips">${e.keywords.map((k) => App.ui.keywordChip(k, { size: 'lg' })).join('')}</div>
-            </div>` : ''}
-            ${g ? `<div class="dc-done-next"><span class="ai-dot">R</span><div><div class="dc-done-label">다음에 이어서 물어볼게요</div><div>${esc(g.text)}</div></div></div>` : ''}
+            <h1>${head}</h1>
+            <p class="dc-done-sub">${undone ? '대화 전 상태로 돌려 두었어요.' : `답변 ${n}개를 위키에 반영했어요.
+              ${e ? `「${esc(App.wiki.short(e.title, 30))}」 완성도 <b>${e.completeness}%</b>${delta > 0 ? ` (+${delta}%)` : ''}.` : ''} 언제든 이어서 더 채울 수 있어요.`}</p>
+            <div class="dc-done-report">${entry ? App.wiki.reportHTML(entry) : ''}</div>
+            ${g ? (() => { const queued = App.store.state.inbox.some((q) => q.targetExpId === e.id && (q.status === 'pending' || q.status === 'later'));
+              return `<div class="dc-done-next"><span class="ai-dot">R</span><div style="flex:1"><div class="dc-done-label">다음에 채우면 좋은 질문</div><div>${esc(g.text)}</div></div>
+              ${queued ? '<span class="subtle" style="font-size:12.5px;align-self:center">✓ 오늘의 질문에 있어요</span>' : `<button class="btn btn-sm" data-act="queue-gap" data-stage="${esc(g.stage)}" data-text="${esc(g.text)}" data-exp="${esc(e.id)}" type="button">오늘의 질문으로 받기</button>`}</div>`; })() : ''}
             <div class="dc-done-actions">
-              <a class="btn btn-primary btn-lg" href="#/card/${esc(id)}">카드 보기</a>
-              <button class="btn btn-lg" data-act="another" type="button">다른 경험 발굴하기</button>
+              ${!entry && e ? `<a class="btn btn-lg" href="#/card/${esc(e.id)}">경험 페이지 보기</a>` : ''}
+              <button class="btn btn-primary btn-lg" data-act="another" type="button">다른 경험 기록하기</button>
               <a class="btn btn-ghost btn-lg" href="#/home">홈으로</a>
             </div>
           </div>`;
-        window.scrollTo(0, 0);
+        App.wiki.bindReport(root.querySelector('.dc-done-report'), (ne) => paintDone(ne || entry));
       }
 
       /* ---------- events ---------- */
@@ -675,14 +834,23 @@
           renderDraft(); updateMeta(); App.ui.toast(`#${k} 키워드를 확정했어요`); return;
         }
         const seed = t.closest('[data-seed]');
-        if (seed) { App.navigate('#/discover?seed=' + seed.dataset.seed); return; }
+        const pickedProj = S.picker ? S.picker.projectId : '';
+        if (seed) { App.navigate('#/discover?seed=' + seed.dataset.seed + (pickedProj ? '&project=' + encodeURIComponent(pickedProj) : '')); return; }
+        const pseed = t.closest('[data-project-seed]');
+        if (pseed) {
+          const p = App.store.getProject(pseed.dataset.projectSeed);
+          if (p) startChat({ type: 'custom', cat: '프로젝트', projectId: p.id, text: projectFirstQ(p) });
+          return;
+        }
         const cseed = t.closest('[data-custom-seed]');
         if (cseed) {
           const cat = cseed.dataset.customSeed;
-          startChat({ type: 'custom', cat, text: `${cat}에서 "이건 기억에 남는다" 싶은 순간이 있나요?` }); return;
+          startChat({ type: 'custom', cat, projectId: pickedProj, text: `${cat}에서 "이건 기억에 남는다" 싶은 순간이 있나요?` }); return;
         }
+        const projBtn = t.closest('[data-proj]');
+        if (projBtn && S.picker) { showPicker({ cat: S.picker.cat, onboarding: S.picker.onboarding, projectId: projBtn.dataset.proj }); return; }
         const cat = t.closest('[data-cat]');
-        if (cat && S.picker) { showPicker({ cat: cat.dataset.cat, onboarding: S.picker.onboarding }); return; }
+        if (cat && S.picker) { showPicker({ cat: cat.dataset.cat, onboarding: S.picker.onboarding, projectId: S.picker.projectId }); return; }
         const cont = t.closest('[data-exp]');
         if (cont) { App.navigate('#/discover?exp=' + cont.dataset.exp); return; }
 
@@ -696,7 +864,28 @@
         else if (act === 'stop') onStop();
         else if (act === 'save') save();
         else if (act === 'another') App.navigate('#/discover');
+        else if (act === 'queue-gap') {
+          App.store.pushQuestion({ type: 'deepen', targetExpId: actEl.dataset.exp, stage: actEl.dataset.stage, text: actEl.dataset.text, hint: '답하면 이 경험의 비어 있는 칸이 채워져요.' });
+          actEl.outerHTML = '<span class="subtle" style="font-size:12.5px;align-self:center">✓ 오늘의 질문에 있어요</span>';
+          App.ui.toast('오늘의 질문으로 보냈어요');
+        }
         else if (act === 'goto') gotoStage(actEl.dataset.stage);
+        else if (act === 'merge-yes' || act === 'merge-no') {
+          const cb = S.pendingTarget; S.pendingTarget = null;
+          const box = actEl.closest('[data-merge-acts]'); if (box) box.remove();
+          if (act === 'merge-yes') { S.mergeInto = actEl.dataset.expId; addUser('네, 거기에 반영할래요', true); }
+          else addUser('새 경험으로 할래요', true);
+          if (cb) cb();
+        } else if (act === 'code-yes' || act === 'code-no') {
+          const box = actEl.closest('[data-code-acts]'); if (box) box.remove();
+          if (act === 'code-yes') {
+            const fid = actEl.dataset.finding;
+            if (!S.d.codeRefs.includes(fid)) S.d.codeRefs.push(fid);
+            S.dirty = true;
+            addUser('네, 관련 있어요', true);
+            addNote('이 코드를 경험의 근거로 붙여 둘게요. 위키에 반영할 때 함께 연결돼요.');
+          } else addUser('관련 없어요', true);
+        }
         else if (act === 'edit-replace' || act === 'edit-undo') applyEdit(actEl.dataset.editId, act === 'edit-replace' ? 'replaced' : 'undone');
         else if (act === 'sheet') {
           S.sheet = !S.sheet;
@@ -718,24 +907,31 @@
       if (params.exp) {
         const e = App.store.get(params.exp);
         if (e) startChat({ type: 'exp', exp: e, stage: params.stage });
-        else { App.ui.toast('카드를 찾을 수 없어요. 새 경험부터 떠올려 볼까요?'); showPicker(); }
+        else { App.ui.toast('경험을 찾을 수 없어요. 새 경험부터 떠올려 볼까요?'); showPicker(); }
       } else if (params.seed != null && params.seed !== '' && params.seed !== 'onboarding' && window.SEED.recallPrompts[Number(params.seed)]) {
-        startChat({ type: 'seed', index: Number(params.seed) });
+        startChat({ type: 'seed', index: Number(params.seed), projectId: params.project || '' });
       } else if (params.free && params.free.trim()) {
-        startChat({ type: 'free', text: params.free.trim().slice(0, 80), cat: params.cat || '' });
-      } else if (params.kw) {
-        const k = App.keywords.get(params.kw);
-        startChat({ type: 'custom', cat: params.cat || '일상', text: `#${k.name} 역량이 드러났던 순간을 찾아볼게요. ${k.desc ? '"' + k.desc + '"' : ''} — 아주 작은 일이라도 비슷한 장면이 떠오르나요?` });
+        startChat({ type: 'free', text: params.free.trim().slice(0, 80), cat: params.cat || '', projectId: params.project || '' });
       } else if (params.seed === 'onboarding' && App.store.state.user.firstSeed && (App.store.state.user.firstSeed.text || '').trim()) {
         const fs = App.store.state.user.firstSeed;
-        startChat({ type: 'free', text: fs.text.trim(), cat: (fs.categories || [])[0] || '' });
+        startChat({ type: 'free', text: fs.text.trim(), cat: (fs.categories || [])[0] || '', projectId: params.project || '' });
+      } else if (params.project && App.store.getProject(params.project) && !params.kw) {
+        const p = App.store.getProject(params.project);
+        startChat({ type: 'custom', cat: '프로젝트', projectId: p.id, text: projectFirstQ(p) });
+      } else if (params.kw) {
+        const k = App.keywords.get(params.kw);
+        startChat({ type: 'custom', cat: params.cat || '일상', projectId: params.project || '', text: `#${k.name} 역량이 드러났던 순간을 찾아볼게요. ${k.desc ? '"' + k.desc + '"' : ''} — 아주 작은 일이라도 비슷한 장면이 떠오르나요?` });
       } else {
-        showPicker({ onboarding: params.seed === 'onboarding', cat: params.cat || (params.seed === 'onboarding' && App.store.state.user.firstSeed ? (App.store.state.user.firstSeed.categories || [])[0] || '' : '') });
+        showPicker({ projectId: params.project || '', onboarding: params.seed === 'onboarding', cat: params.cat || (params.seed === 'onboarding' && App.store.state.user.firstSeed ? (App.store.state.user.firstSeed.categories || [])[0] || '' : '') });
       }
 
       return () => {
         alive = false; session++;
         root.removeEventListener('click', onClick);
+        // 대화 중에 떠나도 답변은 잃지 않는다: 작성 중인 경험으로 위키에 반영
+        if (S.d && !S.finished && S.dirty && (sessionAnswers() > 0 || S.d.id)) {
+          try { S.pendingTarget = null; persist(); App.ui.toast('나눈 이야기는 작성 중인 경험으로 위키에 반영해 뒀어요'); } catch (e) { /* noop */ }
+        }
       };
     },
   };

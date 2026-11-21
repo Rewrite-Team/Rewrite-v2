@@ -6,7 +6,7 @@
   const S = () => App.store;
 
   const SECTIONS = [
-    ['project', '프로젝트', '코드 분석·체크인 기록·경험 카드에서 나온 한 줄이 쌓여요'],
+    ['project', '프로젝트', '코드 분석과 경험 위키의 경험에서 나온 한 줄이 쌓여요'],
     ['career', '경력', '인턴, 아르바이트, 직장'],
     ['activity', '활동', '동아리, 스터디, 교육 과정, 대외활동'],
     ['education', '학력', ''],
@@ -83,8 +83,8 @@
     if (s.type === 'github') return `<button type="button" class="rs-src rs-src-gh" data-act="src" ${data} title="근거 코드 보기"><span class="rs-src-ico">&lt;/&gt;</span>GitHub 코드</button>`;
     if (s.type === 'card') {
       const c = S().get(s.expId);
-      return c ? `<a class="rs-src rs-src-card" href="#/card/${encodeURIComponent(c.id)}" title="${esc(c.title)}"><span class="rs-src-ico">▦</span>경험 카드</a>`
-        : '<span class="rs-src rs-src-card is-gone"><span class="rs-src-ico">▦</span>경험 카드 (삭제됨)</span>';
+      return c ? `<a class="rs-src rs-src-card" href="#/card/${encodeURIComponent(c.id)}" title="${esc(c.title)}"><span class="rs-src-ico">▦</span>경험</a>`
+        : '<span class="rs-src rs-src-card is-gone"><span class="rs-src-ico">▦</span>경험 (삭제됨)</span>';
     }
     if (s.type === 'log') return `<button type="button" class="rs-src rs-src-log" data-act="src" ${data} title="체크인 기록 보기"><span class="rs-src-ico">✎</span>체크인 기록</button>`;
     return '<span class="rs-src rs-src-manual">직접 작성</span>';
@@ -150,7 +150,7 @@
       title: '이력서에 한 줄로 담기',
       body: `<div class="rs-form">
         <div class="rs-form-src">${App.ui.statusTag(exp.status)}<b>${esc(exp.title)}</b></div>
-        <label class="label" for="rk-text">이력서 한 줄 <span class="rs-ai-mini">AI</span> <span class="subtle">카드의 행동·결과로 만든 초안이에요</span></label>
+        <label class="label" for="rk-text">이력서 한 줄 <span class="rs-ai-mini">AI</span> <span class="subtle">경험의 행동·결과로 만든 초안이에요</span></label>
         <textarea class="textarea" id="rk-text" data-rk-text rows="3">${esc(oneLiner(exp))}</textarea>
         <div class="rs-help">무엇을 했는지 + 숫자로 된 결과가 한 줄에 보이면 좋아요. 담은 뒤에도 마스터 이력서에서 고칠 수 있어요.</div>
         <label class="label" for="rk-target" style="margin-top:14px">담을 곳</label>
@@ -286,7 +286,7 @@
           </div>
         </div>` : `
         <div class="rs-mat" data-kind="card">
-          <div class="rs-mat-top"><span class="rs-src rs-src-card"><span class="rs-src-ico">▦</span>경험 카드</span>
+          <div class="rs-mat-top"><span class="rs-src rs-src-card"><span class="rs-src-ico">▦</span>경험</span>
             <a class="rs-mat-from" href="#/card/${encodeURIComponent(it.e.id)}">${esc(it.e.title)}</a></div>
           <div class="rs-mat-text"><span class="rs-ai-mini">AI</span> ${esc(oneLiner(it.e))}</div>
           <div class="rs-mat-foot">
@@ -296,7 +296,7 @@
           </div>
         </div>`).join('')}</div>
         ${items.length > 3 ? `<button type="button" class="rs-inbox-more" data-act="inbox-more">${ui.inboxAll ? '접기' : `${items.length - 3}개 더 보기`}</button>` : ''}`
-        : '<div class="rs-inbox-empty">새 재료를 모두 확인했어요. 프로젝트에 체크인하거나 경험 카드를 완성하면 여기에 쌓여요.</div>'}
+        : '<div class="rs-inbox-empty">새 재료를 모두 확인했어요. 체크인과 답변은 경험 위키의 경험이 되고, 경험을 완성하면 여기에 이력서 재료로 쌓여요.</div>'}
       ${!gh ? `<div class="rs-inbox-cta"><span>${anyRepo ? '연결된 레포에서 새로 찾은 코드가 없어요.' : 'GitHub 레포를 연결하면 코드에서 이력서 한 줄을 찾아 드려요.'}</span><a class="cd-link rs-link" href="#/projects">프로젝트에서 코드 분석하기 →</a></div>` : ''}
     </section>`;
   }
@@ -343,7 +343,7 @@
         const list = sk.filter((s) => (s.group || '프레임워크·라이브러리') === g);
         if (!list.length) return '';
         return `<div class="rs-skg"><div class="rs-skg-lb">${g}</div><div class="rs-skg-chips">${list.map((s) => `
-          <span class="rs-skill ${s.included ? 'is-on' : ''}" title="${s.source && s.source.type === 'github' ? 'GitHub 코드에서 찾은 기술' : s.source && s.source.type === 'card' ? '경험 카드에서 나온 기술' : ''}">
+          <span class="rs-skill ${s.included ? 'is-on' : ''}" title="${s.source && s.source.type === 'github' ? 'GitHub 코드에서 찾은 기술' : s.source && s.source.type === 'card' ? '경험에서 나온 기술' : ''}">
             <button type="button" class="rs-skill-t" data-act="skill-toggle" data-id="${esc(s.id)}" aria-pressed="${s.included}">${s.included ? '✓' : '＋'} ${esc(s.name)}${s.source && s.source.type === 'github' ? '<span class="rs-skill-gh">GH</span>' : ''}</button>
             <button type="button" class="rs-skill-x" data-act="skill-del" data-id="${esc(s.id)}" aria-label="${esc(s.name)} 삭제">×</button>
           </span>`).join('')}</div></div>`;
@@ -390,7 +390,7 @@
         <label class="rs-switch" title="${e.included ? '이 항목을 이력서에서 빼기' : '이 항목을 이력서에 넣기'}"><input type="checkbox" data-act="entry-toggle" data-id="${esc(e.id)}" ${e.included ? 'checked' : ''}><span></span></label>
         <div class="rs-entry-main">
           <div class="rs-entry-title">${esc(e.title || '제목 없는 항목')}${e.included ? '' : '<span class="rs-pool-tag">풀에 보관</span>'}</div>
-          <div class="rs-entry-meta">${meta.map(esc).join(' · ') || '기간·역할을 적어 주세요'}${p ? ` · <a class="rs-proj-link" href="#/projects/${encodeURIComponent(p.id)}">▤ 트래커</a>` : ''}</div>
+          <div class="rs-entry-meta">${meta.map(esc).join(' · ') || '기간·역할을 적어 주세요'}${p ? ` · <a class="rs-proj-link" href="#/projects/${encodeURIComponent(p.id)}">▤ 프로젝트</a>` : ''}</div>
           ${e.bullets.length ? `<div class="rs-entry-count">한 줄 ${e.bullets.length}개 중 ${incB}개 포함</div>` : ''}
         </div>
         ${tools('entry', e.id, `data-id="${esc(e.id)}"`, i, n)}
@@ -411,7 +411,7 @@
         <button type="button" class="btn btn-sm btn-ghost rs-sec-add" data-act="entry-add" data-sec="${key}">＋ ${label} 추가</button></div>
       ${help && list.length ? `<p class="rs-sec-help">${help}</p>` : ''}
       ${list.length ? `<div class="rs-entries">${list.map((e, i) => entryHTML(e, i, list.length, ui)).join('')}</div>`
-        : `<div class="rs-sec-empty">아직 없어요. ${key === 'project' ? '프로젝트 트래커의 프로젝트를 불러오거나 ' : ''}직접 추가해 보세요.</div>`}
+        : `<div class="rs-sec-empty">아직 없어요. ${key === 'project' ? '프로젝트 페이지를 불러오거나 ' : ''}직접 추가해 보세요.</div>`}
     </section>`;
   }
 
@@ -612,7 +612,7 @@
         App.ui.modal({
           title: `${SECTION_LABEL[sec]} 추가`,
           body: `<div class="rs-form">
-            ${fresh.length ? `<label class="label">프로젝트 트래커에서 불러오기</label>
+            ${fresh.length ? `<label class="label">프로젝트에서 불러오기</label>
               <select class="select" data-ae-proj><option value="">직접 입력</option>${fresh.map((p) => `<option value="${esc(p.id)}">${esc(p.title)}</option>`).join('')}</select>
               <div class="rs-help">불러오면 기간·역할이 채워지고, 코드 분석 결과도 이 항목에 담겨요.</div>` : ''}
             <div class="rs-pf-grid" style="margin-top:12px">

@@ -139,3 +139,14 @@
   .ob-phone { width: 230px; height: 420px; }
   .ob-phone-time { font-size: 48px; }
 }
+
+/* 첫 기록 단계: AI와 대화하며 기록 (선택) */
+.ob-chat-alt {
+  display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 16px; padding: 12px 14px; text-align: left;
+  border: 1px dashed var(--border-strong); border-radius: var(--radius); background: var(--surface); cursor: pointer; font: inherit; color: var(--text);
+}
+.ob-chat-alt:hover { border-color: var(--primary); background: var(--primary-soft); }
+.ob-chat-alt .ai-dot { flex-shrink: 0; }
+.ob-chat-alt > span:last-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ob-chat-alt b { font-size: 14px; }
+.ob-chat-alt b + span { font-size: 12.5px; color: var(--text-3); }

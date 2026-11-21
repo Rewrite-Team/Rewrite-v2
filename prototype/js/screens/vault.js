@@ -1,12 +1,19 @@
-/* 경험 보관함 — #/vault?kw=<키워드>&q=<검색어> */
+/* 경험 위키 — #/vault?kw=<키워드>&q=<검색어>
+   기록(답변·체크인·대화·코드) → AI가 정리한 경험 페이지 목록 + 위키 점검 + 최근 변경 */
 (function (App) {
   const esc = (s) => App.ui.esc(s);
   const VIEW_KEY = 'rewrite-vault-view';
+  const GROUP_KEY = 'rewrite-vault-group';
   const STATUS_FILTERS = [['', '전체'], ['draft', '작성중'], ['done', '완성']];
   const SORTS = [['updated', '최근 수정순'], ['complete', '완성도순'], ['period', '기간순']];
+  const GROUPS = [['project', '프로젝트별'], ['keyword', '역량별'], ['recent', '최근 순']];
+  const ISSUE_LIMIT = 5;
 
   function loadView() { try { return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid'; } catch (e) { return 'grid'; } }
   function saveView(v) { try { localStorage.setItem(VIEW_KEY, v); } catch (e) { /* ignore */ } }
+  function loadGroup() { try { const g = localStorage.getItem(GROUP_KEY); return GROUPS.some(([v]) => v === g) ? g : 'project'; } catch (e) { return 'project'; } }
+  function saveGroup(v) { try { localStorage.setItem(GROUP_KEY, v); } catch (e) { /* ignore */ } }
+  const projShort = (p) => (p.title.match(/「[^」]+」/) || [p.title.split(' — ')[0]])[0];
 
   function allKeywordNames() {
     const master = App.keywords.all().map((k) => k.name);
@@ -42,51 +49,53 @@
 
   function isFiltered(st) { return !!(st.q.trim() || st.kws.size || st.category || st.status); }
 
-  function menuHTML(e) {
+  // key: 같은 경험이 여러 묶음(역량별)에 나올 수 있어 메뉴마다 고유 키를 쓴다
+  function menuHTML(e, key) {
+    key = key || e.id;
     return `<div class="vt-menu-wrap">
-      <button type="button" class="vt-menu-btn" data-menu="${esc(e.id)}" aria-label="더보기" title="더보기">⋯</button>
-      <div class="vt-menu" data-menu-for="${esc(e.id)}" hidden>
+      <button type="button" class="vt-menu-btn" data-menu="${esc(key)}" aria-label="더보기" title="더보기">⋯</button>
+      <div class="vt-menu" data-menu-for="${esc(key)}" hidden>
         <button type="button" data-act="view" data-id="${esc(e.id)}">보기</button>
         <button type="button" data-act="edit" data-id="${esc(e.id)}">수정</button>
         <button type="button" class="vt-menu-danger" data-act="delete" data-id="${esc(e.id)}">삭제</button>
       </div></div>`;
   }
 
-  function gridHTML(list) {
-    return `<div class="vt-grid">${list.map((e) => `<div class="vt-item">${App.ui.expCard(e)}${menuHTML(e)}</div>`).join('')}</div>`;
+  function gridHTML(list, pre = '') {
+    return `<div class="vt-grid">${list.map((e) => `<div class="vt-item">${App.ui.expCard(e)}${menuHTML(e, pre + e.id)}</div>`).join('')}</div>`;
   }
 
-  function listHTML(list) {
+  function listHTML(list, pre = '') {
     return `<div class="card vt-table">
       <div class="vt-row vt-row-head"><div>경험</div><div>유형</div><div>기간</div><div>역량 키워드</div><div>완성도</div><div></div></div>
       ${list.map((e) => `<div class="vt-row" data-href="#/card/${esc(e.id)}">
-        <div class="vt-c-title">${App.ui.statusTag(e.status)}<span class="vt-t">${esc(e.title)}</span>${e.projectId && App.store.getProject(e.projectId) ? '<span class="vt-from" title="프로젝트에서 나온 카드">▤</span>' : ''}</div>
+        <div class="vt-c-title">${App.ui.statusTag(e.status)}<span class="vt-t">${esc(e.title)}</span>${e.projectId && App.store.getProject(e.projectId) ? '<span class="vt-from" title="프로젝트의 경험">▤</span>' : ''}</div>
         <div class="vt-c-cat">${esc(e.category)}</div>
         <div class="vt-c-period">${App.ui.period(e.period)}</div>
         <div class="vt-c-kws">${e.keywords.map((k) => App.ui.keywordChip(k)).join('') || '<span class="subtle">—</span>'}</div>
         <div class="vt-c-comp"><span>${e.completeness}%</span>${App.ui.progress(e.completeness)}</div>
-        <div class="vt-c-act">${menuHTML(e)}</div>
+        <div class="vt-c-act">${menuHTML(e, pre + e.id)}</div>
       </div>`).join('')}
     </div>`;
   }
 
   function emptyHTML(st) {
     if (!App.store.list().length) {
-      return `<div class="card vt-empty"><div class="vt-empty-ico">📭</div><h3>아직 보관된 경험이 없어요</h3>
-        <p class="muted">평범해 보이는 일도 좋은 경험이 될 수 있어요. AI 질문으로 첫 경험을 꺼내 볼까요?</p>
-        <div class="row vt-empty-actions"><a class="btn btn-primary" href="#/discover">✦ AI와 경험 찾기</a><a class="btn" href="#/card/new">직접 추가하기</a></div></div>`;
+      return `<div class="card vt-empty"><div class="vt-empty-ico">📭</div><h3>아직 위키에 경험이 없어요</h3>
+        <p class="muted">평범해 보이는 일도 좋은 경험이 될 수 있어요. 한 줄만 기록해도 AI가 경험 페이지로 정리해요.</p>
+        <div class="row vt-empty-actions"><button type="button" class="btn btn-primary" data-capture>＋ 기록하기</button><a class="btn" href="#/discover">✦ AI와 대화하며 기록</a></div></div>`;
     }
     if (st.kws.size) {
       const names = Array.from(st.kws);
       return `<div class="card vt-empty"><div class="vt-empty-kws">${names.map((k) => App.ui.keywordChip(k, { size: 'lg' })).join('')}</div>
-        <h3>이 키워드의 경험이 아직 없어요</h3>
-        <p class="muted">이 역량이 드러났던 순간을 AI와 찾아볼까요? 몇 가지 질문에 답하면 카드가 만들어져요.</p>
-        <div class="row vt-empty-actions"><a class="btn btn-primary" href="#/discover?kw=${encodeURIComponent(names[0])}">✦ AI와 찾아보기</a>
+        <h3>이 역량의 경험이 아직 없어요</h3>
+        <p class="muted">이 역량이 드러났던 순간을 AI와 대화하며 기록해 볼까요? 답하면 경험 페이지가 만들어져요.</p>
+        <div class="row vt-empty-actions"><a class="btn btn-primary" href="#/discover?kw=${encodeURIComponent(names[0])}">✦ AI와 대화하며 기록</a>
         <button type="button" class="btn" data-act="reset">필터 초기화</button></div></div>`;
     }
     return `<div class="card vt-empty"><div class="vt-empty-ico">🔍</div><h3>조건에 맞는 경험이 없어요</h3>
-      <p class="muted">검색어를 바꾸거나 필터를 풀어 보세요. 떠오르지 않는다면 AI가 먼저 질문해 드릴게요.</p>
-      <div class="row vt-empty-actions"><button type="button" class="btn" data-act="reset">필터 초기화</button><a class="btn btn-primary" href="#/discover">✦ AI와 찾아보기</a></div></div>`;
+      <p class="muted">검색어를 바꾸거나 필터를 풀어 보세요.</p>
+      <div class="row vt-empty-actions"><button type="button" class="btn" data-act="reset">필터 초기화</button><button type="button" class="btn btn-primary" data-capture>＋ 기록하기</button></div></div>`;
   }
 
   function chipRowHTML(st) {
@@ -113,12 +122,13 @@
         </select>
         <select class="select vt-sel" data-vt-sort aria-label="정렬">${SORTS.map(([v, l]) => `<option value="${v}" ${st.sort === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
         <div class="vt-viewtoggle" role="group" aria-label="보기 방식">
-          <button type="button" data-view="grid" class="${st.view === 'grid' ? 'is-on' : ''}" title="카드로 보기">▦</button>
+          <button type="button" data-view="grid" class="${st.view === 'grid' ? 'is-on' : ''}" title="격자로 보기">▦</button>
           <button type="button" data-view="list" class="${st.view === 'list' ? 'is-on' : ''}" title="목록으로 보기">☰</button>
         </div>
       </div>
     </div>
     <div class="vt-statusbar">
+      <div class="vt-seg" role="group" aria-label="묶어 보기">${GROUPS.map(([v, l]) => `<button type="button" data-group="${v}" class="${st.group === v ? 'is-on' : ''}">${l}</button>`).join('')}</div>
       <div class="vt-seg" role="group" aria-label="상태">${STATUS_FILTERS.map(([v, l]) => `<button type="button" data-status="${v}" class="${st.status === v ? 'is-on' : ''}">${l}</button>`).join('')}</div>
     </div>
     <div class="vt-kwbar">
@@ -127,68 +137,122 @@
     </div>`;
   }
 
+  function itemsHTML(st, list, pre) { return st.view === 'list' ? listHTML(list, pre) : gridHTML(list, pre); }
+  const srcCount = (list) => list.reduce((n, e) => n + App.wiki.sourcesOf(e).length, 0);
+  const codeCount = (list) => list.reduce((n, e) => n + (e.codeRefs || []).length, 0);
+
+  // 프로젝트별: 프로젝트 페이지마다 그 경험들 + 프로젝트 밖 경험
+  function byProjectHTML(st, list) {
+    const out = [];
+    App.store.projects().forEach((p) => {
+      const items = list.filter((e) => e.projectId === p.id);
+      if (!items.length) return;
+      const code = codeCount(items);
+      out.push(`<section class="vt-group">
+        <div class="vt-group-head"><a class="vt-group-t" href="#/projects/${encodeURIComponent(p.id)}">▤ ${esc(projShort(p))} 프로젝트</a>
+          <span class="vt-group-meta">경험 ${items.length}${code ? ` · 코드 근거 ${code}` : ''}</span>
+          <a class="vt-group-more" href="#/projects/${encodeURIComponent(p.id)}">프로젝트 보기 →</a></div>
+        ${itemsHTML(st, items, 'p' + p.id + '-')}</section>`);
+    });
+    const loose = list.filter((e) => !e.projectId || !App.store.getProject(e.projectId));
+    if (loose.length) {
+      out.push(`<section class="vt-group">
+        <div class="vt-group-head"><span class="vt-group-t">프로젝트 밖 경험</span><span class="vt-group-meta">경험 ${loose.length}</span></div>
+        ${itemsHTML(st, loose, 'loose-')}</section>`);
+    }
+    return out.join('');
+  }
+
+  // 역량별: 키워드마다 그 역량을 보여 주는 경험 + 근거 수
+  function byKeywordHTML(st, list) {
+    const map = new Map();
+    list.forEach((e) => e.keywords.forEach((k) => { if (st.kws.size && !st.kws.has(k)) return; if (!map.has(k)) map.set(k, []); map.get(k).push(e); }));
+    const keys = Array.from(map.keys()).sort((a, b) => map.get(b).length - map.get(a).length || srcCount(map.get(b)) - srcCount(map.get(a)));
+    const out = keys.map((k) => {
+      const items = map.get(k);
+      return `<section class="vt-group">
+        <div class="vt-group-head">${App.ui.keywordChip(k, { size: 'lg' })}<span class="vt-group-meta">경험 ${items.length} · 근거 ${srcCount(items)}</span>
+          <span class="vt-group-desc subtle">${esc(App.keywords.get(k).desc || '')}</span></div>
+        ${itemsHTML(st, items, 'k' + k + '-')}</section>`;
+    });
+    const none = st.kws.size ? [] : list.filter((e) => !e.keywords.length);
+    if (none.length) {
+      out.push(`<section class="vt-group">
+        <div class="vt-group-head"><span class="vt-group-t">역량이 아직 없는 경험</span><span class="vt-group-meta">경험 ${none.length}</span></div>
+        ${itemsHTML(st, none, 'none-')}</section>`);
+    }
+    return out.join('');
+  }
+
   function resultsHTML(st) {
     const list = filterList(st);
     const head = `<div class="vt-reshead"><div class="vt-count"><b>${list.length}</b>개의 경험${isFiltered(st) ? ` <span class="subtle">/ 전체 ${App.store.list().length}개</span>` : ''}</div>
       ${isFiltered(st) ? '<button type="button" class="btn btn-sm btn-ghost" data-act="reset">↺ 필터 초기화</button>' : ''}</div>`;
     if (!list.length) return head + emptyHTML(st);
-    return head + (st.view === 'list' ? listHTML(list) : gridHTML(list));
+    if (st.group === 'project') return head + byProjectHTML(st, list);
+    if (st.group === 'keyword') return head + byKeywordHTML(st, list);
+    return head + itemsHTML(st, list, '');
   }
 
   function initState(params) {
     const kws = new Set();
     if (params.kw) params.kw.split(',').map((x) => x.trim()).filter(Boolean).forEach((k) => kws.add(k));
-    return { q: params.q || '', kws, category: params.category || '', status: params.status || '', sort: 'updated', view: loadView() };
+    return { q: params.q || '', kws, category: params.category || '', status: params.status || '', sort: 'updated', view: loadView(), group: loadGroup(), allIssues: false, fixed: null };
   }
 
-
-  // 집중 발굴 입구: 새 경험 찾기(질문 고르기·한 줄로 시작) + 작성 중 카드 이어서 채우기
-  function discoverHTML() {
-    const P = window.SEED.recallPrompts || [];
-    const start = new Date().getDate() % Math.max(P.length, 1);
-    const seeds = [0, 1, 2].map((k) => (start + k) % P.length).filter((v, i, a) => P[v] && a.indexOf(v) === i);
-    const drafts = App.store.list().filter((e) => e.status === 'draft').sort((a, b) => a.completeness - b.completeness).slice(0, 3);
-    return `<section class="vt-dc">
-      <div class="card vt-dc-new">
-        <div class="vt-dc-head">
-          <div class="ai-badge"><span class="ai-dot">R</span>집중 발굴</div>
-          <h2>AI와 새 경험 찾기</h2>
-          <p>질문 하나에 답하다 보면 경험이 카드로 정리돼요. 떠오르는 질문을 골라 보세요.</p>
-        </div>
-        <div class="vt-dc-seeds">
-          ${seeds.map((i) => `<a class="vt-dc-seed" href="#/discover?seed=${i}"><span class="vt-dc-theme">${esc(P[i].theme)}</span><span class="vt-dc-text">${esc(P[i].text)}</span><span class="vt-dc-go" aria-hidden="true">→</span></a>`).join('')}
-        </div>
-        <form class="vt-dc-free" data-vt-free>
-          <input class="input" data-vt-free-input maxlength="80" placeholder="이미 생각난 경험이 있다면 한 줄로 적어 주세요" autocomplete="off" />
-          <button class="btn btn-primary" type="submit">AI와 정리하기</button>
-        </form>
-        <a class="vt-dc-more" href="#/discover">다른 질문 더 보기 →</a>
-      </div>
-      ${drafts.length ? `<div class="vt-dc-cont">
-        <div class="vt-dc-cont-head"><b>작성 중인 카드 이어서 채우기</b><span class="subtle">덜 채워진 순서예요</span></div>
-        <div class="vt-dc-cont-list">${drafts.map((e) => { const g = App.ai.gapQuestion(e); return `
-          <a class="card vt-dc-c" href="#/discover?exp=${esc(e.id)}">
-            <div class="vt-dc-c-top"><span class="tag tag-draft">작성중</span><span class="subtle">${esc(e.category)}</span><span class="vt-dc-pct">${e.completeness}%</span></div>
-            <div class="vt-dc-c-title">${esc(e.title)}</div>
-            ${g ? `<div class="vt-dc-q"><span class="ai-dot">R</span>${esc(g.text)}</div>` : ''}
-            ${App.ui.progress(e.completeness)}
-          </a>`; }).join('')}</div>
-      </div>` : ''}
-    </section>`;
+  /* ---------- 위키 점검 ---------- */
+  function askedFor(issue) {
+    return App.store.state.inbox.some((q) => q.lintId === issue.id && (q.status === 'pending' || q.status === 'later'));
+  }
+  function issueHTML(i) {
+    const acts = [];
+    if (i.action === 'compileLog' || i.action === 'link') acts.push(`<button type="button" class="btn btn-sm btn-primary" data-issue-fix="${esc(i.id)}">바로 반영</button>`);
+    if (i.question) {
+      acts.push(askedFor(i)
+        ? '<span class="vt-asked">✓ 오늘의 질문에 있어요</span>'
+        : `<button type="button" class="btn btn-sm" data-issue-ask="${esc(i.id)}">질문으로 받기</button>`);
+    }
+    if (i.expId) acts.push(`<a class="btn btn-sm btn-ghost" href="#/card/${encodeURIComponent(i.expId)}">페이지 →</a>`);
+    else if (i.projectId) acts.push(`<a class="btn btn-sm btn-ghost" href="#/projects/${encodeURIComponent(i.projectId)}${i.findingId ? '?tab=code' : ''}">프로젝트 →</a>`);
+    return `<li class="wk-issue" data-sev="${i.severity}"><span class="wk-issue-dot"></span><span class="wk-issue-text">${esc(i.text)}</span><span class="wk-issue-actions">${acts.join('')}</span></li>`;
+  }
+  function lintHTML(st) {
+    const issues = App.wiki.lint();
+    const shown = st.allIssues ? issues : issues.slice(0, ISSUE_LIMIT);
+    const fixed = st.fixed && App.wiki.get(st.fixed);
+    return `<div class="vt-panel-head"><h2>위키 점검</h2><span class="subtle">${issues.length ? `채우면 좋은 곳 ${issues.length}개` : ''}</span></div>
+      ${fixed ? `<div class="vt-fixed">${App.wiki.reportHTML(fixed)}<button type="button" class="btn btn-sm btn-ghost vt-fixed-close" data-act="close-fixed">닫기</button></div>` : ''}
+      ${issues.length ? `<ul class="wk-issues">${shown.map(issueHTML).join('')}</ul>
+        ${issues.length > ISSUE_LIMIT ? `<button type="button" class="btn btn-sm btn-ghost vt-more" data-act="more-issues">${st.allIssues ? '접기' : `더 보기 (${issues.length - ISSUE_LIMIT}개)`}</button>` : ''}`
+        : '<div class="vt-soft">빈 곳이 없어요. 위키가 잘 정리돼 있어요.</div>'}`;
+  }
+  function feedHTML() {
+    const list = App.wiki.entries().slice(0, 8);
+    return `<div class="vt-panel-head"><h2>최근 변경</h2><span class="subtle">기록이 어느 페이지를 바꿨는지</span></div>
+      ${list.length ? `<div class="wk-feed">${list.map((e) => App.wiki.reportHTML(e, { compact: true })).join('')}</div>`
+        : '<div class="vt-soft">아직 변경 기록이 없어요. 오늘의 질문에 답하거나 ＋ 기록하기로 시작해 보세요.</div>'}`;
+  }
+  function statsText() {
+    const s = App.wiki.stats();
+    return `경험 ${s.pages} · 프로젝트 ${s.projects} · 근거 기록 ${s.sources}`;
   }
 
   App.screens.vault = {
-    title: '경험 보관함',
+    title: '경험 위키',
     render(params) {
       const st = initState(params);
-      const total = App.store.list().length;
       return `<div class="page vt-page">
         <div class="page-head vt-pagehead">
-          <div><h1>경험 보관함</h1><p>새 경험을 찾고, 쌓인 경험 ${total}개를 키워드로 꺼내 쓰세요</p></div>
-          <a class="btn" href="#/card/new">＋ 직접 작성</a>
+          <div><h1>경험 위키</h1>
+            <p>답변·체크인·AI 대화·코드 분석을 기록하면 AI가 경험 페이지로 정리해요. 이력서와 자소서는 여기서 꺼내 써요.</p>
+            <div class="vt-stats" data-vt-stats>${statsText()}</div></div>
+          <div class="row vt-head-acts"><a class="btn" href="#/discover">✦ AI와 대화하며 기록</a><button type="button" class="btn btn-primary" data-capture>＋ 기록하기</button></div>
         </div>
-        ${discoverHTML()}
-        <div class="vt-list-head"><h2>내 경험 카드 <span class="subtle">${total}</span></h2></div>
+        <div class="vt-wk">
+          <section class="card card-pad vt-panel" data-vt-lint>${lintHTML(st)}</section>
+          <section class="card card-pad vt-panel" data-vt-feed>${feedHTML()}</section>
+        </div>
+        <div class="vt-list-head"><h2>경험 페이지 <span class="subtle" data-vt-total>${App.store.list().length}</span></h2></div>
         ${toolbarHTML(st)}
         <div class="vt-results" data-vt-results>${resultsHTML(st)}</div>
       </div>`;
@@ -197,13 +261,6 @@
       const st = initState(params);
       const $ = (s) => root.querySelector(s);
       const resultsEl = $('[data-vt-results]');
-      const freeForm = $('[data-vt-free]');
-      if (freeForm) freeForm.addEventListener('submit', (ev) => {
-        ev.preventDefault();
-        const inp = $('[data-vt-free-input]'); const v = inp.value.trim();
-        if (!v) { inp.focus(); App.ui.toast('어떤 경험인지 한 줄만 적어 주세요'); return; }
-        App.navigate('#/discover?free=' + encodeURIComponent(v));
-      });
       let qTimer = null;
 
       function syncUrl() {
@@ -226,9 +283,21 @@
         highlight();
         $('[data-vt-chips]').innerHTML = chipRowHTML(st);
         root.querySelectorAll('[data-status]').forEach((b) => b.classList.toggle('is-on', b.getAttribute('data-status') === st.status));
+        root.querySelectorAll('[data-group]').forEach((b) => b.classList.toggle('is-on', b.getAttribute('data-group') === st.group));
         root.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('is-on', b.getAttribute('data-view') === st.view));
         $('[data-act="clear-q"]').hidden = !st.q;
         syncUrl();
+      }
+
+      // 위키가 바뀐 뒤: 점검·변경 기록·통계·목록 모두 다시
+      function refreshWiki() {
+        const lintEl = $('[data-vt-lint]');
+        lintEl.innerHTML = lintHTML(st);
+        App.wiki.bindReport(lintEl, (n) => { st.fixed = n ? n.id : null; refreshWiki(); });
+        $('[data-vt-feed]').innerHTML = feedHTML();
+        $('[data-vt-stats]').textContent = statsText();
+        $('[data-vt-total]').textContent = App.store.list().length;
+        refresh();
       }
 
       function closeMenus(except) {
@@ -244,16 +313,14 @@
       function confirmDelete(id) {
         const e = App.store.get(id); if (!e) return;
         App.ui.modal({
-          title: '이 경험 카드를 삭제할까요?',
-          body: `<p><b>${esc(e.title)}</b></p><p style="margin-top:6px">STAR 정리와 원문 기록이 함께 삭제되고 되돌릴 수 없어요.</p>`,
+          title: '이 경험을 삭제할까요?',
+          body: `<p><b>${esc(e.title)}</b></p><p style="margin-top:6px">STAR 정리와 이 페이지에 모인 답변이 함께 삭제되고 되돌릴 수 없어요. 프로젝트 체크인 기록은 그대로 남아요.</p>`,
           confirmText: '삭제하기', danger: true,
-          onConfirm() {
-            App.store.remove(id); App.ui.toast('경험 카드를 삭제했어요');
-            const p = root.querySelector('.vt-pagehead p'); if (p) p.textContent = `지금까지 쌓인 경험 ${App.store.list().length}개 · 키워드로 찾아서 바로 꺼내 쓰세요`;
-            refresh();
-          },
+          onConfirm() { App.store.remove(id); App.ui.toast('경험을 삭제했어요'); refreshWiki(); },
         });
       }
+
+      function findIssue(id) { return App.wiki.lint().find((i) => i.id === id); }
 
       function onClick(ev) {
         const t = ev.target;
@@ -266,8 +333,24 @@
           return;
         }
         if (!t.closest('.vt-menu')) closeMenus();
+        const ask = t.closest('[data-issue-ask]');
+        if (ask) {
+          const issue = findIssue(ask.getAttribute('data-issue-ask'));
+          if (issue && App.wiki.askIssue(issue)) App.ui.toast('오늘의 질문으로 보냈어요. 답하면 이 페이지에 반영돼요.');
+          refreshWiki(); return;
+        }
+        const fix = t.closest('[data-issue-fix]');
+        if (fix) {
+          const issue = findIssue(fix.getAttribute('data-issue-fix'));
+          const entry = issue && App.wiki.fixIssue(issue);
+          st.fixed = entry ? entry.id : null;
+          App.ui.toast(entry ? '위키에 반영했어요' : '반영할 내용이 없었어요');
+          refreshWiki(); return;
+        }
         const kt = t.closest('[data-kw-toggle]');
         if (kt) { const k = kt.getAttribute('data-kw-toggle'); if (st.kws.has(k)) st.kws.delete(k); else st.kws.add(k); refresh(); return; }
+        const gb = t.closest('[data-group]');
+        if (gb) { st.group = gb.getAttribute('data-group'); saveGroup(st.group); refresh(); return; }
         const sb = t.closest('[data-status]');
         if (sb) { st.status = sb.getAttribute('data-status'); refresh(); return; }
         const vb = t.closest('[data-view]');
@@ -276,6 +359,8 @@
         const act = a.getAttribute('data-act'), id = a.getAttribute('data-id');
         if (act === 'reset') reset();
         else if (act === 'clear-q') { st.q = ''; const i = $('[data-vt-q]'); i.value = ''; i.focus(); refresh(); }
+        else if (act === 'more-issues') { st.allIssues = !st.allIssues; refreshWiki(); }
+        else if (act === 'close-fixed') { st.fixed = null; refreshWiki(); }
         else if (act === 'view') App.navigate('#/card/' + id);
         else if (act === 'edit') App.navigate('#/card/' + id + '?edit=1');
         else if (act === 'delete') { closeMenus(); confirmDelete(id); }

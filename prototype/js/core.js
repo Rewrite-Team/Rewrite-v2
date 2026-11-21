@@ -1,7 +1,7 @@
 /* App core: store, router, ui helpers, mock AI. 모든 화면이 이 API만 사용한다. */
 window.App = window.App || {};
 (function (App) {
-  const LS_KEY = 'rewrite-proto-v5'; // v5: 깃허브 레포 분석 + 마스터 이력서, v2: 프로젝트와 경험 카드 분리 (1 프로젝트 : N 카드), v3: 완료 프로젝트 예시 추가, v4: 지난 질문 기록 시드 + 연속 기록을 답변 날짜에서 계산
+  const LS_KEY = 'rewrite-proto-v6'; // v6: 경험 위키 (모든 기록 → ingest → 경험 페이지, 변경 기록·점검), v5: 깃허브 레포 분석 + 마스터 이력서, v2: 프로젝트와 경험 카드 분리 (1 프로젝트 : N 카드), v3: 완료 프로젝트 예시 추가, v4: 지난 질문 기록 시드 + 연속 기록을 답변 날짜에서 계산
   const clone = (o) => JSON.parse(JSON.stringify(o));
 
   /* ---------------- Store ---------------- */
@@ -11,7 +11,7 @@ window.App = window.App || {};
       if (raw) return JSON.parse(raw);
     } catch (e) { /* ignore */ }
     const s = clone(window.SEED);
-    return { user: s.user, settings: s.settings, projects: s.projects, experiences: s.experiences, inbox: s.inbox, applications: s.applications, resume: s.resume };
+    return { user: s.user, settings: s.settings, projects: s.projects, experiences: s.experiences, inbox: s.inbox, applications: s.applications, resume: s.resume, wikiLog: [], wikiMeta: { lastQueue: '' } };
   }
   function EMPTY_RESUME() { return { profile: { name: '', headline: '', email: '', phone: '', github: '', blog: '', intro: '' }, skills: [], entries: [], versions: [] }; }
   let state = load();
@@ -36,9 +36,12 @@ window.App = window.App || {};
 
   App.store = {
     get state() { return state; },
+    // 프로젝트 짧은 이름: 「모여봄」 → 모여봄, '개인 프로젝트 — 가계부 슬랙봇' → 가계부 슬랙봇
+    projectName(p) { return projectShort(p && p.title).slice(1, -1); },
     // 로컬 날짜 도우미
     localDay, fmtDay, parseDay,
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+    touch() { emit(); },
     reset() { try { localStorage.removeItem(LS_KEY); } catch (e) {} state = load(); emit(); },
 
     // 경험 카드
@@ -97,7 +100,7 @@ window.App = window.App || {};
     // 질문 답변이 쌓일 곳: 프로젝트 로그 또는 경험 카드
     questionTarget(q) {
       if (q && q.targetProjectId) { const p = this.getProject(q.targetProjectId); if (p) return { kind: 'project', id: p.id, title: p.title, href: '#/projects/' + p.id, place: '프로젝트 로그' }; }
-      if (q && q.targetExpId) { const e = this.get(q.targetExpId); if (e) return { kind: 'card', id: e.id, title: e.title, href: '#/card/' + e.id, place: '카드' }; }
+      if (q && q.targetExpId) { const e = this.get(q.targetExpId); if (e) return { kind: 'card', id: e.id, title: e.title, href: '#/card/' + e.id, place: '경험' }; }
       return null;
     },
 
@@ -105,16 +108,26 @@ window.App = window.App || {};
     inbox() { return state.inbox.slice(); },
     pending() { return state.inbox.filter((q) => q.status === 'pending'); },
     // opts (프로젝트 체크인일 때): { type, keywords } — 트래커에서 답하면 사용자가 고른 유형·키워드를 그대로 쓴다
+    // 답변은 모두 경험 위키를 지난다 (App.wiki.ingest). 반환값: 위키 반영 결과 entry — 화면은 App.wiki.reportHTML(entry) 로 보여 준다
     answer(qid, text, opts = {}) {
-      const q = state.inbox.find((x) => x.id === qid); if (!q) return;
+      const q = state.inbox.find((x) => x.id === qid); if (!q) return null;
       q.status = 'answered'; q.answer = text; q.answeredAt = localDay();
-      if (q.targetProjectId && this.getProject(q.targetProjectId)) {
-        // 프로젝트 질문의 답변은 그 프로젝트의 체크인 로그로 쌓인다
+      let entry = null;
+      if (q.targetProjectId && this.getProject(q.targetProjectId) && !q.findingId) {
+        // 프로젝트 체크인: 원문은 타임라인(로그)에, 이야기는 위키의 경험 페이지에
         const t = opts.type || q.checkinType || (/결정|선택/.test(q.text) ? 'decision' : /문제|이슈|에러/.test(q.text) ? 'issue' : /팀원|의견|협업/.test(q.text) ? 'collab' : 'milestone');
         const p = this.getProject(q.targetProjectId);
-        p.logs.push({ id: uid('l'), date: localDay(), type: t, text, keywords: opts.keywords || App.ai.extractKeywords(text), fromQuestion: q.checkinText || q.text }); p.updatedAt = localDay();
-      } else if (q.targetExpId) this.addQA(q.targetExpId, q.text, text);
-      emit();
+        const log = { id: uid('l'), date: localDay(), type: t, text, keywords: opts.keywords || App.ai.extractKeywords(text), fromQuestion: q.checkinText || q.text };
+        p.logs.push(log); p.updatedAt = localDay();
+        entry = App.wiki.ingest({ type: 'checkin', text, question: q.checkinText || q.text, questionId: q.id, projectId: p.id, logId: log.id, logType: t, keywords: log.keywords });
+      } else if (q.findingId) {
+        // 코드 분석에서 나온 질문: 그 코드가 근거로 붙은 경험으로
+        entry = App.wiki.ingest({ type: 'answer', text, question: q.text, questionId: q.id, projectId: q.targetProjectId, findingId: q.findingId });
+      } else {
+        entry = App.wiki.ingest({ type: 'answer', text, question: q.text, questionId: q.id, expId: q.targetExpId || null, stage: q.stage || null });
+      }
+      if (entry) q.wikiEntry = entry.id;
+      emit(); return entry;
     },
     // 질문이 답변된 날 (로컬 'YYYY-MM-DD')
     answerDay(q) { return (q && (q.answeredAt || (q.askedAt || '').slice(0, 10))) || ''; },
@@ -182,7 +195,7 @@ window.App = window.App || {};
       const b = window.SEED.projectCheckins[bankIndex % window.SEED.projectCheckins.length];
       return Object.assign(base, {
         type: 'project', checkin: true, targetProjectId: p.id, targetExpId: null, checkinType: b.type, checkinText: b.text, bankIndex,
-        text: `${projectShort(p.title)} ${b.text}`, hint: '한두 줄이면 충분해요. 답변은 프로젝트 타임라인에 기록돼요.',
+        text: `${projectShort(p.title)} ${b.text}`, hint: '한두 줄이면 충분해요. 타임라인에 기록되고, 관련 경험에 반영돼요.',
       });
     },
     // 트래커에서 "다른 질문"·유형 변경 → 인박스 질문도 같이 바뀐다

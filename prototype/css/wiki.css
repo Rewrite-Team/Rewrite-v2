@@ -1,0 +1,50 @@
+/* 경험 위키 공통 — "위키 반영" 결과 카드, 변경 기록 피드, 점검 목록 */
+.wk-report { border: 1px solid var(--primary-soft); background: linear-gradient(180deg, #f7f7fe, var(--surface)); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.wk-report.is-undone { background: var(--surface-2); border-color: var(--border); color: var(--text-3); }
+.wk-report-head { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.wk-badge { font-size: 11px; font-weight: 700; color: var(--primary-ink); background: var(--primary-soft); border-radius: 999px; padding: 2px 8px; letter-spacing: .02em; white-space: nowrap; }
+.wk-changes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.wk-ch { display: flex; gap: 8px; font-size: 13px; line-height: 1.5; color: var(--text-2); }
+.wk-ch b { color: var(--text); }
+.wk-ch q { display: block; quotes: none; color: var(--text-3); font-size: 12.5px; margin-top: 2px; }
+.wk-ch q::before { content: '“'; } .wk-ch q::after { content: '”'; }
+.wk-ch.wk-create { color: var(--success); font-weight: 600; }
+.wk-ico { width: 18px; flex: none; text-align: center; color: var(--primary); font-weight: 700; }
+.wk-create .wk-ico { color: var(--success); }
+.wk-report-move { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; }
+.wk-move-sel { width: auto; min-width: 180px; padding: 4px 8px; font-size: 12.5px; height: auto; }
+.wk-report-foot { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+
+/* 변경 기록 피드 (홈·위키) */
+.wk-feed { display: flex; flex-direction: column; }
+.wk-feed-item { display: flex; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--border); cursor: pointer; align-items: flex-start; }
+.wk-feed-item:last-child { border-bottom: 0; }
+.wk-feed-item:hover .wk-feed-t { color: var(--primary-ink); }
+.wk-src { width: 26px; height: 26px; flex: none; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); display: grid; place-items: center; font-size: 13px; color: var(--text-2); }
+.wk-feed-body { min-width: 0; flex: 1; }
+.wk-feed-t { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wk-feed-t .subtle { font-weight: 500; margin-left: 4px; }
+.wk-feed-meta { font-size: 12px; margin-top: 1px; }
+
+/* 위키 점검 */
+.wk-issues { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.wk-issue { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-2); border: 1px solid var(--border); font-size: 13px; }
+.wk-issue-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--text-3); }
+.wk-issue[data-sev="3"] .wk-issue-dot { background: var(--danger); }
+.wk-issue[data-sev="2"] .wk-issue-dot { background: var(--warn); }
+.wk-issue-text { flex: 1 1 220px; min-width: 0; line-height: 1.45; }
+.wk-issue-actions { display: flex; gap: 6px; flex: none; margin-left: auto; }
+@media (max-width: 640px) { .wk-issue { flex-wrap: wrap; } .wk-issue-actions { width: 100%; justify-content: flex-end; } }
+
+/* 출처 칩 (경험 페이지·이력서) */
+.wk-srcchip { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+
+/* ＋ 기록하기 (하나의 입구) */
+.wk-add-modes { display: grid; gap: 8px; }
+.wk-add-mode { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; background: var(--surface); text-align: left; font: inherit; color: inherit; }
+.wk-add-mode:hover, .wk-add-mode.active { border-color: var(--primary); background: var(--primary-soft); }
+.wk-add-mode .wk-src { width: 32px; height: 32px; font-size: 15px; }
+.wk-add-mode b { display: block; font-size: 14px; margin-bottom: 2px; }
+.wk-add-mode span.subtle { font-size: 12.5px; }
+.nav-item .badge-count.badge-soft { background: var(--warn-soft); color: var(--warn); }
+.capture-modal { max-width: 560px; width: calc(100vw - 32px); }

@@ -82,7 +82,7 @@
     const st = exp.star || {};
     if (st.result && !/\d/.test(st.result)) lines.push('결과(R)에 숫자를 하나만 더해도 설득력이 확 올라가요.');
     const empty = ['situation', 'task', 'action', 'result'].filter((k) => !st[k]);
-    if (empty.length) lines.push(`${empty.map((k) => PART_LABEL[k]).join('·')} 칸이 비어 있어요. 카드에서 먼저 채워 두면 좋아요.`);
+    if (empty.length) lines.push(`${empty.map((k) => PART_LABEL[k]).join('·')} 칸이 비어 있어요. 경험 페이지에서 먼저 채워 두면 좋아요.`);
     return { part, quote: st[part] || '', lines };
   }
 
@@ -109,7 +109,7 @@
     }
     return [
       ['도입', `저는 「${exp.title}」 경험을 통해 ${kwTxt} 역량을 키웠습니다.`],
-      ['상황', b.situation || '(카드의 상황·과제를 채워 주세요)'],
+      ['상황', b.situation || '(경험의 상황·과제를 채워 주세요)'],
       ['행동', b.action || '(내가 한 행동을 채워 주세요)'],
       ['결과', b.result || '(결과를 채워 주세요. 숫자가 있으면 더 좋아요)'],
       ['직무 연결', (b.insight ? b.insight + ' ' : '') + link],
@@ -187,7 +187,7 @@
         ${t.quote ? `<blockquote class="ae-quote">${esc(t.quote)}</blockquote>` : ''}
         <ul>${t.lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul></details>
       <div class="ae-rec-actions">
-        <a class="btn btn-sm btn-ghost" href="#/card/${esc(e.id)}">카드 보기</a>
+        <a class="btn btn-sm btn-ghost" href="#/card/${esc(e.id)}">경험 페이지 보기</a>
         ${linked ? '<span class="ae-linked-tag">✓ 이 문항에 연결됨</span>'
           : `<button class="btn btn-sm btn-primary" data-ae-use="${esc(q.id)}" data-exp="${esc(e.id)}">이 경험으로 쓰기</button>`}
       </div>
@@ -204,7 +204,7 @@
     const nudge = best < 50 ? `<div class="ae-nudge"><span class="ae-nudge-ico">✦</span><div class="ae-nudge-body">
         <b>${all.length ? '딱 맞는 경험이 아직 부족해요' : '이 역량을 보여 줄 경험이 아직 없어요'}</b>
         <span>${all.length ? '적합도 50% 이상인 경험이 없어요. ' : ''}${kw ? `#${esc(kw)} 경험을 ` : '경험을 '}질문 몇 개로 같이 찾아봐요.</span></div>
-        <a class="btn btn-sm btn-primary" href="#/discover${kw ? '?kw=' + encodeURIComponent(kw) : ''}">경험 발굴하기</a></div>` : '';
+        <a class="btn btn-sm btn-primary" href="#/discover${kw ? '?kw=' + encodeURIComponent(kw) : ''}">AI와 대화하며 기록</a></div>` : '';
     return `<div class="ae-sec">
       <div class="ae-sec-h"><b>추천 경험</b><span class="subtle">${all.length ? `${recs.length}개 · 적합도 순 · ${esc(app.company)} 요구 역량 반영` : ''}</span></div>
       ${recs.length ? `<div class="ae-recs">${recs.map((r, i) => recCard(r, all.indexOf(r), q, app, use)).join('')}</div>` : ''}
@@ -217,7 +217,7 @@
     const rows = outline(e, q, app);
     const len = rows.reduce((n, r) => n + r[1].length, 0);
     return `<div class="ae-sec ae-outline">
-      <div class="ae-sec-h"><b>자소서 개요</b><span class="subtle">${esc(e.title.split(' — ')[0])} · 카드의 STAR로 조립했어요</span>
+      <div class="ae-sec-h"><b>자소서 개요</b><span class="subtle">${esc(e.title.split(' — ')[0])} · 경험의 STAR로 조립했어요</span>
         <button class="btn btn-sm" data-ae-copy="${esc(q.id)}">⧉ 복사</button></div>
       <ol>${rows.map(([k, v]) => `<li><span class="ae-ol-k">${k}</span><span class="ae-ol-v">${esc(v)}</span></li>`).join('')}</ol>
       ${q.limit ? `<div class="ae-len subtle">개요 약 ${len}자 · 제한 ${q.limit}자 — 행동과 결과에 살을 붙여 ${Math.round(q.limit * 0.9)}자 안팎으로 맞춰 보세요. 표현은 내 말로 다듬어 주세요.</div>` : ''}
@@ -402,7 +402,7 @@
           const id = del.getAttribute('data-ae-del'); const idx = a.essays.findIndex((x) => x.id === id); if (idx < 0) return;
           App.ui.modal({
             title: `${idx + 1}번 문항을 삭제할까요?`,
-            body: `<p class="ae-modal-q">${esc(a.essays[idx].text)}</p><p class="subtle">연결한 경험과 메모도 함께 지워져요. 경험 카드 자체는 그대로 남아요.</p>`,
+            body: `<p class="ae-modal-q">${esc(a.essays[idx].text)}</p><p class="subtle">연결한 경험과 메모도 함께 지워져요. 경험 자체는 경험 위키에 그대로 남아요.</p>`,
             confirmText: '삭제', danger: true,
             onConfirm: () => { App.store.removeAppItem(appId, 'essays', id); delete ui.open[id]; App.ui.toast('문항을 삭제했어요'); refresh(); },
           });

@@ -34,6 +34,7 @@
 .dy-qcard::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: var(--accent); opacity: .85; }
 .dy-qcard[data-type="deepen"]::before { background: var(--primary); }
 .dy-qcard[data-type="project"]::before { background: var(--success); }
+.dy-qcard[data-type="code"]::before { background: var(--text-2); }
 .dy-feedback::before { background: var(--success); }
 .dy-empty::before { display: none; }
 
@@ -46,6 +47,7 @@
 .dy-type { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--accent-soft); color: #b25d15; }
 .dy-type[data-type="deepen"] { background: var(--primary-soft); color: var(--primary-ink); }
 .dy-type[data-type="project"] { background: var(--success-soft); color: var(--success); }
+.dy-type[data-type="code"] { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); font-family: inherit; }
 .dy-type-sm { font-size: 11.5px; padding: 1px 8px; }
 .dy-asked { font-size: 12.5px; color: var(--text-3); }
 .dy-count { margin-left: auto; font-size: 12.5px; color: var(--text-3); }
@@ -108,6 +110,17 @@
 .dy-target span:nth-child(2) { font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dy-target-sub { color: var(--text-3); flex-shrink: 0; }
 .dy-target:hover { border-color: var(--border-strong); }
+.dy-target-ico { color: var(--success); font-weight: 800; }
+.dy-went { display: flex; flex-wrap: wrap; gap: 6px; font-size: 13px; }
+
+/* 답하기 전: 이 답이 위키의 어디로 가는지 */
+.dy-dest { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; color: var(--primary-ink); background: var(--primary-soft); border-radius: 10px; padding: 9px 12px; max-width: 100%; }
+.dy-dest b { font-weight: 700; overflow-wrap: anywhere; }
+.dy-dest-ico { font-weight: 800; flex-shrink: 0; }
+a.dy-dest:hover { box-shadow: 0 0 0 1px var(--primary) inset; }
+.dy-dest[data-kind="project"] { color: var(--success); background: var(--success-soft); }
+.dy-dest[data-kind="code"] { color: var(--text); background: var(--surface-2); border: 1px solid var(--border); }
+.dy-feedback .wk-report { margin: 0; }
 .dy-qtext { font-size: 23px; font-weight: 800; line-height: 1.42; letter-spacing: -0.02em; margin: 2px 0; }
 .dy-hint { display: flex; gap: 8px; font-size: 13.5px; color: var(--text-2); background: var(--warn-soft); border-radius: 10px; padding: 9px 12px; }
 
@@ -130,22 +143,8 @@
 .dy-fb-streak { font-size: 13px; color: #b25d15; font-weight: 600; }
 .dy-fb-q { font-size: 13.5px; color: var(--text-3); }
 .dy-quote { margin: -6px 0 0; padding: 10px 14px; border-left: 3px solid var(--primary); background: var(--primary-soft); color: var(--primary-ink); border-radius: 0 10px 10px 0; font-size: 14.5px; white-space: pre-wrap; }
-.dy-merge { display: flex; flex-direction: column; gap: 8px; }
-.dy-merge-label { font-size: 12.5px; font-weight: 700; color: var(--success); }
-.dy-seed .dy-merge-label { color: #b25d15; }
-.dy-merge-card { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; transition: border-color .12s, box-shadow .12s; }
-.dy-merge-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow); }
-.dy-merge-title { font-weight: 700; font-size: 14.5px; }
-.dy-merge-meta { display: flex; gap: 10px; font-size: 12px; color: var(--text-3); }
-.dy-merge-meta span:first-child { color: var(--success); font-weight: 600; }
-.dy-merge-pct { margin-left: auto; }
-.dy-fb-kws-label { font-size: 12.5px; font-weight: 700; color: var(--primary); margin-bottom: 6px; }
-.dy-fb-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.dy-fb-chips .kw { animation: dy-pop .4s cubic-bezier(.2, 1.4, .4, 1) both; }
-.dy-fb-chips .kw:nth-child(2) { animation-delay: .08s; }
-.dy-fb-chips .kw:nth-child(3) { animation-delay: .16s; }
+.dy-fb-gap { font-size: 12.5px; }
 .dy-fb-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding-top: 4px; }
-.dy-fb-actions .btn-ghost { margin-left: auto; }
 
 /* ---------- Empty ---------- */
 .dy-empty { text-align: center; align-items: center; padding: 40px 28px 32px; }
@@ -210,7 +209,7 @@
 .dy-hist-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-3); }
 .dy-hist-q { font-weight: 650; font-size: 14.5px; }
 .dy-hist-a { font-size: 14px; color: var(--text-2); padding-left: 12px; border-left: 2px solid var(--border-strong); white-space: pre-wrap; }
-.dy-hist-foot { display: flex; align-items: center; gap: 8px; }
+.dy-hist-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .dy-hist-foot:empty { display: none; }
 .dy-hist-exp { font-size: 12.5px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .dy-hist-exp:hover { color: var(--primary); }
@@ -234,7 +233,7 @@
   .dy-kbd { display: none; }
   .dy-answer { padding-bottom: 13px; }
   .dy-fb-actions .btn { flex: 1 1 auto; }
-  .dy-fb-actions .btn-ghost { margin-left: 0; flex-basis: 100%; }
+  .dy-fb-gap { flex-basis: 100%; text-align: center; }
   .dy-aside { grid-template-columns: 1fr; }
   .dy-tabs { margin-left: 0; width: 100%; }
   .dy-tab { flex: 1; justify-content: center; }

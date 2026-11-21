@@ -1,4 +1,5 @@
-/* 경험 카드 상세·편집 — #/card/:id (id = 'new' 이면 새 카드, ?edit=1 이면 편집 모드로 시작) */
+/* 경험 페이지 상세·편집 — #/card/:id (id = 'new' 이면 새 경험, ?edit=1 이면 편집 모드로 시작)
+   출처(원문 기록) + 변경 기록(어떤 기록이 무엇을 바꿨는지)을 함께 보여 준다 */
 (function (App) {
   const esc = (s) => App.ui.esc(s);
 
@@ -41,7 +42,7 @@
   }
 
   const clone = (o) => JSON.parse(JSON.stringify(o));
-  // 이 카드가 나온 프로젝트와, 근거로 고른 로그
+  // 이 경험이 속한 프로젝트와, 근거로 연결된 체크인 로그
   function projectOf(e) { return e.projectId ? App.store.getProject(e.projectId) : null; }
   function sourceLogs(e) {
     const p = projectOf(e); if (!p) return [];
@@ -76,41 +77,117 @@
     const missing = STAR.filter((s) => !(e.star[s.key] || '').trim()).map((s) => s.label);
     if (missing.length) return `${missing.join('·')}을(를) 채우면 완성도가 올라가요`;
     if (!/\d/.test(e.star.result || '')) return '결과에 숫자를 넣으면 설득력이 커져요';
-    if (!e.insights) return '배운 점을 적으면 카드가 완성돼요';
+    if (!e.insights) return '배운 점을 적으면 페이지가 완성돼요';
     if (!e.keywords.length) return '역량 키워드를 1개 이상 붙여 주세요';
-    return '면접에서 바로 꺼내 쓸 수 있는 카드예요';
+    return '면접에서 바로 꺼내 쓸 수 있는 경험이에요';
   }
 
   /* ---------------- View ---------------- */
+  const projShort = (p) => (p.title.match(/「[^」]+」/) || [p.title.split(' — ')[0]])[0];
+  const fmtDate = (d) => String(d || '').replace(/^(\d{4})-(\d{2})-(\d{2}).*$/, '$1.$2.$3');
+
+  // 이 경험의 빈 곳 질문이 이미 오늘의 질문함에 있는지
+  function gapQueued(e, gap) {
+    return !!gap && App.store.state.inbox.some((q) => q.targetExpId === e.id && q.type === 'deepen' && (q.status === 'pending' || q.status === 'later') && (!q.stage || q.stage === gap.stage));
+  }
+
+  // 출처: 답변·대화·체크인·코드 분석 — 이 페이지를 만든 원문 기록 그대로
+  function sourcesHTML(e) {
+    const W = App.wiki;
+    const list = W.sourcesOf(e);
+    if (!list.length) return '<div class="cd-soft-empty">아직 출처가 없어요. 오늘의 질문에 답하거나 AI와 이어서 채우면 원문이 여기에 그대로 남아요.</div>';
+    return `<ol class="cd-srcs">${list.map((s) => {
+      const top = `<div class="cd-src-top"><span class="cd-src-type">${esc(W.SOURCE_LABEL[s.type] || '기록')}</span>
+        ${s.type === 'checkin' && LOG_TYPES[s.logType] ? `<span class="wk-srcchip">${LOG_TYPES[s.logType][1]} ${LOG_TYPES[s.logType][0]}</span>` : ''}
+        <span class="subtle">${esc(fmtDate(s.date))}</span>
+        ${s.href ? `<a class="cd-src-link" href="${esc(s.href)}">${s.type === 'code' ? '코드 분석 보기' : '타임라인에서 보기'} →</a>` : ''}</div>`;
+      let body;
+      if (s.type === 'code' && s.finding) {
+        const f = s.finding; const ev = (f.evidence || [])[0];
+        body = `<div class="cd-src-text"><b>${esc(f.title)}</b></div>
+          <div class="cd-src-meta"><span class="wk-srcchip">${esc(f.category || '코드')}</span>
+          ${ev ? `<a class="cd-src-path" href="${esc(ev.url || '#')}" target="_blank" rel="noopener"><code>${esc(ev.path)}:${esc(ev.start)}</code></a>` : ''}</div>`;
+      } else {
+        const q = s.q && s.q !== '(직접 기록)' ? s.q : '';
+        body = `${q ? `<div class="cd-src-q"><span class="ai-dot">R</span><div>${esc(q)}</div></div>` : ''}<div class="cd-src-text">${esc(s.text)}</div>`;
+      }
+      return `<li class="cd-src" data-type="${esc(s.type)}"><span class="wk-src">${W.SOURCE_ICO[s.type] || '•'}</span><div class="cd-src-body">${top}${body}</div></li>`;
+    }).join('')}</ol>`;
+  }
+
+  // 변경 기록: 어떤 기록이 이 페이지의 무엇을 바꿨는지
+  function changeText(c) {
+    const F = App.wiki.FIELD_LABEL;
+    switch (c.kind) {
+      case 'create': return '이 경험 페이지를 만들었어요';
+      case 'fill': return `<b>${esc(F[c.field] || c.field)}</b> 칸을 채웠어요<q>${esc(App.wiki.short(c.after, 70))}</q>`;
+      case 'append': return `<b>${esc(F[c.field] || c.field)}</b>에 덧붙였어요<q>${esc(App.wiki.short(c.after, 70))}</q>`;
+      case 'keyword': return `역량 ${(c.after || []).map((k) => App.ui.keywordChip(k)).join(' ')} 추가`;
+      case 'evidence': return esc(c.text || '근거 연결');
+      case 'link': { const p = App.store.getProject(c.projectId); return `${p ? esc(projShort(p)) : ''} 프로젝트에 연결`; }
+      default: return '';
+    }
+  }
+  function historyHTML(e) {
+    const W = App.wiki;
+    const list = W.entries({ expId: e.id });
+    if (!list.length) return '<div class="cd-soft-empty">아직 변경 기록이 없어요. 답변이나 대화가 이 페이지에 반영되면 무엇이 바뀌었는지 여기에 남아요.</div>';
+    return `<ol class="cd-hist">${list.slice(0, 12).map((w, i) => {
+      const mine = w.changes.filter((c) => c.expId === e.id).map(changeText).filter(Boolean);
+      const src = w.source || {};
+      return `<li class="cd-hist-item" data-wk-entry="${esc(w.id)}">
+        <span class="wk-src" title="${esc(W.SOURCE_LABEL[src.type] || '')}">${W.SOURCE_ICO[src.type] || '•'}</span>
+        <div class="cd-hist-body">
+          <div class="cd-src-top"><span class="cd-src-type">${esc(W.SOURCE_LABEL[src.type] || '기록')}</span><span class="subtle">${esc(fmtDate(w.date))}${w.at ? ' ' + esc(w.at) : ''}</span>
+            ${i === 0 && mine.length ? '<button type="button" class="btn btn-ghost btn-sm cd-hist-undo" data-wk-undo>되돌리기</button>' : ''}</div>
+          ${src.text && src.type !== 'code' ? `<div class="cd-hist-src">“${esc(W.short(src.text, 60))}”</div>` : ''}
+          ${mine.length ? `<ul class="wk-changes">${mine.map((t) => `<li class="wk-ch"><span class="wk-ico">✎</span><span>${t}</span></li>`).join('')}</ul>` : ''}
+        </div></li>`;
+    }).join('')}</ol>`;
+  }
+
   function viewHTML(e) {
     const kwInfo = e.keywords.map((k) => App.keywords.get(k));
     const counts = App.keywords.counts();
     const gap = App.ai.gapQuestion(e);
+    const queued = gapQueued(e, gap);
     const sp = pitch(e);
     const secs = Math.max(5, Math.round(sp.length / 7));
     const qs = [];
     e.keywords.forEach((k) => (KW_QUESTIONS[k] || []).forEach((q, i) => qs.push({ k, q, i })));
     qs.sort((a, b) => a.i - b.i);
     const pickQs = qs.slice(0, 3);
+    const p = projectOf(e);
+    const codeHits = (e.codeRefs || []).map((fid) => App.store.findFinding(fid)).filter(Boolean);
+    const codeN = codeHits.length;
+    const srcN = App.wiki.sourcesOf(e).length;
+    const askBtn = gap ? (queued
+      ? '<span class="cd-asked">✓ 오늘의 질문에 있어요</span>'
+      : '<button class="btn btn-sm" data-act="ask-gap">✉ 오늘의 질문으로 받기</button>') : '';
 
     return `
     <div class="cd-head card">
       <div class="cd-head-main">
-        <div class="cd-meta">${App.ui.statusTag(e.status)}<span class="cd-meta-cat">${esc(e.category)}</span><span class="cd-dot">·</span><span>${App.ui.period(e.period)}</span>
-          ${projectOf(e) ? `<a class="cd-proj-badge" href="#/projects/${encodeURIComponent(e.projectId)}">▤ ${esc(projectOf(e).title.split(' — ')[0])}에서 나온 카드</a>` : ''}</div>
+        <div class="cd-meta">${App.ui.statusTag(e.status)}<span class="cd-meta-cat">${esc(e.category)}</span><span class="cd-dot">·</span><span>${App.ui.period(e.period)}</span></div>
+        ${p || codeN ? `<div class="cd-origin">
+          ${p ? `<a class="cd-proj-badge" href="#/projects/${encodeURIComponent(p.id)}">▤ ${esc(projShort(p))} 프로젝트의 경험</a>` : ''}
+          ${codeN ? `<a class="wk-srcchip cd-code-chip" href="#/projects/${encodeURIComponent(codeHits[0].project.id)}?tab=code">⌥ 코드 근거 ${codeN}</a>` : ''}
+          <span class="wk-srcchip">출처 ${srcN}</span>
+        </div>` : ''}
         <h1 class="cd-title">${esc(e.title || '제목 없는 경험')}</h1>
         ${e.role ? `<div class="cd-role"><span class="cd-role-lb">역할</span>${esc(e.role)}</div>` : ''}
-        <p class="cd-summary ${e.summary ? '' : 'is-empty'}">${esc(e.summary || '아직 한 줄 요약이 없어요. 수정에서 추가하거나 질문에 답하면 채워져요.')}</p>
+        <p class="cd-summary ${e.summary ? '' : 'is-empty'}">${esc(e.summary || '아직 한 줄 요약이 없어요. 질문에 답하면 AI가 채워요.')}</p>
       </div>
       <div class="cd-head-side">
         ${ring(e.completeness)}
         <div class="cd-comp-text"><div class="cd-comp-lb">완성도</div><div class="cd-comp-hint">${esc(nextHint(e))}</div></div>
       </div>
       <div class="cd-head-actions">
-        <a class="btn btn-sm cd-ai-talk" href="#/discover?exp=${encodeURIComponent(e.id)}"><span class="cd-ai-mini">AI</span> AI와 대화하며 다듬기</a>
+        <a class="btn btn-primary btn-sm" href="#/discover?exp=${encodeURIComponent(e.id)}">✦ AI와 이어서 채우기</a>
+        ${askBtn}
         <button class="btn btn-sm" data-act="edit">✎ 직접 수정</button>
         ${App.resumeKit ? (App.resumeKit.isCardIn(e.id)
-          ? `<a class="cd-resume-in" href="#/resume" title="마스터 이력서 풀에 이 카드에서 나온 한 줄이 있어요"><span class="cd-resume-check">✓</span>이력서에 담김 · 보기 →</a>`
+          ? `<a class="cd-resume-in" href="#/resume" title="마스터 이력서에 이 경험에서 나온 한 줄이 있어요"><span class="cd-resume-check">✓</span>이력서에 담김 · 보기 →</a>`
           : `<button class="btn btn-sm cd-resume-btn" data-act="resume">☰ 이력서에 한 줄로 담기</button>`) : ''}
         <button class="btn btn-sm btn-ghost cd-del" data-act="delete">삭제</button>
       </div>
@@ -119,16 +196,14 @@
     <div class="cd-layout">
       <div class="cd-main">
         <section class="card card-pad cd-sec">
-          <div class="section-title">STAR 정리 <span class="subtle cd-sec-sub">AI 정리본 · 원문은 아래에 보존돼요</span></div>
+          <div class="section-title">STAR 정리 <span class="subtle cd-sec-sub">AI 정리본 · 원문은 아래 출처에 그대로 있어요</span></div>
           <div class="cd-star">
             ${STAR.map((s) => {
               const v = (e.star[s.key] || '').trim();
               return `<div class="cd-star-blk ${v ? '' : 'is-empty'}" data-stage="${s.key}">
                 <div class="cd-star-lb"><span class="cd-star-letter">${s.letter}</span>${s.label}</div>
-                ${v ? `<div class="cd-star-text">${esc(v)}</div>
-                  <a class="cd-refine" href="#/discover?exp=${encodeURIComponent(e.id)}&stage=${s.key}">✦ AI와 다듬기</a>` : `
-                  <div class="cd-star-empty"><div>아직 비어 있어요</div><div class="subtle">${esc(s.hint)}</div>
-                  <a class="btn btn-sm cd-fill-btn" href="#/discover?exp=${encodeURIComponent(e.id)}&stage=${s.key}"><span class="cd-ai-mini">AI</span> AI 질문으로 채우기</a></div>`}
+                ${v ? `<div class="cd-star-text">${esc(v)}</div>` : `
+                  <div class="cd-star-empty"><div>아직 비어 있어요</div><div class="subtle">${esc(s.hint)}</div></div>`}
               </div>`;
             }).join('')}
           </div>
@@ -136,8 +211,17 @@
 
         <section class="card card-pad cd-sec">
           <div class="section-title">배운 점 · 성장</div>
-          ${e.insights ? `<p class="cd-insight">${esc(e.insights)}</p><a class="cd-refine" href="#/discover?exp=${encodeURIComponent(e.id)}&stage=insight">✦ AI와 다듬기</a>` : `<div class="cd-soft-empty">아직 비어 있어요. 이 경험 이후 달라진 점이 있다면 적어 보세요.
-            <a class="cd-link" href="#/discover?exp=${encodeURIComponent(e.id)}&stage=insight">AI와 떠올려 보기 →</a></div>`}
+          ${e.insights ? `<p class="cd-insight">${esc(e.insights)}</p>` : '<div class="cd-soft-empty">아직 비어 있어요. 이 경험 이후 달라진 점이 있다면 AI와 이어서 채워 보세요.</div>'}
+        </section>
+
+        <section class="card card-pad cd-sec">
+          <div class="section-title">출처 <span class="subtle cd-sec-sub">이 페이지를 만든 원문 기록 ${srcN}개</span>${p ? `<a class="more" href="#/projects/${encodeURIComponent(p.id)}">프로젝트 타임라인 →</a>` : ''}</div>
+          ${sourcesHTML(e)}
+        </section>
+
+        <section class="card card-pad cd-sec" data-cd-hist>
+          <div class="section-title">변경 기록 <span class="subtle cd-sec-sub">어떤 기록이 이 페이지를 바꿨는지</span></div>
+          ${historyHTML(e)}
         </section>
 
         <section class="card card-pad cd-sec">
@@ -166,35 +250,13 @@
           </section>
         </div>
 
-        ${projectOf(e) ? (() => {
-          const p = projectOf(e); const logs = sourceLogs(e);
+        ${p ? (() => {
           const siblings = App.store.cardsOf(p.id).filter((x) => x.id !== e.id);
-          return `
-        <section class="card card-pad cd-sec">
-          <div class="section-title">근거 기록 <span class="subtle cd-sec-sub">${esc(p.title.split(' — ')[0])} 체크인 로그에서</span><a class="more" href="#/projects/${encodeURIComponent(p.id)}">프로젝트 타임라인 →</a></div>
-          ${logs.length ? `<ol class="cd-timeline">${logs.map((l) => {
-            const [lb, ico] = LOG_TYPES[l.type] || ['기록', '•'];
-            return `<li class="cd-tl-item" data-type="${esc(l.type)}">
-              <span class="cd-tl-dot">${ico}</span>
-              <div class="cd-tl-body"><div class="cd-tl-top"><span class="cd-tl-type">${lb}</span><span class="subtle">${esc(l.date)}</span></div>
-              <div class="cd-tl-text">${esc(l.text)}</div>
-              ${(l.keywords || []).length ? `<div class="cd-tl-kws">${l.keywords.map((k) => App.ui.keywordChip(k)).join('')}</div>` : ''}</div></li>`;
-          }).join('')}</ol>`
-          : '<div class="cd-soft-empty">연결된 로그가 없어요. 프로젝트 타임라인에서 기록을 골라 카드를 만들면 여기에 근거로 남아요.</div>'}
-          ${siblings.length ? `<div class="cd-siblings"><span class="subtle">같은 프로젝트의 다른 카드</span>${siblings.map((x) => `<a class="cd-sibling" href="#/card/${encodeURIComponent(x.id)}">${App.ui.statusTag(x.status)}<span>${esc(x.title)}</span></a>`).join('')}</div>` : ''}
-        </section>`;
+          return siblings.length ? `<section class="card card-pad cd-sec">
+            <div class="section-title">${esc(projShort(p))} 프로젝트의 다른 경험</div>
+            <div class="cd-siblings">${siblings.map((x) => `<a class="cd-sibling" href="#/card/${encodeURIComponent(x.id)}">${App.ui.statusTag(x.status)}<span>${esc(x.title)}</span></a>`).join('')}</div>
+          </section>` : '';
         })() : ''}
-
-        <section class="card card-pad cd-sec">
-          <div class="section-title">원문 기록 <span class="subtle cd-sec-sub">질문과 내 답변 그대로</span></div>
-          ${e.qa.length ? `<div class="cd-qa">${e.qa.slice().reverse().map((x) => `
-            <div class="cd-qa-item">
-              <div class="cd-qa-q"><span class="ai-dot">R</span><div>${esc(x.q)}</div></div>
-              <div class="cd-qa-a"><div class="cd-qa-bubble">${esc(x.a)}</div></div>
-              <div class="cd-qa-date">${esc(x.date || '')}</div>
-            </div>`).join('')}</div>`
-            : `<div class="cd-soft-empty">아직 원문 기록이 없어요. AI 질문에 답하면 여기에 그대로 보관돼요.</div>`}
-        </section>
       </div>
 
       <aside class="cd-side">
@@ -204,7 +266,8 @@
           <div class="cd-coach-blk">
             <div class="cd-coach-lb">지금 채우면 좋은 부분</div>
             ${gap ? `<div class="cd-gap"><div class="cd-gap-q">“${esc(gap.text)}”</div>
-              <a class="btn btn-primary btn-sm cd-gap-btn" href="#/discover?exp=${encodeURIComponent(e.id)}&stage=${esc(gap.stage)}">이 질문에 답하기</a></div>`
+              <div class="cd-gap-acts">${askBtn}</div>
+              <div class="subtle cd-gap-help">받아 두면 오늘의 질문으로 와요. 답하면 이 페이지에 바로 반영돼요.</div></div>`
               : `<div class="cd-gap cd-gap-done">STAR가 모두 채워졌어요! 이제 면접에서 바로 쓸 수 있어요.</div>`}
           </div>
 
@@ -251,8 +314,8 @@
     return `
     <form class="cd-form" autocomplete="off" onsubmit="return false">
       <div class="cd-edit-bar">
-        <div><div class="cd-edit-title">${isNew ? '새 경험 카드' : '경험 카드 수정'}</div>
-          <div class="subtle">빈칸이 있어도 괜찮아요. 저장한 뒤 AI 질문으로 이어서 채울 수 있어요.</div></div>
+        <div><div class="cd-edit-title">${isNew ? '새 경험' : '경험 수정'}</div>
+          <div class="subtle">빈칸이 있어도 괜찮아요. 저장하면 위키에 반영되고, AI와 이어서 채울 수 있어요.</div></div>
         <div class="row"><button type="button" class="btn" data-act="cancel">취소</button><button type="button" class="btn btn-primary" data-act="save">저장</button></div>
       </div>
 
@@ -265,7 +328,7 @@
           ${field('시작', `<input class="input" type="month" name="start" value="${esc(d.period.start)}">`)}
           ${field('종료', `<input class="input" type="month" name="end" value="${esc(d.period.end)}"><div class="cd-help">비워 두면 ‘진행중’으로 표시돼요</div>`)}
         </div>
-        ${field('나온 프로젝트', `<select class="select" name="projectId"><option value="">없음 (단독 경험)</option>${App.store.projects().map((p) => `<option value="${esc(p.id)}" ${p.id === d.projectId ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}</select><div class="cd-help">프로젝트 하나에서 에피소드별로 카드를 여러 장 만들 수 있어요. 진행 중인 일을 기록하려면 <a class="cd-link" href="#/projects">프로젝트 트래커</a>에서 시작하세요.</div>`)}
+        ${field('프로젝트', `<select class="select" name="projectId"><option value="">없음 (단독 경험)</option>${App.store.projects().map((p) => `<option value="${esc(p.id)}" ${p.id === d.projectId ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}</select><div class="cd-help">한 프로젝트에 경험 페이지를 여러 개 둘 수 있어요. 진행 중인 일은 <a class="cd-link" href="#/projects">프로젝트</a>에서 체크인하세요.</div>`)}
         ${field('역할', `<input class="input" name="role" placeholder="예) 백엔드 담당, 4인 팀" value="${esc(d.role)}">`)}
         ${field('한 줄 요약', `<input class="input" name="summary" placeholder="이 경험을 한 문장으로 소개한다면요?" value="${esc(d.summary)}">`)}
       </section>
@@ -299,16 +362,16 @@
       </section>
 
       <div class="cd-edit-foot">
-        ${isNew ? '' : '<button type="button" class="btn btn-danger" data-act="delete">이 카드 삭제</button>'}
+        ${isNew ? '' : '<button type="button" class="btn btn-danger" data-act="delete">이 경험 삭제</button>'}
         <div class="row cd-edit-foot-r"><button type="button" class="btn" data-act="cancel">취소</button><button type="button" class="btn btn-primary btn-lg" data-act="save">저장하기</button></div>
       </div>
     </form>`;
   }
 
   function notFoundHTML() {
-    return `<div class="card cd-notfound"><div class="big">🗂️</div><h2>경험 카드를 찾을 수 없어요</h2>
+    return `<div class="card cd-notfound"><div class="big">🗂️</div><h2>경험 페이지를 찾을 수 없어요</h2>
       <p class="muted">삭제되었거나 주소가 잘못된 것 같아요.</p>
-      <div class="row cd-nf-actions"><a class="btn btn-primary" href="#/vault">경험 보관함으로 가기</a><a class="btn" href="#/card/new">새 경험 만들기</a></div></div>`;
+      <div class="row cd-nf-actions"><a class="btn btn-primary" href="#/vault">경험 위키로 가기</a><button type="button" class="btn" data-capture>＋ 기록하기</button></div></div>`;
   }
 
   function initialState(params) {
@@ -326,7 +389,7 @@
   }
 
   App.screens.card = {
-    title: (p) => (p && p.id === 'new' ? '새 경험 카드' : '경험 카드'),
+    title: (p) => (p && p.id === 'new' ? '새 경험' : '경험 페이지'),
     render(params) {
       const st = initialState(params);
       return `<div class="page cd-page" data-cd-root>${bodyHTML(st)}</div>`;
@@ -336,8 +399,12 @@
       let st = initialState(params);
       if (st.notFound) return null;
       let ddIndex = 0;
+      if (st.mode === 'view') App.wiki.bindReport(root.querySelector('[data-cd-hist]'), () => { if (!App.store.get(st.id)) { App.navigate('#/vault'); return; } draw(true); });
 
-      function draw() { root.innerHTML = bodyHTML(st); window.scrollTo(0, 0); }
+      function draw(keepScroll) {
+        root.innerHTML = bodyHTML(st); if (!keepScroll) window.scrollTo(0, 0);
+        if (st.mode === 'view') App.wiki.bindReport(root.querySelector('[data-cd-hist]'), () => { if (!App.store.get(st.id)) { App.navigate('#/vault'); return; } draw(true); });
+      }
       function drawKw() { const el = root.querySelector('[data-kw-editor]'); if (el) el.innerHTML = kwEditorHTML(st); }
 
       function readForm() {
@@ -410,12 +477,15 @@
         };
         if (!st.id) {
           const created = App.store.create(patch);
-          App.ui.toast('새 경험 카드를 만들었어요');
+          App.wiki.recordEdit('manual', created.id, null, { text: d.summary || d.title });
+          App.ui.toast('새 경험을 위키에 추가했어요');
           App.navigate('#/card/' + created.id);
           return;
         }
+        const before = clone(App.store.get(st.id));
         App.store.update(st.id, patch);
-        App.ui.toast('저장했어요');
+        App.wiki.recordEdit('manual', st.id, before, { text: '직접 수정' });
+        App.ui.toast('저장했어요 · 변경 기록에 남겼어요');
         st = { id: st.id, mode: 'view', draft: clone(App.store.get(st.id)), suggest: [] };
         if (location.hash.includes('edit=1')) history.replaceState(null, '', '#/card/' + st.id);
         draw();
@@ -424,10 +494,10 @@
       function confirmDelete() {
         const e = App.store.get(st.id); if (!e) return;
         App.ui.modal({
-          title: '이 경험 카드를 삭제할까요?',
-          body: `<p><b>${esc(e.title)}</b></p><p style="margin-top:6px">STAR 정리와 원문 기록이 함께 삭제되고 되돌릴 수 없어요.${projectOf(e) ? ' 프로젝트의 체크인 로그는 그대로 남아요.' : ''}</p>`,
+          title: '이 경험을 삭제할까요?',
+          body: `<p><b>${esc(e.title)}</b></p><p style="margin-top:6px">STAR 정리와 이 페이지에 모인 답변이 함께 삭제되고 되돌릴 수 없어요.${projectOf(e) ? ' 프로젝트의 체크인 로그는 그대로 남아요.' : ''}</p>`,
           confirmText: '삭제하기', danger: true,
-          onConfirm() { App.store.remove(e.id); App.ui.toast('경험 카드를 삭제했어요'); App.navigate('#/vault'); },
+          onConfirm() { App.store.remove(e.id); App.ui.toast('경험을 삭제했어요'); App.navigate('#/vault'); },
         });
       }
 
@@ -456,6 +526,12 @@
         else if (act === 'delete') confirmDelete();
         else if (act === 'resume') { const e = App.store.get(st.id); if (e && App.resumeKit) App.resumeKit.openCardModal(e, () => draw()); }
         else if (act === 'ai-kw') aiSuggest(a);
+        else if (act === 'ask-gap') {
+          const e = App.store.get(st.id); const g = e && App.ai.gapQuestion(e); if (!g) return;
+          App.store.pushQuestion({ type: 'deepen', targetExpId: e.id, stage: g.stage, text: `${App.wiki.short(e.title, 30)} — ${g.text}`, hint: '답하면 이 경험 페이지의 빈 칸이 채워져요.' });
+          App.ui.toast('오늘의 질문으로 보냈어요');
+          draw(true);
+        }
         else if (act === 'accept-all') { st.suggest.slice().forEach((k) => { if (!st.draft.keywords.includes(k)) st.draft.keywords.push(k); }); st.suggest = []; drawKw(); }
         else if (act === 'copy') {
           const txt = root.querySelector('.cd-pitch').textContent;
