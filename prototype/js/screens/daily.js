@@ -126,12 +126,12 @@
       const S = {
         queue: App.store.pending().map((q) => q.id),
         pos: 0,
-        feedback: null, // { qid, text, entryId } — 위키 반영 결과
         done: [],       // 이번 방문에서 답한 것
         tab: 'answered',
         leaving: false,
-        drafts: {},     // 질문별 작성 중 답변 (왔다갔다 해도 유지)
         dir: 'fwd',     // 슬라이드 방향
+        talk: null,     // 지금 질문의 AI 대화 (App.talk.mount)
+        justDone: null, // 이번에 대화로 반영을 마친 질문 id (대화 화면을 그대로 둔다)
       };
       const STATUS_LABEL = { pending: '대기', answered: '답변함', skipped: '건너뜀', later: '나중에' };
       const statusOf = (id) => { const q = getQ(id); return q ? q.status : 'pending'; };
@@ -142,13 +142,14 @@
         return S.queue.length;
       }
       const openCount = () => S.queue.filter((id) => statusOf(id) === 'pending').length;
-      function saveDraft() { const ta = root.querySelector('#dy-answer'); const q = current(); if (ta && q) S.drafts[q.id] = ta.value; }
+      // 이 질문 말고 남은 대기 질문이 있는지 (반영 뒤 "다음 질문 →" / "마치기")
+      const hasOtherOpen = (qid) => S.queue.some((id) => id !== qid && statusOf(id) === 'pending');
+      function dropTalk() { if (S.talk) { S.talk.destroy(); S.talk = null; } S.justDone = null; }
       function go(i) {
         i = Math.max(0, Math.min(S.queue.length, i));
-        if (i === S.pos && !S.feedback) return;
-        saveDraft();
+        if (i === S.pos) return;
         const dir = i < S.pos ? 'back' : 'fwd';
-        transition(() => { S.feedback = null; S.pos = i; }, dir);
+        transition(() => { S.pos = i; }, dir);
       }
       const getQ = (id) => App.store.inbox().find((q) => q.id === id) || null;
       const current = () => (S.pos < S.queue.length ? getQ(S.queue[S.pos]) : null);
@@ -208,12 +209,11 @@
           <div class="dy-queue-head"><b>도착한 질문 미리 보기</b><span class="subtle">끌리는 질문부터 골라 답해도 돼요 · ← → 키로 이동</span></div>
           <ol class="dy-queue-list">${S.queue.map((id, i) => {
             const q = getQ(id); if (!q) return '';
-            const st = statusOf(id); const t = typeInfo(q.type); const hasDraft = st === 'pending' && (S.drafts[id] || '').trim();
+            const st = statusOf(id); const t = typeInfo(q.type);
             return `<li><button type="button" class="dy-qrow is-${st} ${i === S.pos ? 'is-on' : ''}" data-dy-jump="${i}">
               <span class="dy-qrow-n">${i + 1}</span>
               <span class="dy-qrow-ico" title="${esc(t.label)}">${t.ico}</span>
               <span class="dy-qrow-text">${esc(q.text)}</span>
-              ${hasDraft ? '<span class="dy-qrow-draft">작성 중</span>' : ''}
               <span class="dy-qrow-st">${i === S.pos ? '보는 중' : STATUS_LABEL[st]}</span>
             </button></li>`;
           }).join('')}</ol>
@@ -247,51 +247,51 @@
             <div class="dy-qtop">
               <span class="dy-type" data-type="${esc(q.type)}">${t.ico} ${t.label}</span>
               <span class="dy-asked">${esc(askedLabel(q.askedAt))} 도착</span>
+              <span class="dy-done-tag" data-dy-donetag hidden>✓ 위키에 반영함</span>
             </div>
             ${q.status === 'skipped' || q.status === 'later' ? `<div class="dy-revisit">${q.status === 'skipped' ? '건너뛴' : '나중에로 미뤄 둔'} 질문이에요. 지금 답해도 괜찮아요.</div>` : ''}
-            <h2 class="dy-qtext">${esc(q.text)}</h2>
-            ${q.hint ? `<div class="dy-hint"><span>💡</span><span>${esc(q.hint)}</span></div>` : ''}
             ${destHTML(q)}
-            <div class="dy-answer-wrap">
-              <textarea class="dy-answer" id="dy-answer" rows="3" maxlength="400" placeholder="한두 줄이면 충분해요">${esc(S.drafts[q.id] || '')}</textarea>
-              <span class="dy-kbd">Enter 보내기 · Shift+Enter 줄바꿈</span>
-            </div>
-            <div class="dy-qfoot">
+            <div class="dy-talk" id="dy-talk"></div>
+            <div class="dy-qfoot" data-dy-qfoot>
               <div class="dy-qfoot-left">
                 <button class="btn btn-ghost btn-sm" data-dy="skip" type="button">건너뛰기</button>
                 <button class="btn btn-ghost btn-sm" data-dy="later" type="button">나중에</button>
               </div>
-              <button class="btn btn-primary dy-submit" data-dy="answer" type="button" ${(S.drafts[q.id] || '').trim() ? '' : 'disabled'}>답변하기</button>
+              <span class="subtle dy-talk-tip">AI와 대화하며 어디에 어떻게 반영할지 정해요</span>
             </div>
           </div>`;
       }
 
-      function feedbackCard() {
-        const f = S.feedback;
-        const q = getQ(f.qid);
-        const entry = f.entryId ? App.wiki.get(f.entryId) : null;
-        const tgt = entry && !entry.undone && entry.target ? App.store.get(entry.target) : null;
-        const gap = tgt ? App.ai.gapQuestion(tgt) : null;
-        const gapField = gap ? App.wiki.FIELD_LABEL[gap.stage === 'insight' ? 'insights' : gap.stage] : '';
-        const isLast = nextOpen(S.pos) >= S.queue.length;
-        return `
-          <div class="dy-qcard dy-feedback dy-slide-in">
-            <div class="dy-fb-top">
-              <span class="dy-fb-burst" aria-hidden="true">🎉</span>
-              <div>
-                <h3>좋아요, 기록했어요!</h3>
-                <div class="dy-fb-streak">🔥 ${App.store.streak()}일 연속 기록 중</div>
-              </div>
-            </div>
-            <div class="dy-fb-q">${esc(q ? q.text : '')}</div>
-            <blockquote class="dy-quote">${esc(f.text)}</blockquote>
-            ${App.wiki.reportHTML(entry)}
-            <div class="dy-fb-actions">
-              <button class="btn btn-primary" data-dy="next" type="button">${isLast ? '마치기' : '다음 질문 →'}</button>
-              ${gap ? `<a class="btn" href="#/discover?exp=${esc(tgt.id)}">AI와 이어서 채우기 →</a>
-              <span class="subtle dy-fb-gap">다음으로 채울 칸 · ${esc(gapField || '')}</span>` : ''}
-            </div>
-          </div>`;
+      // 질문 하나 = AI 대화 하나. 반영은 사용자가 제안을 확인한 뒤에만 (App.talk)
+      function srcOf(q) {
+        if (q.findingId) return { type: 'answer', question: q.text, questionId: q.id, projectId: q.targetProjectId, findingId: q.findingId };
+        if (q.targetProjectId && App.store.getProject(q.targetProjectId)) return { type: 'checkin', question: q.checkinText || q.text, questionId: q.id, projectId: q.targetProjectId, logType: q.checkinType };
+        if (q.targetExpId) return { type: 'answer', question: q.text, questionId: q.id, expId: q.targetExpId, stage: q.stage };
+        return { type: 'answer', question: q.text, questionId: q.id };
+      }
+      function mountTalk(el, q) {
+        const box = el.querySelector('#dy-talk'); if (!box) return;
+        S.talk = App.talk.mount(box, {
+          ask: { text: q.text, hint: q.hint || '' },
+          src: srcOf(q),
+          commit: (text, d) => App.store.answer(q.id, text, { decision: d }),
+          onDone: (entry) => onAnswered(q, entry),
+          next: { get label() { return hasOtherOpen(q.id) ? '다음 질문 →' : '마치기'; }, onClick: () => goNext() },
+          noAutofocus: !window.matchMedia('(min-width: 901px)').matches,
+        });
+      }
+      function onAnswered(q, entry) {
+        S.justDone = q.id;
+        S.done.push({ qid: q.id, kws: App.ai.extractKeywords(q.answer || '') });
+        const card = root.querySelector('#dy-stage .dy-qcard');
+        if (card) {
+          card.classList.add('dy-answered');
+          const tag = card.querySelector('[data-dy-donetag]'); if (tag) tag.hidden = false;
+          const foot = card.querySelector('[data-dy-qfoot]'); if (foot) foot.remove();
+          const rv = card.querySelector('.dy-revisit'); if (rv) rv.remove();
+        }
+        App.ui.toast(`🔥 ${App.store.streak()}일 연속 기록 중`);
+        renderHead(); renderNav(); renderQueue(); renderHistory(); renderPhone();
       }
 
       function emptyCard() {
@@ -316,29 +316,17 @@
 
       function renderStage(still) {
         const el = root.querySelector('#dy-stage');
+        dropTalk();
         const q = current();
-        if (S.feedback) el.innerHTML = feedbackCard();
-        else if (q && q.status === 'answered') el.innerHTML = answeredCard(q);
+        if (q && q.status === 'answered') el.innerHTML = answeredCard(q);
         else if (q) el.innerHTML = questionCard(q);
         else el.innerHTML = emptyCard();
         const card = el.querySelector('.dy-slide-in');
         if (card && still) card.classList.remove('dy-slide-in');
         else if (card && S.dir === 'back') { card.classList.remove('dy-slide-in'); card.classList.add('dy-slide-in-back'); }
-        if (S.feedback) App.wiki.bindReport(el, onReport);
         S.leaving = false;
+        if (q && q.status !== 'answered') mountTalk(el, q);
         renderNav(); renderQueue();
-        const ta = el.querySelector('#dy-answer');
-        if (ta) {
-          const btn = el.querySelector('[data-dy="answer"]');
-          ta.addEventListener('input', () => {
-            if (q) S.drafts[q.id] = ta.value;
-            btn.disabled = !ta.value.trim();
-            ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 220) + 'px';
-          });
-          ta.addEventListener('keydown', (ev) => {
-            if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing && ev.keyCode !== 229) { ev.preventDefault(); submit(); }
-          });
-        }
         renderPhone();
       }
 
@@ -351,34 +339,7 @@
       }
 
       /* ---------- actions ---------- */
-      function submit() {
-        const q = current(); if (!q || S.leaving) return;
-        const ta = root.querySelector('#dy-answer');
-        const text = (ta && ta.value.trim()) || '';
-        if (!text) { if (ta) ta.focus(); return; }
-        // 다시 답하기: 이전 답이 위키에 만든 변화(와 체크인 기록)를 먼저 되돌려 중복 반영을 막는다
-        const prev = q.wikiEntry ? App.wiki.get(q.wikiEntry) : null;
-        if (prev && !prev.undone) {
-          App.wiki.undo(prev.id, true);
-          if (prev.source.logId && prev.source.projectId) App.store.removeLog(prev.source.projectId, prev.source.logId);
-        }
-        const entry = App.store.answer(q.id, text);
-        delete S.drafts[q.id];
-        S.feedback = { qid: q.id, text, entryId: entry ? entry.id : null };
-        S.done.push({ qid: q.id, kws: App.ai.extractKeywords(text) });
-        transition(() => {});
-        renderHead();
-      }
-
-      // 반영 결과 카드에서 되돌리기/옮기기 했을 때
-      function onReport(r) {
-        if (!S.feedback) return;
-        const q = getQ(S.feedback.qid);
-        if (r && !r.undone) { S.feedback.entryId = r.id; if (q) { q.wikiEntry = r.id; App.store.touch(); } }
-        renderStage(true); renderHistory();
-      }
-
-      function goNext() { saveDraft(); const to = nextOpen(S.pos); transition(() => { S.feedback = null; S.pos = to; }, to < S.pos ? 'back' : 'fwd'); }
+      function goNext() { const to = nextOpen(S.pos); transition(() => { S.pos = to; }, to < S.pos ? 'back' : 'fwd'); }
 
       function pushDemo() {
         const P = window.SEED.recallPrompts;
@@ -389,14 +350,20 @@
         const id = App.store.inbox()[0].id;
         S.queue.push(id);
         App.ui.pushToast('오늘의 질문이 도착했어요', p.text, null);
-        if (!S.feedback && S.pos === S.queue.length - 1) transition(() => {});
+        if (S.pos === S.queue.length - 1) transition(() => {});
         else { renderNav(); renderQueue(); }
       }
 
+      // 다시 답하기: 이전 답이 위키에 만든 변화(와 체크인 기록)를 먼저 되돌려 중복 반영을 막고, 그 질문으로 대화를 다시 연다
       function reask(id) {
+        const q = getQ(id);
+        const prev = q && q.wikiEntry ? App.wiki.get(q.wikiEntry) : null;
+        if (prev && !prev.undone) {
+          if (App.wiki.canUndo(prev)) App.wiki.undo(prev.id, true);
+          // 체크인 답이면 타임라인 기록도 지운다 — 다시 답하면 새 기록이 생기므로
+          if (prev.source.logId && prev.source.projectId) App.store.removeLog(prev.source.projectId, prev.source.logId);
+        }
         App.store.setQuestionStatus(id, 'pending');
-        saveDraft();
-        if (S.feedback) { S.feedback = null; }
         const old = S.queue.indexOf(id);
         if (old !== -1) { S.queue.splice(old, 1); if (old < S.pos) S.pos--; }
         S.queue.splice(S.pos, 0, id);
@@ -406,7 +373,9 @@
 
       /* ---------- phone mock ---------- */
       function renderPhone() {
-        const q = S.feedback ? null : current();
+        const cur = current();
+        const fresh = cur && S.justDone === cur.id;
+        const q = cur && cur.status !== 'answered' ? cur : null;
         const ch = (App.store.state.settings || {}).channels || {};
         const time = q && q.askedAt ? q.askedAt.split(' ')[1] : nextTime().time;
         const lastAnswered = App.store.inbox().find((x) => x.status === 'answered' && x.compiledTo && App.store.get(x.compiledTo));
@@ -430,7 +399,7 @@
                   </div>` : `
                   <div class="dy-notif dy-notif-new">
                     <div class="dy-notif-head"><span class="dy-notif-icon">R</span><span class="dy-notif-app">REWRITE</span><span class="dy-notif-when">지금</span></div>
-                    <div class="dy-notif-title">${S.feedback ? '답변을 위키에 반영했어요 ✓' : '오늘 질문은 모두 답했어요'}</div>
+                    <div class="dy-notif-title">${fresh ? '답변을 위키에 반영했어요 ✓' : cur ? '이 질문에는 답했어요 ✓' : '오늘 질문은 모두 답했어요'}</div>
                     <div class="dy-notif-body">다음 질문은 ${esc(nextTime().label)}에 보내 드릴게요.</div>
                   </div>`}
                   ${lastExp ? `
@@ -495,15 +464,14 @@
         if (!a || a.disabled) return;
         const act = a.dataset.dy;
         const q = current();
-        if (act === 'answer') submit();
-        else if (act === 'skip' && q) {
+        if (act === 'skip' && q) {
           App.store.setQuestionStatus(q.id, 'skipped');
           App.ui.toast('건너뛰었어요. 비슷한 질문은 덜 보내 볼게요');
-          saveDraft(); { const to = nextOpen(S.pos); transition(() => { S.pos = to; }, to < S.pos ? 'back' : 'fwd'); }
+          { const to = nextOpen(S.pos); transition(() => { S.pos = to; }, to < S.pos ? 'back' : 'fwd'); }
         } else if (act === 'later' && q) {
           App.store.setQuestionStatus(q.id, 'later');
           App.ui.toast(`${nextTime().label}에 다시 물어볼게요`);
-          saveDraft(); { const to = nextOpen(S.pos); transition(() => { S.pos = to; }, to < S.pos ? 'back' : 'fwd'); }
+          { const to = nextOpen(S.pos); transition(() => { S.pos = to; }, to < S.pos ? 'back' : 'fwd'); }
         } else if (act === 'next') goNext();
         else if (act === 'more') pushDemo();
       }
@@ -521,11 +489,10 @@
       renderHead();
       renderStage();
       renderHistory();
-      const ta = root.querySelector('#dy-answer');
-      if (ta && window.matchMedia('(min-width: 901px)').matches) ta.focus({ preventScroll: true });
 
       return () => {
         alive = false;
+        dropTalk();
         timers.forEach(clearTimeout); timers.clear();
         root.removeEventListener('click', onClick);
         document.removeEventListener('keydown', onKey);

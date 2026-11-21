@@ -161,15 +161,16 @@
   /* ---------- 상세 ---------- */
   // 화면 상태 (프로젝트별 질문 인덱스)
   // tab: 프로젝트별 'exp'|'timeline'|'code', gh: 레포 분석 화면 상태
-  // report: { pid, id(위키 반영 entry), where:'checkin'|'log:<id>'|'code' } — 방금 반영한 결과를 그 자리에 보여 준다
+  // report: { pid, id(위키 반영 entry), where:'code' } — 코드 분석을 위키에 반영한 결과를 그 자리에 보여 준다
+  // logTalk / codeTalk: 타임라인 기록·코드 항목 아래에 열어 둔 기록 대화 (logId / findingId)
   // autoAnalyze: { pid, url } — 새 프로젝트를 만들며 레포를 넣었으면 상세 화면에 들어가자마자 분석
-  const ui = { qIndex: {}, type: {}, ck: {}, edit: null, tab: {}, gh: {}, ghView: null, report: null, autoAnalyze: null };
+  const ui = { qIndex: {}, type: {}, typeQ: {}, edit: null, tab: {}, gh: {}, ghView: null, report: null, logTalk: null, codeTalk: null, autoAnalyze: null };
   const reportAt = (pid, where) => {
     const r = ui.report; if (!r || r.pid !== pid || r.where !== where) return '';
     return App.wiki.reportHTML(App.wiki.get(r.id));
   };
 
-  /* ---------- 역량 키워드 편집기 (체크인·로그 수정 공용) ----------
+  /* ---------- 역량 키워드 편집기 (로그 수정) ----------
      selected = 직접 고른 것(manual) ∪ (AI 추천(suggested) − 사용자가 뺀 것(rejected))
      AI 추천은 자동으로 선택되지만, 빼면 다시 자동으로 들어오지 않는다. */
   const uniq = (a) => [...new Set(a)];
@@ -199,7 +200,6 @@
       </div>` : ''}
     </div>`;
   }
-  const ckState = (id) => (ui.ck[id] = ui.ck[id] || kwNew());
 
   function pickInitialQuestion(e) {
     // AI가 가장 덜 기록된 유형의 질문부터 골라요
@@ -211,7 +211,11 @@
   function currentQ(e) {
     // 체크인할 때가 됐으면 오늘의 질문함에 도착한 바로 그 질문을 보여 준다
     const oq = App.store.openCheckin(e.id);
-    if (oq) { ui.type[e.id] = oq.checkinType || ui.type[e.id] || 'milestone'; return { type: oq.checkinType, text: oq.checkinText || oq.text, inbox: oq }; }
+    if (oq) {
+      // 질문이 바뀔 때만 유형을 질문에 맞추고, 그 뒤 사용자가 고른 유형은 그대로 둔다
+      const k = oq.id + ':' + oq.checkinType;
+      if (ui.typeQ[e.id] !== k) { ui.type[e.id] = oq.checkinType || 'milestone'; ui.typeQ[e.id] = k; }
+      return { type: oq.checkinType, text: oq.checkinText || oq.text, inbox: oq }; }
     const Q = window.SEED.projectCheckins;
     if (ui.qIndex[e.id] == null) ui.qIndex[e.id] = pickInitialQuestion(e);
     const q = Q[ui.qIndex[e.id] % Q.length];
@@ -231,20 +235,33 @@
     return `<div class="card pj-checkin ${q.inbox ? 'is-due' : ''}">
       <div class="pj-checkin-head"><span class="ai-badge"><span class="ai-dot">R</span>${q.inbox ? '오늘의 체크인' : '체크인 남기기'}</span>
         <button class="btn btn-ghost btn-sm" data-pj="next-q">↻ 다른 질문</button></div>
-      <div class="pj-q">${esc(q.text)}</div>
-      <div class="pj-q-why">${esc(whyQuestion(e, q))}</div>
       ${q.inbox ? '<a class="pj-ck-sync" href="#/daily">✉ 오늘의 질문함에도 같은 질문이 도착했어요 · 어디서 답해도 함께 완료돼요</a>'
         : `<div class="pj-ck-sync is-quiet">다음 체크인 질문은 ${esc(md(dueDate))}에 드릴게요. 지금 자유롭게 남겨도 좋아요.</div>`}
       <div class="pj-types" role="radiogroup" aria-label="기록 유형">
         ${TYPE_ORDER.map((t) => `<button class="pj-type ${sel === t ? 'on' : ''}" data-type="${t}" data-pj-type="${t}" role="radio" aria-checked="${sel === t}">
           <span class="pj-type-ico">${TYPES[t].ico}</span>${TYPES[t].label}</button>`).join('')}
       </div>
-      <textarea class="textarea pj-ta" id="pj-ta" rows="3" maxlength="400" placeholder="한두 줄이면 충분해요. 예) JWT와 세션 중 고민하다가 모바일 확장 때문에 JWT로 결정했어요."></textarea>
-      <div id="pj-ck-kw">${kwEditor(ckState(e.id), 'ck')}</div>
-      <div class="pj-checkin-foot"><span class="subtle">⌘/Ctrl + Enter로 바로 기록 · 타임라인에 남고 관련 경험에 반영돼요</span>
-        <button class="btn btn-primary" data-pj="save">기록하기</button></div>
-      ${reportBox(e.id, 'checkin', '타임라인에 기록하고, 관련 경험에 반영했어요')}
+      <div data-pj-talk="ck"></div>
     </div>`;
+  }
+  // 체크인 대화: 질문함에 온 체크인이면 그 질문에 답한 것으로, 아니면 타임라인에 기록을 남기고 위키에 반영
+  function checkinTalkCfg(e) {
+    const q = currentQ(e); const oq = q.inbox; const pid = e.id;
+    const typeOf = () => ui.type[pid] || (oq && oq.checkinType) || 'milestone';
+    return {
+      sig: oq ? `q:${oq.id}:${q.text}` : `b:${q.text}`,
+      ask: { label: (TYPES[q.type] || TYPES.milestone).label, text: q.text, hint: whyQuestion(e, q) },
+      placeholder: '한두 줄이면 충분해요. 예) JWT와 세션 중 고민하다가 모바일 확장 때문에 JWT로 결정했어요.',
+      noAutofocus: true,
+      src: oq ? { type: 'checkin', question: oq.checkinText || oq.text, questionId: oq.id, projectId: pid, logType: typeOf() }
+        : { type: 'checkin', projectId: pid, logType: typeOf(), question: '(직접 기록)' },
+      commit: oq ? (text, d) => App.store.answer(oq.id, text, { decision: d, type: typeOf() })
+        : (text, d) => {
+          const t = typeOf(); const log = App.store.addLog(pid, { type: t, text });
+          return App.wiki.ingest({ type: 'checkin', text, projectId: pid, logId: log.id, logType: t, keywords: log.keywords, decision: d });
+        },
+      inbox: !!oq,
+    };
   }
   // 방금 반영한 결과 (자리마다 하나)
   function reportBox(pid, where, lead) {
@@ -280,9 +297,9 @@
               ${(l.keywords || []).length ? `<div class="exp-card-kws">${l.keywords.map((k) => App.ui.keywordChip(k)).join('')}</div>` : ''}
               <div class="pj-log-wiki">
                 ${cards.length ? cards.map((c) => `<a class="pj-log-card" href="#/card/${esc(c.id)}" title="${esc(c.title)}">→ 「${esc(short(c.title, 24))}」</a>`).join('')
-                  : l.type === 'milestone' ? '' : `<span class="subtle">아직 경험에 반영되지 않았어요</span><button type="button" class="btn btn-sm pj-log-ingest" data-pj-log="ingest" data-id="${esc(l.id)}">경험에 반영</button>`}
+                  : l.type === 'milestone' || ui.logTalk === l.id ? '' : `<span class="subtle">아직 경험에 반영되지 않았어요</span><button type="button" class="btn btn-sm pj-log-ingest" data-pj-log="ingest" data-id="${esc(l.id)}">경험에 반영</button>`}
               </div>
-              ${reportBox(e.id, 'log:' + l.id)}
+              ${ui.logTalk === l.id ? `<div data-pj-talk="log:${esc(l.id)}"></div>` : ''}
             </div></div>`;
         }).join('')}</div>`;
     }).join('')}</div>`;
@@ -445,13 +462,16 @@
       ${open ? `<div class="pj-gf-evs">${ev.map(codeBlock).join('')}</div>` : ''}
     </div>`;
   }
-  // 이 코드가 근거로 붙은 경험 / 없으면 이야기를 받으러 가기
+  // 이 코드가 근거로 붙은 경험 / 없으면 그 자리에서 이야기를 들려주기
+  const openCodeQ = (fid) => App.store.state.inbox.find((q) => q.findingId === fid && (q.status === 'pending' || q.status === 'later')) || null;
   function findingWiki(f) {
+    const talk = ui.codeTalk === f.id ? `<div data-pj-talk="code:${esc(f.id)}"></div>` : '';
     const exps = App.wiki.cardsForFinding(f.id);
-    if (exps.length) return `<div class="pj-gf-wiki">${exps.map((x) => `<a class="pj-gf-exp" href="#/card/${esc(x.id)}">↳ 「${esc(short(x.title, 28))}」 근거</a>`).join('')}</div>`;
-    const queued = App.store.state.inbox.some((q) => q.findingId === f.id && (q.status === 'pending' || q.status === 'later'));
+    if (exps.length) return `<div class="pj-gf-wiki">${exps.map((x) => `<a class="pj-gf-exp" href="#/card/${esc(x.id)}">↳ 「${esc(short(x.title, 28))}」 근거</a>`).join('')}</div>${talk}`;
+    if (talk) return talk;
+    const queued = !!openCodeQ(f.id);
     return `<div class="pj-gf-wiki is-empty"><span class="subtle">${queued ? '오늘의 질문에 이 코드 이야기가 와 있어요' : '이 코드를 뒷받침할 경험이 아직 없어요'}</span>
-      <button type="button" class="btn btn-sm" data-gh="ask" data-id="${esc(f.id)}">${queued ? '오늘의 질문에서 답하기 →' : '이 코드로 경험 만들기'}</button></div>`;
+      <button type="button" class="btn btn-sm" data-gh="ask" data-id="${esc(f.id)}">${queued ? '여기서 답하기' : '이 코드로 경험 만들기'}</button></div>`;
   }
   function codeSection(e) {
     const st = ghState(e.id);
@@ -559,11 +579,73 @@
     mount(root, params) {
       const id = params && params.id;
       const rerenderLocal = () => {
-        const ck = root.querySelector('#pj-ta'); const draft = ck ? ck.value : '';
         root.innerHTML = params && params.id ? renderDetail(id) : renderList();
-        const ck2 = root.querySelector('#pj-ta'); if (ck2 && draft) ck2.value = draft;
-        fitTas(); bindReports();
+        fitTas(); bindReports(); placeTalks();
       };
+      /* ---- 기록 대화 (App.talk) ----
+         다시 그려도 대화가 이어지도록, 대화 DOM(host)을 따로 들고 있다가 자리표시([data-pj-talk])에 끼운다 */
+      const talks = {}; // key → { host, ctl, sig, done }
+      const dropTalk = (key) => { const t = talks[key]; if (!t) return; t.ctl.destroy(); t.host.remove(); delete talks[key]; };
+      const closeTalk = (key) => () => { if (key.startsWith('log:')) ui.logTalk = null; else if (key.startsWith('code:')) ui.codeTalk = null; dropTalk(key); rerenderLocal(); };
+      function talkCfg(key) {
+        const e = App.store.getProject(id); if (!e) return null;
+        if (key === 'ck') {
+          const c = checkinTalkCfg(e);
+          return Object.assign(c, {
+            onDone: () => { talks.ck.done = true; App.ui.toast(c.inbox ? '체크인 완료! 오늘의 질문에서도 답변 완료로 바뀌었어요' : '타임라인에 기록했어요'); rerenderLocal(); },
+            next: { label: '다른 체크인 남기기', onClick: () => {
+              const Q = window.SEED.projectCheckins;
+              if (!App.store.openCheckin(id)) { ui.qIndex[id] = ((ui.qIndex[id] || 0) + 1) % Q.length; ui.type[id] = Q[ui.qIndex[id]].type; }
+              dropTalk('ck'); rerenderLocal();
+            } },
+          });
+        }
+        if (key.startsWith('log:')) {
+          const l = (e.logs || []).find((x) => x.id === key.slice(4)); if (!l) return null;
+          return {
+            sig: key, ask: { label: '타임라인 기록', text: '이 기록, 어느 경험에 어떻게 반영할까요?' }, prefill: l.text,
+            src: { type: 'checkin', projectId: id, logId: l.id, logType: l.type, question: l.fromQuestion || '', keywords: l.keywords },
+            onDone: () => rerenderLocal(), next: { label: '닫기', onClick: closeTalk(key) },
+          };
+        }
+        if (key.startsWith('code:')) {
+          const fid = key.slice(5); const f = e.repo && e.repo.findings.find((x) => x.id === fid); if (!f) return null;
+          const cq = openCodeQ(fid) || App.wiki.codeQuestion(e, f);
+          return {
+            sig: key, ask: { label: '코드 분석', text: cq.text, hint: cq.hint },
+            src: { type: 'answer', projectId: id, findingId: fid, question: cq.text },
+            // 오늘의 질문 기록에도 남도록, 질문함의 질문에 답한 것으로 처리
+            commit: (text, d) => {
+              let q = openCodeQ(fid);
+              if (!q) {
+                const { id: _i, status: _s, askedAt: _a, ...nq } = App.wiki.codeQuestion(App.store.getProject(id), f);
+                App.store.pushQuestion(nq);
+                q = App.store.state.inbox.find((x) => x.findingId === fid && x.status === 'pending');
+              }
+              return q ? App.store.answer(q.id, text, { decision: d }) : null;
+            },
+            onDone: () => rerenderLocal(), next: { label: '닫기', onClick: closeTalk(key) },
+          };
+        }
+        return null;
+      }
+      function placeTalks() {
+        root.querySelectorAll('[data-pj-talk]').forEach((ph) => {
+          const key = ph.getAttribute('data-pj-talk');
+          let t = talks[key];
+          const cfg = !t || !t.done ? talkCfg(key) : null;
+          if (t && cfg && cfg.sig !== t.sig) { dropTalk(key); t = null; }
+          if (!t) {
+            if (!cfg) return;
+            const host = document.createElement('div'); host.className = 'pj-talk';
+            t = talks[key] = { host, sig: cfg.sig, done: false };
+            t.ctl = App.talk.mount(host, cfg);
+          }
+          ph.replaceWith(t.host);
+        });
+      }
+      // 체크인 대화를 아직 시작하지 않았는지 (유형을 바꾸면 질문도 바꿔도 되는지)
+      const ckUntouched = () => { const t = talks.ck; if (!t) return true; const inp = t.host.querySelector('[data-tk-in]'); return !t.done && t.ctl.phase === 'ask' && !(inp && inp.value.trim()); };
       // 방금 반영한 결과 카드: 되돌리기·옮기기 후 새 entry 로 다시 그린다
       const bindReports = () => root.querySelectorAll('[data-pj-report]').forEach((box) => {
         App.wiki.bindReport(box, (n) => { if (n && ui.report) ui.report.id = n.id; rerenderLocal(); });
@@ -573,14 +655,14 @@
       const fitTa = (ta) => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 2 + 'px'; };
       const fitTas = () => root.querySelectorAll('.pj-gf-ta').forEach(fitTa);
 
-      const kwStateOf = (scope) => (scope === 'ed' ? ui.edit && ui.edit.kw : ckState(id));
+      const kwStateOf = () => ui.edit && ui.edit.kw;
       const redrawKw = (scope) => {
-        const st = kwStateOf(scope); if (!st) return;
-        const box = root.querySelector(scope === 'ed' ? '#pj-ed-kw' : '#pj-ck-kw'); if (box) box.innerHTML = kwEditor(st, scope);
+        const st = kwStateOf(); if (!st) return;
+        const box = root.querySelector('#pj-ed-kw'); if (box) box.innerHTML = kwEditor(st, scope);
       };
       /* ---- 코드 분석 ---- */
       let alive = true;
-      const ghRedraw = () => { if (!alive) return; const box = root.querySelector('#pj-gh'); const e = App.store.getProject(id); if (box && e) { box.innerHTML = codeSection(e); fitTas(); } };
+      const ghRedraw = () => { if (!alive) return; const box = root.querySelector('#pj-gh'); const e = App.store.getProject(id); if (box && e) { box.innerHTML = codeSection(e); fitTas(); placeTalks(); } };
       ui.ghView = { pid: id, redraw: ghRedraw, full: () => alive && rerenderLocal() };
       // 다른 화면에 갔다 와도 진행 중인 분석은 계속되고, 돌아오면 이어서 보인다
       const view = (pid) => (ui.ghView && ui.ghView.pid === pid ? ui.ghView : null);
@@ -666,13 +748,9 @@
         else if (a === 'restore') { App.store.updateFinding(id, fid, { status: 'new' }); rerenderLocal(); }
         else if (a === 'show-dismissed') { st.showDismissed = !st.showDismissed; ghRedraw(); }
         else if (a === 'ask') {
-          // 이 코드 이야기를 오늘의 질문으로 받아 답하면, 코드가 근거로 붙은 경험이 생긴다
-          const f = e.repo && e.repo.findings.find((x) => x.id === fid); if (!f) return;
-          if (!App.store.state.inbox.some((q) => q.findingId === fid && (q.status === 'pending' || q.status === 'later'))) {
-            const { id: _i, status: _s, askedAt: _a, ...q } = App.wiki.codeQuestion(e, f);
-            App.store.pushQuestion(q);
-          }
-          App.navigate('#/daily');
+          // 이 코드 이야기를 그 자리에서 들려주면, 코드가 근거로 붙은 경험이 생긴다 (오늘의 질문 기록에도 남음)
+          if (ui.codeTalk && ui.codeTalk !== fid) dropTalk('code:' + ui.codeTalk);
+          ui.codeTalk = fid; ghRedraw();
         }
       }
 
@@ -695,7 +773,7 @@
         if (ghBtn) { onGh(ghBtn); return; }
         const kwBtn = ev.target.closest('[data-kwact]');
         if (kwBtn) {
-          const scope = kwBtn.closest('[data-kw-scope]').getAttribute('data-kw-scope'); const st = kwStateOf(scope); if (!st) return;
+          const scope = kwBtn.closest('[data-kw-scope]').getAttribute('data-kw-scope'); const st = kwStateOf(); if (!st) return;
           const a = kwBtn.getAttribute('data-kwact'); const k = kwBtn.getAttribute('data-k');
           if (a === 'remove') kwRemove(st, k);
           else if (a === 'add') kwAdd(st, k);
@@ -710,8 +788,9 @@
         if (logBtn) {
           const a = logBtn.getAttribute('data-pj-log'); const e = App.store.getProject(id); if (!e) return;
           if (a === 'ingest') {
-            const entry = App.wiki.ingestLog(id, logBtn.getAttribute('data-id'));
-            showReport('log:' + logBtn.getAttribute('data-id'), entry); rerenderLocal();
+            // 바로 반영하지 않고, 이 기록 아래에서 AI와 어디에 어떻게 넣을지 정한다
+            if (ui.logTalk) dropTalk('log:' + ui.logTalk);
+            ui.logTalk = logBtn.getAttribute('data-id'); rerenderLocal();
           } else if (a === 'edit') {
             const l = e.logs.find((x) => x.id === logBtn.getAttribute('data-id')); if (!l) return;
             ui.edit = { logId: l.id, type: l.type, text: l.text, date: l.date, kw: kwNew(l.keywords || [], App.ai.extractKeywords(l.text)) };
@@ -729,7 +808,7 @@
             App.ui.modal({
               title: '이 기록을 삭제할까요?', confirmText: '삭제', danger: true,
               body: `<p>「${esc(l.text.length > 60 ? l.text.slice(0, 60) + '…' : l.text)}」</p><p style="margin-top:8px">삭제한 기록은 되돌릴 수 없어요.${usedBy.length ? ' 이 기록이 반영된 경험 페이지는 그대로 남아요.' : ''}</p>`,
-              onConfirm() { App.store.removeLog(id, l.id); if (ui.edit && ui.edit.logId === l.id) ui.edit = null; App.ui.toast('기록을 삭제했어요'); rerenderLocal(); return true; },
+              onConfirm() { App.store.removeLog(id, l.id); if (ui.edit && ui.edit.logId === l.id) ui.edit = null; if (ui.logTalk === l.id) { ui.logTalk = null; dropTalk('log:' + l.id); } App.ui.toast('기록을 삭제했어요'); rerenderLocal(); return true; },
             });
           }
           return;
@@ -738,12 +817,13 @@
         if (typeBtn) {
           const t = typeBtn.getAttribute('data-pj-type');
           ui.type[id] = t;
-          // 유형을 바꾸면 그 유형에 맞는 질문으로 (오늘의 질문함의 질문도 함께)
-          const qi = window.SEED.projectCheckins.findIndex((q) => q.type === t);
-          const draft = (root.querySelector('#pj-ta') || {}).value || '';
-          const oq = App.store.openCheckin(id);
-          if (qi >= 0) { if (oq) App.store.changeCheckin(oq.id, qi); else ui.qIndex[id] = qi; }
-          rerenderLocal(); const ta = root.querySelector('#pj-ta'); if (ta) { ta.value = draft; ta.focus(); }
+          // 아직 답하기 전이면 그 유형에 맞는 질문으로 (오늘의 질문함의 질문도 함께) — 대화를 시작했으면 기록 유형만 바꾼다
+          if (ckUntouched()) {
+            const qi = window.SEED.projectCheckins.findIndex((q) => q.type === t);
+            const oq = App.store.openCheckin(id);
+            if (qi >= 0) { if (oq) App.store.changeCheckin(oq.id, qi); else ui.qIndex[id] = qi; }
+          }
+          rerenderLocal();
           return;
         }
         const btn = ev.target.closest('[data-pj]'); if (!btn) return;
@@ -755,24 +835,7 @@
           const oq = App.store.openCheckin(id);
           if (oq) App.store.changeCheckin(oq.id, ((oq.bankIndex != null ? oq.bankIndex : Q.findIndex((x) => x.type === oq.checkinType)) + 1) % Q.length);
           else { ui.qIndex[id] = ((ui.qIndex[id] || 0) + 1) % Q.length; ui.type[id] = Q[ui.qIndex[id]].type; }
-          const draft = (root.querySelector('#pj-ta') || {}).value || '';
-          rerenderLocal(); const ta = root.querySelector('#pj-ta'); if (ta) ta.value = draft;
-        } else if (act === 'save') {
-          const ta = root.querySelector('#pj-ta'); const text = (ta.value || '').trim();
-          if (!text) { App.ui.toast('한 줄만 적어 주세요. 짧아도 괜찮아요'); ta.focus(); return; }
-          const kws = kwSelected(ckState(id));
-          const oq = App.store.openCheckin(id);
-          // 오늘의 질문함에 온 체크인이면 그 질문에 답한 것으로 처리 (질문함에서도 답변 완료)
-          // 원문은 타임라인에, 이야기는 위키의 경험 페이지에 — 결과는 체크인 카드 아래에 보여 준다
-          let entry;
-          if (oq) entry = App.store.answer(oq.id, text, { type: ui.type[id] || oq.checkinType, keywords: kws });
-          else { const log = App.store.addLog(id, { type: ui.type[id] || 'milestone', text, keywords: kws }); entry = log && App.wiki.ingestLog(id, log.id); }
-          delete ui.ck[id];
-          showReport('checkin', entry);
-          if (oq) App.ui.toast('체크인 완료! 오늘의 질문에서도 답변 완료로 바뀌었어요');
-          const Q = window.SEED.projectCheckins;
-          ui.qIndex[id] = ((ui.qIndex[id] || 0) + 1) % Q.length; ui.type[id] = Q[ui.qIndex[id]].type;
-          rerenderLocal();
+          dropTalk('ck'); rerenderLocal();
         } else if (act === 'close-report') {
           ui.report = null; rerenderLocal();
         } else if (act === 'add-link') {
@@ -806,18 +869,18 @@
         }
       };
 
-      // 입력 중 키워드 미리보기
+      // 기록 수정 중 키워드 미리보기
       let t = null;
       const onInput = (ev) => {
         if (ev.target.matches && ev.target.matches('.pj-gf-ta')) { fitTa(ev.target); return; }
         if (ev.target.id === 'pj-edit-date' && ui.edit) { ui.edit.date = ev.target.value; return; }
-        const scope = ev.target.id === 'pj-ta' ? 'ck' : ev.target.id === 'pj-edit-ta' ? 'ed' : null;
-        if (!scope) return;
-        if (scope === 'ed') ui.edit.text = ev.target.value;
+        if (ev.target.id !== 'pj-edit-ta' || !ui.edit) return;
+        const scope = 'ed';
+        ui.edit.text = ev.target.value;
         const val = ev.target.value || '';
         clearTimeout(t);
         t = setTimeout(() => {
-          const st = kwStateOf(scope); if (!st) return;
+          const st = kwStateOf(); if (!st) return;
           const next = App.ai.extractKeywords(val);
           if (next.join() === st.suggested.join()) return;
           st.suggested = next; redrawKw(scope);
@@ -834,22 +897,22 @@
         if (ev.target.id === 'pj-gh-url' && ev.key === 'Enter' && !ev.isComposing) { ev.preventDefault(); runAnalyze(id, ev.target.value); return; }
         if (ev.target.matches && ev.target.matches('[data-kw-input]') && ev.key === 'Enter' && !ev.isComposing) {
           ev.preventDefault();
-          const scope = ev.target.closest('[data-kw-scope]').getAttribute('data-kw-scope'); const st = kwStateOf(scope);
+          const scope = ev.target.closest('[data-kw-scope]').getAttribute('data-kw-scope'); const st = kwStateOf();
           if (st && ev.target.value.trim()) { kwAdd(st, ev.target.value); redrawKw(scope); const inp = root.querySelector(`[data-kw-scope="${scope}"] [data-kw-input]`); if (inp) inp.focus(); }
           return;
         }
         if (ev.target.id === 'pj-edit-ta' && ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey)) { const b = root.querySelector('[data-pj-log=save]'); if (b) b.click(); return; }
-        if (ev.target.id === 'pj-edit-ta' && ev.key === 'Escape') { ui.edit = null; rerenderLocal(); return; }
-        if (ev.target.id === 'pj-ta' && ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey)) { const b = root.querySelector('[data-pj=save]'); if (b) b.click(); }
+        if (ev.target.id === 'pj-edit-ta' && ev.key === 'Escape') { ui.edit = null; rerenderLocal(); }
       };
       root.addEventListener('click', onClick);
       root.addEventListener('input', onInput);
       root.addEventListener('keydown', onKey);
       root.addEventListener('change', onChange);
-      fitTas(); bindReports();
+      fitTas(); bindReports(); placeTalks();
       if (ui.autoAnalyze && ui.autoAnalyze.pid === id) { const u = ui.autoAnalyze.url; ui.autoAnalyze = null; setTimeout(() => runAnalyze(id, u), 0); }
       return () => {
-        clearTimeout(t); ui.edit = null; alive = false;
+        clearTimeout(t); ui.edit = null; ui.logTalk = null; ui.codeTalk = null; alive = false;
+        Object.keys(talks).forEach(dropTalk);
         if (ui.report && ui.report.pid === id) ui.report = null; if (ui.ghView && ui.ghView.redraw === ghRedraw) ui.ghView = null;
         root.removeEventListener('click', onClick); root.removeEventListener('input', onInput); root.removeEventListener('keydown', onKey); root.removeEventListener('change', onChange);
       };

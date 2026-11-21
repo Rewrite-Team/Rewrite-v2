@@ -75,14 +75,14 @@
   function inferField(answer, question, stage) {
     if (stage && FIELD_LABEL[stage === 'insight' ? 'insights' : stage]) return stage === 'insight' ? 'insights' : stage;
     const q = String(question || ''); const a = String(answer || '');
-    if (/왜 이렇게 만들|계기|어떤 문제가 있었/.test(q)) return 'situation';
+    if (/왜 이렇게 만들|계기|어떤 문제가 있었|막혔던|원인은|갈렸던|어떤 상황|기억에 남는|처음 해본/.test(q)) return 'situation';
     if (/배운|배웠|달라진 점|다르게 하게/.test(q)) return 'insights';
     if (/결과|달라졌|줄었|늘었|수치|숫자|반응|회복|통과/.test(q)) return 'result';
     if (/역할|맡은|책임|목표/.test(q)) return 'task';
     if (/어떻게|방법|왜 그|설득|준비|먼저 한|대응|정했/.test(q)) return 'action';
     if (/배웠|알게 됐|깨달|느꼈|이후로/.test(a)) return 'insights';
     if (/\d/.test(a) && /(줄|늘|개선|→|%|배|초|건|명|만에|회복|통과|상|등)/.test(a)) return 'result';
-    if (/(했어요|했다|만들|제안|바꿨|추가|설명|정리|보여|확인|나눠|맞추)/.test(a)) return 'action';
+    if (/(했어요|했다|했음|만들|제안|바꿨|추가|설명|정리|보여|확인|나눠|맞추|봤|세어|찾았|알렸|물어|걸었|썼|붙|옮겼|고쳤)/.test(a)) return 'action';
     return 'situation';
   }
 
@@ -129,15 +129,17 @@
 
   // 경험 페이지에 원문을 엮는다: STAR 칸 채우기/덧붙이기 + 근거 + 키워드
   function compileInto(e, text, opts, changes) {
-    const field = inferField(text, opts.question, opts.stage);
+    // opts.field / opts.applyText: 사용자와 대화로 정한 칸·문장 (없으면 AI 추정). 원문(text)은 출처(qa)에 그대로 남는다
+    const field = opts.field || inferField(text, opts.question, opts.stage);
     const cur = field === 'insights' ? e.insights : field === 'summary' ? e.summary : e.star[field];
-    const add = sentence(text);
-    if (!String(cur || '').includes(text.trim().slice(0, 20))) {
+    const applied = String(opts.applyText || text).trim();
+    const add = sentence(applied);
+    if (!String(cur || '').includes(applied.slice(0, 20))) {
       const next = cur && cur.trim() ? `${cur.trim()} ${add}` : add;
       if (field === 'insights') e.insights = next; else e.star[field] = next;
       changes.push({ kind: cur && cur.trim() ? 'append' : 'fill', expId: e.id, field, after: add });
     }
-    if (!e.summary && field !== 'summary') { e.summary = short(text, 60); }
+    if (!e.summary && field !== 'summary') { e.summary = short(applied, 60); }
     // 새 페이지는 키워드 2개까지, 기존 페이지는 1개만 조심스럽게 보탠다 (최대 5개)
     const room = Math.max(0, Math.min(e.keywords.length ? 1 : 2, 5 - e.keywords.length));
     const kws = (opts.keywords || App.ai.extractKeywords(text)).filter((k) => !e.keywords.includes(k)).slice(0, room);
@@ -175,6 +177,50 @@
     return entry;
   }
 
+  // AI 추정: 이 기록은 어느 경험 이야기인가 (변경 없음)
+  function decide(src, text, finding) {
+    let target = null; let decided = 'new'; let candidates = []; let projectId = src.projectId || null;
+    if (src.expId && S.get(src.expId) && !src.forceNew) { target = S.get(src.expId); decided = src.decided || 'question'; }
+    else if (finding && !src.forceNew) {
+      // 코드 질문의 답: 같은 기술 이야기를 하는 경험이 그 프로젝트에 있으면 거기로, 없으면 코드를 근거로 새 경험
+      const hit = codeMatch(finding, src.projectId); if (hit) { target = hit; decided = 'high'; }
+      candidates = st().experiences.filter((e) => e.projectId === src.projectId).map((e) => e.id);
+    } else if (!src.forceNew) {
+      projectId = src.projectId || (detectProject(text) || {}).id || null;
+      const m = match(text, { projectId, projectOnly: src.type === 'checkin' || src.type === 'code' });
+      candidates = m.candidates.map((e) => e.id);
+      const threshold = src.type === 'checkin' ? 'high' : 'mid';
+      if (m.best && (m.confidence === 'high' || (threshold === 'mid' && m.confidence === 'mid'))) { target = m.best; decided = m.confidence; }
+    }
+    return { target, decided, candidates: candidates.filter((id) => !target || id !== target.id), projectId };
+  }
+
+  // 구어체 답변 → 경험 페이지용 문장 (모의 AI: 어미 정리 + 군더더기 제거). 사용자가 제안 단계에서 고칠 수 있다
+  function polish(text) {
+    let t = String(text || '').trim().replace(/\s+/g, ' ');
+    t = t.replace(/(^|\s)(그냥|약간|좀|뭔가|그래서|아무튼|일단)\s/g, '$1');
+    t = t.replace(/했었어요/g, '했었음').replace(/([았었였했됐줬봤왔갔났웠렸켰쳤])어요/g, '$1음').replace(/해요/g, '함').replace(/(이에요|예요)/g, '임').replace(/있어요/g, '있음').replace(/없어요/g, '없음').replace(/돼요/g, '됨').replace(/거든요|더라고요|네요/g, '음');
+    return t;
+  }
+
+  /* plan: 반영하기 전에 "어디에 · 어떤 문장으로" 제안 (변경 없음). 대화 화면이 이걸 보여 주고 사용자가 고른 뒤 ingest({ ..., decision }) 한다
+     → { mode:'update'|'new'|'timeline', expId, field, text, title, current, candidates:[id], projectId, confidence } */
+  function plan(src) {
+    ensure();
+    const text = String(src.text || '').trim();
+    const finding = src.findingId ? (S.findFinding(src.findingId) || {}).finding : null;
+    const g = decide(src, text, finding);
+    const field = (src.field) || inferField(text, src.question, src.stage);
+    const e = g.target;
+    const project = g.projectId ? S.getProject(g.projectId) : null;
+    let mode = e ? 'update' : 'new';
+    if (!e && src.type === 'checkin' && src.logType === 'milestone') mode = 'timeline';
+    const title = e ? e.title : (finding ? finding.title : (project ? `「${S.projectName(project)}」 ` : '') + short(text, 24)).trim();
+    const pool = g.candidates.length ? g.candidates : S.list().filter((x) => !e || x.id !== e.id).slice(0, 6).map((x) => x.id);
+    return { mode, expId: e ? e.id : null, field, text: polish(text), title, current: e ? currentOf(e, field) : '', candidates: pool.slice(0, 6), projectId: g.projectId, confidence: g.decided };
+  }
+  function currentOf(e, field) { return field === 'insights' ? (e.insights || '') : ((e.star || {})[field] || ''); }
+
   function done(source, changes, snap, extra) { const e = record(source, changes, snap, extra); persist(); return e; }
 
   /* ---------- ingest: 모든 기록이 들어오는 단 하나의 입구 ----------
@@ -194,20 +240,17 @@
     }
     if (!text) { return done({ type: src.type, text, question: src.question, questionId: src.questionId, projectId: src.projectId }, changes, snap); }
 
-    // 1) 대상 경험 정하기
-    if (src.expId && S.get(src.expId) && !src.forceNew) { target = S.get(src.expId); decided = src.decided || 'question'; }
-    else if (finding && !src.forceNew) {
-      // 코드 질문의 답: 같은 기술 이야기를 하는 경험이 그 프로젝트에 있으면 거기로, 없으면 코드를 근거로 새 경험
-      const hit = codeMatch(finding, src.projectId); if (hit) { target = hit; decided = 'high'; }
-      opts.projectId = src.projectId;
-    }
-    else if (!src.forceNew) {
-      const projectId = src.projectId || (detectProject(text) || {}).id || null;
-      const m = match(text + ' ' + (finding ? finding.title : ''), { projectId, projectOnly: src.type === 'checkin' || src.type === 'code' });
-      candidates = m.candidates.map((e) => e.id);
-      const threshold = src.type === 'checkin' ? 'high' : 'mid';
-      if (m.best && (m.confidence === 'high' || (threshold === 'mid' && m.confidence === 'mid'))) { target = m.best; decided = m.confidence; }
-      if (!projectId) opts.projectId = null; else opts.projectId = projectId;
+    // 1) 대상 경험 정하기 — 사용자가 대화로 정했으면(src.decision) 그대로, 아니면 AI 추정
+    const d = src.decision || null;
+    if (d) {
+      if (d.mode === 'skip') return done({ type: src.type, text, question: src.question, questionId: src.questionId, projectId: src.projectId, logId: src.logId }, changes, snap, { decided: 'skip' });
+      if (d.mode === 'update' && d.expId && S.get(d.expId)) { target = S.get(d.expId); decided = 'user'; }
+      opts.field = d.field || null; opts.applyText = d.text || null; if (d.title) opts.title = d.title;
+      opts.projectId = d.projectId !== undefined ? d.projectId : (src.projectId || (detectProject(text) || {}).id || null);
+      if (d.mode === 'timeline') return done({ type: src.type, text, question: src.question, questionId: src.questionId, projectId: src.projectId, logId: src.logId }, changes, snap, { decided: 'timeline' });
+    } else {
+      const g = decide(src, text, finding);
+      target = g.target; decided = g.decided; candidates = g.candidates; opts.projectId = g.projectId;
     }
 
     // 2) 반영
@@ -216,11 +259,11 @@
       compileInto(target, text, opts, changes);
     } else {
       // 체크인 중 '마일스톤'은 타임라인에만 — 경험 페이지는 이야기(결정·문제·협업·배움)가 있을 때 만든다
-      if (src.type === 'checkin' && src.logType === 'milestone') {
+      if (!d && src.type === 'checkin' && src.logType === 'milestone') {
         return done({ type: src.type, text, question: src.question, questionId: src.questionId, projectId: src.projectId, logId: src.logId }, changes, snap, { candidates });
       }
       const e = newCard(text, opts, changes);
-      snap.exps[e.id] = null; target = e; decided = 'new';
+      snap.exps[e.id] = null; target = e; decided = d ? 'user-new' : 'new';
     }
     if (src.questionId) { const q = st().inbox.find((x) => x.id === src.questionId); if (q) q.compiledTo = target.id; }
     return done({ type: src.type, text, question: src.question, questionId: src.questionId, projectId: src.projectId, logId: src.logId, findingId: src.findingId }, changes, snap, { target: target.id, decided, candidates: candidates.filter((id) => id !== target.id) });
@@ -429,6 +472,9 @@
       : entry.decided === 'new' ? '새 경험으로 위키에 추가했어요'
       : entry.decided === 'question' || entry.decided === 'edit' ? '이 경험 페이지에 반영했어요'
       : entry.decided === 'user' ? '고른 경험에 반영했어요'
+      : entry.decided === 'user-new' ? '새 경험으로 위키에 추가했어요'
+      : entry.decided === 'skip' ? '위키에는 반영하지 않고 답변만 남겼어요'
+      : entry.decided === 'timeline' ? '타임라인에만 기록했어요'
       : tgt ? '비슷한 경험을 찾아 거기에 반영했어요'
       : entry.source.type === 'code' ? (entry.changes.length ? '코드 분석 결과를 위키에 반영했어요' : '새로 연결할 경험이 없어요 — 발견 항목은 코드 분석 탭에 그대로 있어요')
       : entry.changes.some((c) => c.kind === 'log') ? '타임라인에 기록했어요 — 결정·문제·협업 이야기가 생기면 경험으로 정리돼요' : '위키에 기록했어요';
@@ -440,7 +486,7 @@
     }
     const alts = (entry.candidates || []).map((id) => S.get(id)).filter(Boolean).slice(0, 3);
     // AI 대화·직접 작성은 여러 칸을 한꺼번에 고친 것이라 옮기기 대신 되돌리기만
-    const canMove = canUndo(entry) && tgt && entry.source.text && entry.source.type !== 'chat' && entry.decided !== 'edit';
+    const canMove = canUndo(entry) && tgt && entry.source.text && entry.source.type !== 'chat' && !['edit', 'user', 'user-new', 'skip', 'timeline'].includes(entry.decided); // 대화로 직접 고른 반영은 다시 묻지 않는다
     return `<div class="wk-report ${entry.undone ? 'is-undone' : ''}" data-wk-entry="${entry.id}">
       <div class="wk-report-head"><span class="wk-badge">위키 반영</span><b>${esc(head)}</b></div>
       ${entry.undone ? '' : `<ul class="wk-changes">${entry.changes.map(changeLine).join('')}</ul>`}
@@ -480,7 +526,7 @@
     });
   }
 
-  App.wiki = { canUndo, ingest, ingestLog, ingestCode, recordEdit, undo, reroute, match, detectProject, inferField, lint, askIssue, fixIssue, autoQueue, entries, sourcesOf, cardsForFinding, stats, reportHTML, bindReport, codeQuestion, get: (id) => (st().wikiLog || []).find((w) => w.id === id) || null, SOURCE_LABEL, SOURCE_ICO, FIELD_LABEL, short };
+  App.wiki = { canUndo, plan, polish, currentOf, ingest, ingestLog, ingestCode, recordEdit, undo, reroute, match, detectProject, inferField, lint, askIssue, fixIssue, autoQueue, entries, sourcesOf, cardsForFinding, stats, reportHTML, bindReport, codeQuestion, get: (id) => (st().wikiLog || []).find((w) => w.id === id) || null, SOURCE_LABEL, SOURCE_ICO, FIELD_LABEL, short };
   ensure();
   // 시드: 이미 분석된 레포의 발견 항목 중 같은 이야기를 하는 경험이 있으면 코드 근거로 조용히 연결
   if (!st().wikiMeta.seededCode) {

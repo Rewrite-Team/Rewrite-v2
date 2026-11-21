@@ -35,7 +35,6 @@
 .dy-qcard[data-type="deepen"]::before { background: var(--primary); }
 .dy-qcard[data-type="project"]::before { background: var(--success); }
 .dy-qcard[data-type="code"]::before { background: var(--text-2); }
-.dy-feedback::before { background: var(--success); }
 .dy-empty::before { display: none; }
 
 .dy-slide-in { animation: dy-in .32s cubic-bezier(.2, .8, .2, 1); }
@@ -92,7 +91,6 @@
 .dy-qrow-st { flex-shrink: 0; font-size: 12px; font-weight: 600; color: var(--text-3); }
 .dy-qrow.is-answered .dy-qrow-st { color: var(--success); }
 .dy-qrow.is-on .dy-qrow-st { color: var(--primary); }
-.dy-qrow-draft { flex-shrink: 0; font-size: 11px; font-weight: 700; color: var(--warn); background: var(--warn-soft); padding: 1px 6px; border-radius: 5px; }
 
 .dy-answered::before { background: var(--success); }
 .dy-done-tag { margin-left: auto; font-size: 12.5px; font-weight: 700; color: var(--success); }
@@ -120,31 +118,22 @@
 a.dy-dest:hover { box-shadow: 0 0 0 1px var(--primary) inset; }
 .dy-dest[data-kind="project"] { color: var(--success); background: var(--success-soft); }
 .dy-dest[data-kind="code"] { color: var(--text); background: var(--surface-2); border: 1px solid var(--border); }
-.dy-feedback .wk-report { margin: 0; }
 .dy-qtext { font-size: 23px; font-weight: 800; line-height: 1.42; letter-spacing: -0.02em; margin: 2px 0; }
-.dy-hint { display: flex; gap: 8px; font-size: 13.5px; color: var(--text-2); background: var(--warn-soft); border-radius: 10px; padding: 9px 12px; }
 
-.dy-answer-wrap { position: relative; }
-.dy-answer {
-  width: 100%; border: 1px solid var(--border-strong); border-radius: 14px; padding: 13px 14px 26px; resize: none; outline: none;
-  font-size: 15px; line-height: 1.6; min-height: 92px; background: var(--surface-2); transition: all .12s;
-}
-.dy-answer:focus { border-color: var(--primary); background: var(--surface); box-shadow: 0 0 0 3px var(--primary-soft); }
-.dy-kbd { position: absolute; right: 12px; bottom: 8px; font-size: 11px; color: var(--text-3); pointer-events: none; }
+/* AI와 대화하며 답하기 (App.talk) — 첫 말풍선이 오늘의 질문 */
+.dy-talk { min-width: 0; }
+.dy-talk .tk-msgs { max-height: min(62vh, 620px); }
+.dy-talk .tk-msg.ai:first-child .tk-q { font-size: 18px; font-weight: 700; line-height: 1.45; letter-spacing: -0.01em; }
+.dy-talk .tk-msg.ai:first-child .tk-bubble { padding: 12px 14px; }
+.dy-talk .wk-report { margin: 0; }
+.dy-talk-tip { font-size: 12px; text-align: right; }
+.dy-qcard .dy-done-tag[hidden] { display: none; }
 .dy-qfoot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .dy-qfoot-left { display: flex; gap: 2px; }
-.dy-submit { padding: 10px 22px; border-radius: 10px; }
 
-/* ---------- Feedback ---------- */
-.dy-fb-top { display: flex; gap: 12px; align-items: center; }
-.dy-fb-burst { font-size: 30px; animation: dy-pop .5s cubic-bezier(.2, 1.6, .4, 1); }
+/* ---------- Answered ---------- */
 @keyframes dy-pop { from { transform: scale(.3) rotate(-20deg); opacity: 0; } to { transform: none; opacity: 1; } }
-.dy-fb-top h3 { font-size: 19px; font-weight: 800; }
-.dy-fb-streak { font-size: 13px; color: #b25d15; font-weight: 600; }
-.dy-fb-q { font-size: 13.5px; color: var(--text-3); }
 .dy-quote { margin: -6px 0 0; padding: 10px 14px; border-left: 3px solid var(--primary); background: var(--primary-soft); color: var(--primary-ink); border-radius: 0 10px 10px 0; font-size: 14.5px; white-space: pre-wrap; }
-.dy-fb-gap { font-size: 12.5px; }
-.dy-fb-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding-top: 4px; }
 
 /* ---------- Empty ---------- */
 .dy-empty { text-align: center; align-items: center; padding: 40px 28px 32px; }
@@ -230,10 +219,8 @@ a.dy-dest:hover { box-shadow: 0 0 0 1px var(--primary) inset; }
   .dy-qcard { padding: 22px 18px 18px; border-radius: 18px; }
   .dy-qtext { font-size: 20px; }
   .dy-count { margin-left: 0; }
-  .dy-kbd { display: none; }
-  .dy-answer { padding-bottom: 13px; }
-  .dy-fb-actions .btn { flex: 1 1 auto; }
-  .dy-fb-gap { flex-basis: 100%; text-align: center; }
+  .dy-talk .tk-msg.ai:first-child .tk-q { font-size: 16.5px; }
+  .dy-talk-tip { display: none; }
   .dy-aside { grid-template-columns: 1fr; }
   .dy-tabs { margin-left: 0; width: 100%; }
   .dy-tab { flex: 1; justify-content: center; }

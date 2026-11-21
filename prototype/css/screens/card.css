@@ -3,10 +3,6 @@
 .cd-sec { margin-bottom: 16px; }
 .cd-sec-sub { font-weight: 500; margin-left: 2px; }
 .cd-mt { margin-top: 16px; }
-.cd-ai-mini {
-  display: inline-grid; place-items: center; min-width: 20px; height: 16px; padding: 0 4px; border-radius: 5px;
-  background: var(--primary); color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .02em;
-}
 .cd-link { color: var(--primary); font-weight: 600; margin-left: 4px; }
 .cd-link:hover { text-decoration: underline; }
 .cd-soft-empty { color: var(--text-3); font-size: 14px; background: var(--surface-2); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 14px 16px; }
@@ -110,20 +106,8 @@
 .cd-quick { margin-top: 8px; border: 1px dashed var(--border-strong); background: transparent; border-radius: 999px; padding: 4px 10px; font-size: 12.5px; color: var(--text-2); cursor: pointer; }
 .cd-quick:hover { border-color: var(--primary); color: var(--primary-ink); }
 
-.cd-ai-btn { margin-left: auto; color: var(--primary-ink); border-color: #d6d7f6; }
-.cd-ai-btn:hover { background: var(--primary-soft); }
-.cd-spin { width: 12px; height: 12px; border: 2px solid #c9caf3; border-top-color: var(--primary); border-radius: 50%; display: inline-block; animation: cd-spin .7s linear infinite; }
-@keyframes cd-spin { to { transform: rotate(360deg); } }
 
 .cd-kw-current { display: flex; flex-wrap: wrap; gap: 6px; min-height: 30px; align-items: center; }
-.cd-sugg { margin-top: 12px; padding: 12px; border-radius: var(--radius); background: #f8f8ff; border: 1px solid #e3e3fa; animation: cd-pop .2s ease-out; }
-.cd-sugg-lb { font-size: 12.5px; font-weight: 700; color: var(--primary-ink); display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
-.cd-sugg-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.cd-sugg-chip { border: 0; background: transparent; padding: 0; cursor: pointer; display: inline-flex; align-items: center; position: relative; }
-.cd-sugg-chip .kw { padding-right: 22px; transition: background .12s; }
-.cd-sugg-chip:hover .kw { background: var(--surface); }
-.cd-plus { position: absolute; right: 8px; font-size: 12px; font-weight: 800; color: var(--text-2); }
-@keyframes cd-pop { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 
 .cd-kw-add { position: relative; margin-top: 12px; }
 .cd-kw-dd {
@@ -194,6 +178,13 @@ a.cd-code-chip:hover { border-color: var(--primary); color: var(--primary-ink); 
 .cd-asked { display: inline-flex; align-items: center; font-size: 12.5px; font-weight: 600; color: var(--success); padding: 4px 6px; }
 .cd-gap-acts { display: flex; gap: 6px; flex-wrap: wrap; }
 .cd-gap-help { font-size: 12px; line-height: 1.5; }
+.cd-gap-pre { display: flex; flex-direction: column; gap: 10px; }
+.cd-gap-pre[hidden], .cd-gap-talk[hidden] { display: none; }
+.cd-gap.is-talking { padding: 10px; }
+.cd-gap-talk { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.cd-gap-talk-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.cd-gap-talk-head .cd-coach-lb { margin: 0; }
+.cd-gap-talk .tk-msgs { max-height: 440px; }
 
 /* 출처 · 변경 기록 */
 .cd-srcs, .cd-hist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }

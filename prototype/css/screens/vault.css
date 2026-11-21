@@ -152,6 +152,14 @@
 .vt-soft { color: var(--text-3); font-size: 13.5px; background: var(--surface-2); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 12px 14px; }
 .vt-fixed { display: flex; flex-direction: column; gap: 6px; }
 .vt-fixed-close { align-self: flex-end; }
+/* 위키 점검 → 그 자리에서 답하기 */
+.vt-wk .wk-issue-actions { flex-wrap: wrap; justify-content: flex-end; }
+.vt-later { font-weight: 600; color: var(--text-2); }
+.wk-issue.is-talking { background: var(--surface); border-color: var(--primary); }
+.vt-talk-wrap { flex: 1 1 100%; min-width: 0; position: relative; margin-top: 4px; padding-top: 10px; border-top: 1px dashed var(--border); }
+.vt-talk-close { position: absolute; top: 4px; right: 0; z-index: 1; }
+.vt-talk { min-width: 0; padding-right: 30px; }
+@media (max-width: 640px) { .vt-talk { padding-right: 0; padding-top: 22px; } }
 .vt-list-head { margin-bottom: 12px; }
 .vt-list-head h2 { font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
 .vt-list-head .subtle { font-weight: 600; font-size: 15px; margin-left: 4px; }

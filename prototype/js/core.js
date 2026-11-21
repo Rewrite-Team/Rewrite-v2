@@ -108,6 +108,7 @@ window.App = window.App || {};
     inbox() { return state.inbox.slice(); },
     pending() { return state.inbox.filter((q) => q.status === 'pending'); },
     // opts (프로젝트 체크인일 때): { type, keywords } — 트래커에서 답하면 사용자가 고른 유형·키워드를 그대로 쓴다
+    // opts.decision: 대화에서 사용자가 정한 반영 방법 { mode:'update'|'new'|'timeline'|'skip', expId, field, text, title } — App.wiki.plan 참고
     // 답변은 모두 경험 위키를 지난다 (App.wiki.ingest). 반환값: 위키 반영 결과 entry — 화면은 App.wiki.reportHTML(entry) 로 보여 준다
     answer(qid, text, opts = {}) {
       const q = state.inbox.find((x) => x.id === qid); if (!q) return null;
@@ -119,12 +120,12 @@ window.App = window.App || {};
         const p = this.getProject(q.targetProjectId);
         const log = { id: uid('l'), date: localDay(), type: t, text, keywords: opts.keywords || App.ai.extractKeywords(text), fromQuestion: q.checkinText || q.text };
         p.logs.push(log); p.updatedAt = localDay();
-        entry = App.wiki.ingest({ type: 'checkin', text, question: q.checkinText || q.text, questionId: q.id, projectId: p.id, logId: log.id, logType: t, keywords: log.keywords });
+        entry = App.wiki.ingest({ type: 'checkin', text, question: q.checkinText || q.text, questionId: q.id, projectId: p.id, logId: log.id, logType: t, keywords: log.keywords, decision: opts.decision });
       } else if (q.findingId) {
         // 코드 분석에서 나온 질문: 그 코드가 근거로 붙은 경험으로
-        entry = App.wiki.ingest({ type: 'answer', text, question: q.text, questionId: q.id, projectId: q.targetProjectId, findingId: q.findingId });
+        entry = App.wiki.ingest({ type: 'answer', text, question: q.text, questionId: q.id, projectId: q.targetProjectId, findingId: q.findingId, decision: opts.decision });
       } else {
-        entry = App.wiki.ingest({ type: 'answer', text, question: q.text, questionId: q.id, expId: q.targetExpId || null, stage: q.stage || null });
+        entry = App.wiki.ingest({ type: 'answer', text, question: q.text, questionId: q.id, expId: q.targetExpId || null, stage: q.stage || null, decision: opts.decision });
       }
       if (entry) q.wikiEntry = entry.id;
       emit(); return entry;

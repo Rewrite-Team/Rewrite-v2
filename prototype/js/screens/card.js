@@ -183,7 +183,7 @@
         <div class="cd-comp-text"><div class="cd-comp-lb">완성도</div><div class="cd-comp-hint">${esc(nextHint(e))}</div></div>
       </div>
       <div class="cd-head-actions">
-        <a class="btn btn-primary btn-sm" href="#/discover?exp=${encodeURIComponent(e.id)}">✦ AI와 이어서 채우기</a>
+        <a class="btn btn-primary btn-sm" href="#/discover?exp=${encodeURIComponent(e.id)}">✦ AI와 길게 대화하며 채우기</a>
         ${askBtn}
         <button class="btn btn-sm" data-act="edit">✎ 직접 수정</button>
         ${App.resumeKit ? (App.resumeKit.isCardIn(e.id)
@@ -232,7 +232,7 @@
               <span class="cd-kw-desc">${esc(k.desc)}</span>
               <span class="cd-kw-count">경험 ${counts[k.name] || 0}개 →</span>
             </a>`).join('')}</div>`
-            : `<div class="cd-soft-empty">아직 키워드가 없어요. 수정에서 <b>AI 키워드 추천</b>을 눌러 보세요.</div>`}
+            : `<div class="cd-soft-empty">아직 키워드가 없어요. <b>✎ 직접 수정</b>에서 붙여 보세요.</div>`}
         </section>
 
         <div class="grid-2 cd-sec">
@@ -265,9 +265,11 @@
 
           <div class="cd-coach-blk">
             <div class="cd-coach-lb">지금 채우면 좋은 부분</div>
-            ${gap ? `<div class="cd-gap"><div class="cd-gap-q">“${esc(gap.text)}”</div>
-              <div class="cd-gap-acts">${askBtn}</div>
-              <div class="subtle cd-gap-help">받아 두면 오늘의 질문으로 와요. 답하면 이 페이지에 바로 반영돼요.</div></div>`
+            ${gap ? `<div class="cd-gap" data-cd-gap>
+              <div class="cd-gap-pre"><div class="cd-gap-q">“${esc(gap.text)}”</div>
+              <div class="cd-gap-acts"><button class="btn btn-sm btn-primary" data-act="talk-gap">바로 답하기</button>${askBtn}</div>
+              <div class="subtle cd-gap-help">여기서 답하면 AI가 어느 칸에 어떻게 적을지 먼저 보여 드려요. 나중에 답하려면 오늘의 질문으로 받아 두세요.</div></div>
+              <div class="cd-gap-talk" data-cd-gap-talk hidden><div class="cd-gap-talk-head"><span class="cd-coach-lb">AI와 대화하며 기록</span><button type="button" class="btn btn-ghost btn-sm" data-act="close-gap-talk" aria-label="닫기">✕</button></div><div data-cd-gap-slot></div></div></div>`
               : `<div class="cd-gap cd-gap-done">STAR가 모두 채워졌어요! 이제 면접에서 바로 쓸 수 있어요.</div>`}
           </div>
 
@@ -299,11 +301,7 @@
   /* ---------------- Edit ---------------- */
   function kwEditorHTML(st) {
     return `
-      <div class="cd-kw-current">${st.draft.keywords.length ? st.draft.keywords.map((k) => App.ui.keywordChip(k, { size: 'lg', removable: true })).join('') : '<span class="subtle">아직 키워드가 없어요. 아래에서 추가하거나 AI 추천을 받아 보세요.</span>'}</div>
-      ${st.suggest && st.suggest.length ? `<div class="cd-sugg">
-        <div class="cd-sugg-lb"><span class="cd-ai-mini">AI</span> 이런 역량이 보여요 · 눌러서 추가</div>
-        <div class="cd-sugg-chips">${st.suggest.map((k) => `<button type="button" class="cd-sugg-chip" data-accept-kw="${esc(k)}">${App.ui.keywordChip(k, { ai: true, size: 'lg' })}<span class="cd-plus">＋</span></button>`).join('')}
-        <button type="button" class="btn btn-sm btn-ghost" data-act="accept-all">모두 추가</button></div></div>` : ''}`;
+      <div class="cd-kw-current">${st.draft.keywords.length ? st.draft.keywords.map((k) => App.ui.keywordChip(k, { size: 'lg', removable: true })).join('') : '<span class="subtle">아직 키워드가 없어요. 아래에서 검색하거나 새로 입력해 추가해요.</span>'}</div>`;
   }
 
   function editHTML(st) {
@@ -315,7 +313,7 @@
     <form class="cd-form" autocomplete="off" onsubmit="return false">
       <div class="cd-edit-bar">
         <div><div class="cd-edit-title">${isNew ? '새 경험' : '경험 수정'}</div>
-          <div class="subtle">빈칸이 있어도 괜찮아요. 저장하면 위키에 반영되고, AI와 이어서 채울 수 있어요.</div></div>
+          <div class="subtle">빈칸이 있어도 괜찮아요. 적은 그대로 저장돼요.</div></div>
         <div class="row"><button type="button" class="btn" data-act="cancel">취소</button><button type="button" class="btn btn-primary" data-act="save">저장</button></div>
       </div>
 
@@ -345,8 +343,7 @@
       </section>
 
       <section class="card card-pad cd-sec">
-        <div class="section-title">역량 키워드
-          <button type="button" class="btn btn-sm cd-ai-btn" data-act="ai-kw"><span class="cd-ai-mini">AI</span> AI 키워드 추천</button></div>
+        <div class="section-title">역량 키워드</div>
         <div class="cd-kw-editor" data-kw-editor>${kwEditorHTML(st)}</div>
         <div class="cd-kw-add">
           <input class="input" data-kw-input placeholder="키워드 검색 또는 새로 입력 후 Enter (예: 협업)">
@@ -379,7 +376,7 @@
     const exp = isNew ? blankExp(params) : App.store.get(params.id);
     if (!exp) return { notFound: true };
     const mode = isNew || params.edit === '1' ? 'edit' : 'view';
-    return { id: isNew ? null : exp.id, mode, draft: clone(exp), suggest: [] };
+    return { id: isNew ? null : exp.id, mode, draft: clone(exp) };
   }
 
   function bodyHTML(st) {
@@ -401,7 +398,25 @@
       let ddIndex = 0;
       if (st.mode === 'view') App.wiki.bindReport(root.querySelector('[data-cd-hist]'), () => { if (!App.store.get(st.id)) { App.navigate('#/vault'); return; } draw(true); });
 
+      // AI 코치 "지금 채우면 좋은 부분" → 그 자리에서 기록 대화
+      let gapTalk = null;
+      function closeGapTalk() { if (gapTalk) gapTalk.destroy(); gapTalk = null; }
+      function openGapTalk() {
+        const e = App.store.get(st.id); const g = e && App.ai.gapQuestion(e); if (!g) return;
+        const box = root.querySelector('[data-cd-gap]'); if (!box) return;
+        closeGapTalk();
+        box.querySelector('.cd-gap-pre').hidden = true;
+        box.querySelector('[data-cd-gap-talk]').hidden = false;
+        box.classList.add('is-talking');
+        gapTalk = App.talk.mount(box.querySelector('[data-cd-gap-slot]'), {
+          ask: { text: g.text, label: '지금 채우면 좋은 부분' },
+          src: { type: 'answer', expId: e.id, stage: g.stage, question: g.text },
+          onDone: (entry) => { setTimeout(() => { if (!gapTalk) return; closeGapTalk(); if (entry) App.ui.toast('이 페이지에 반영했어요'); if (App.store.get(st.id)) draw(true); }, 1400); },
+        });
+      }
+
       function draw(keepScroll) {
+        closeGapTalk();
         root.innerHTML = bodyHTML(st); if (!keepScroll) window.scrollTo(0, 0);
         if (st.mode === 'view') App.wiki.bindReport(root.querySelector('[data-cd-hist]'), () => { if (!App.store.get(st.id)) { App.navigate('#/vault'); return; } draw(true); });
       }
@@ -425,7 +440,6 @@
         if (!name) return;
         if (st.draft.keywords.includes(name)) { App.ui.toast(`#${name}은(는) 이미 있어요`); return; }
         st.draft.keywords.push(name);
-        st.suggest = st.suggest.filter((k) => k !== name);
         drawKw();
       }
 
@@ -449,20 +463,6 @@
       }
       function closeDD() { const dd = root.querySelector('[data-kw-dd]'); if (dd) dd.hidden = true; }
 
-      async function aiSuggest(btn) {
-        readForm();
-        const d = st.draft;
-        const text = [d.title, d.role, d.summary, d.insights, ...STAR.map((s) => d.star[s.key]), ...(d.qa || []).map((x) => x.a), ...sourceLogs(d).map((l) => l.text)].join(' ');
-        if (!text.trim()) { App.ui.toast('먼저 STAR나 요약을 조금 적어 주세요. 그 내용을 보고 추천해 드려요.'); return; }
-        btn.disabled = true; const prev = btn.innerHTML; btn.innerHTML = '<span class="cd-spin"></span> 분석 중…';
-        await App.ai.think(650);
-        btn.disabled = false; btn.innerHTML = prev;
-        const found = App.ai.extractKeywords(text).filter((k) => !d.keywords.includes(k));
-        st.suggest = found;
-        drawKw();
-        if (!found.length) App.ui.toast('지금 내용에서는 새로 추천할 키워드가 없어요');
-      }
-
       function save() {
         readForm();
         const d = st.draft;
@@ -477,16 +477,16 @@
         };
         if (!st.id) {
           const created = App.store.create(patch);
-          App.wiki.recordEdit('manual', created.id, null, { text: d.summary || d.title });
+          App.wiki.recordEdit('manual', created.id, null); // 변경 기록만 조용히 남긴다
           App.ui.toast('새 경험을 위키에 추가했어요');
           App.navigate('#/card/' + created.id);
           return;
         }
         const before = clone(App.store.get(st.id));
         App.store.update(st.id, patch);
-        App.wiki.recordEdit('manual', st.id, before, { text: '직접 수정' });
-        App.ui.toast('저장했어요 · 변경 기록에 남겼어요');
-        st = { id: st.id, mode: 'view', draft: clone(App.store.get(st.id)), suggest: [] };
+        App.wiki.recordEdit('manual', st.id, before); // 변경 기록만 조용히 남긴다 (AI 정리 없음)
+        App.ui.toast('저장했어요');
+        st = { id: st.id, mode: 'view', draft: clone(App.store.get(st.id)) };
         if (location.hash.includes('edit=1')) history.replaceState(null, '', '#/card/' + st.id);
         draw();
       }
@@ -505,8 +505,6 @@
         const t = ev.target;
         const rm = t.closest('[data-remove-kw]');
         if (rm && st.mode === 'edit') { const k = rm.getAttribute('data-remove-kw'); st.draft.keywords = st.draft.keywords.filter((x) => x !== k); drawKw(); return; }
-        const acc = t.closest('[data-accept-kw]');
-        if (acc) { addKw(acc.getAttribute('data-accept-kw')); return; }
         const ddi = t.closest('[data-dd-kw]');
         if (ddi) { addKw(ddi.getAttribute('data-dd-kw')); const inp = root.querySelector('[data-kw-input]'); inp.value = ''; ddIndex = 0; drawDD(); inp.focus(); return; }
         const job = t.closest('[data-add-job]');
@@ -517,7 +515,7 @@
         if (!t.closest('.cd-kw-add')) closeDD();
         const a = t.closest('[data-act]'); if (!a) return;
         const act = a.getAttribute('data-act');
-        if (act === 'edit') { st.mode = 'edit'; st.draft = clone(App.store.get(st.id)); st.suggest = []; draw(); }
+        if (act === 'edit') { st.mode = 'edit'; st.draft = clone(App.store.get(st.id)); draw(); }
         else if (act === 'cancel') {
           if (!st.id) { App.navigate('#/vault'); return; }
           st.mode = 'view'; if (location.hash.includes('edit=1')) history.replaceState(null, '', '#/card/' + st.id); draw();
@@ -525,14 +523,14 @@
         else if (act === 'save') save();
         else if (act === 'delete') confirmDelete();
         else if (act === 'resume') { const e = App.store.get(st.id); if (e && App.resumeKit) App.resumeKit.openCardModal(e, () => draw()); }
-        else if (act === 'ai-kw') aiSuggest(a);
+        else if (act === 'talk-gap') openGapTalk();
+        else if (act === 'close-gap-talk') draw(true);
         else if (act === 'ask-gap') {
           const e = App.store.get(st.id); const g = e && App.ai.gapQuestion(e); if (!g) return;
           App.store.pushQuestion({ type: 'deepen', targetExpId: e.id, stage: g.stage, text: `${App.wiki.short(e.title, 30)} — ${g.text}`, hint: '답하면 이 경험 페이지의 빈 칸이 채워져요.' });
           App.ui.toast('오늘의 질문으로 보냈어요');
           draw(true);
         }
-        else if (act === 'accept-all') { st.suggest.slice().forEach((k) => { if (!st.draft.keywords.includes(k)) st.draft.keywords.push(k); }); st.suggest = []; drawKw(); }
         else if (act === 'copy') {
           const txt = root.querySelector('.cd-pitch').textContent;
           const done = () => App.ui.toast('30초 요약을 복사했어요');
@@ -568,6 +566,7 @@
       root.addEventListener('focusin', onFocusIn);
       root.addEventListener('keydown', onKey);
       return () => {
+        closeGapTalk();
         root.removeEventListener('click', onClick); root.removeEventListener('input', onInput);
         root.removeEventListener('focusin', onFocusIn); root.removeEventListener('keydown', onKey);
       };

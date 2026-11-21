@@ -148,3 +148,8 @@
 .home-apply-job { font-size: 12.5px; }
 .home-apply-prog { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-3); margin-top: 3px; }
 .home-apply-prog .progress { flex: 1; }
+
+/* 위키 점검: 바로 답하기(주) · 나중에 질문으로(보조) */
+.home-lint .wk-issue-actions { flex-wrap: wrap; justify-content: flex-end; }
+.home-lint .home-lint-later { font-size: 12px; color: var(--text-3); padding-left: 6px; padding-right: 6px; }
+.home-lint .home-lint-later:hover { color: var(--text); }

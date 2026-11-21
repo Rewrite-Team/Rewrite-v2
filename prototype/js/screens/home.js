@@ -73,9 +73,31 @@
       ${top.length ? `<p class="subtle home-feed-sub">채울 곳 ${all.length}개 중 먼저 볼 것</p>
       <ul class="wk-issues">${top.map((i) => `<li class="wk-issue" data-sev="${i.severity}">
         <span class="wk-issue-dot"></span><span class="wk-issue-text">${esc(i.text)}</span>
-        <span class="wk-issue-actions"><button type="button" class="btn btn-sm" data-home-act="ask" data-issue="${esc(i.id)}">질문으로 받기</button></span>
+        <span class="wk-issue-actions">
+          <button type="button" class="btn btn-ghost btn-sm home-lint-later" data-home-act="ask" data-issue="${esc(i.id)}">나중에 질문으로</button>
+          <button type="button" class="btn btn-primary btn-sm" data-home-act="talk" data-issue="${esc(i.id)}">바로 답하기</button>
+        </span>
       </li>`).join('')}</ul>` : '<p class="subtle">지금은 비어 있는 곳이 없어요. 위키가 잘 채워져 있어요.</p>'}
     </section>`;
+  }
+
+  // 위키 점검 → 그 자리에서 AI와 대화하며 답하기. 답은 오늘의 질문(askIssue)으로도 남아 기록·캘린더에 잡힌다
+  function issueSrc(qi) {
+    if (qi.findingId) return { type: 'answer', question: qi.text, projectId: qi.targetProjectId, findingId: qi.findingId };
+    if (qi.targetExpId) return { type: 'answer', question: qi.text, expId: qi.targetExpId, stage: qi.stage || null };
+    return { type: 'answer', question: qi.text };
+  }
+  function answerIssue(issue) {
+    if (!issue || !issue.question) return;
+    const qi = issue.question;
+    const hint = qi.hint || (qi.targetExpId ? '답하면 이 경험의 비어 있는 칸이 채워져요.' : '');
+    App.talk.open({
+      title: '위키 점검',
+      ask: { text: qi.text, label: '위키 점검', hint },
+      src: issueSrc(qi),
+      commit: (text, d) => { const q = App.wiki.askIssue(issue); return App.store.answer(q.id, text, { decision: d }); },
+      onClose: () => App.rerender(),
+    });
   }
 
   /* ---------- 답변 캘린더 ---------- */
@@ -246,6 +268,7 @@
         const btn = ev.target.closest('[data-home-act]');
         if (!btn) return;
         const act = btn.getAttribute('data-home-act');
+        if (act === 'talk') { answerIssue(lintIssues().find((i) => i.id === btn.getAttribute('data-issue'))); return; }
         if (act === 'ask') {
           const issue = lintIssues().find((i) => i.id === btn.getAttribute('data-issue'));
           if (App.wiki.askIssue(issue)) App.ui.toast('오늘의 질문으로 받았어요. 답하면 이 빈칸이 채워져요');

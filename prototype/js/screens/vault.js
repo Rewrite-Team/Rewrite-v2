@@ -197,24 +197,45 @@
   function initState(params) {
     const kws = new Set();
     if (params.kw) params.kw.split(',').map((x) => x.trim()).filter(Boolean).forEach((k) => kws.add(k));
-    return { q: params.q || '', kws, category: params.category || '', status: params.status || '', sort: 'updated', view: loadView(), group: loadGroup(), allIssues: false, fixed: null };
+    return { q: params.q || '', kws, category: params.category || '', status: params.status || '', sort: 'updated', view: loadView(), group: loadGroup(), allIssues: false, fixed: null, talkFor: null };
   }
 
   /* ---------- 위키 점검 ---------- */
   function askedFor(issue) {
     return App.store.state.inbox.some((q) => q.lintId === issue.id && (q.status === 'pending' || q.status === 'later'));
   }
-  function issueHTML(i) {
+  function issueHTML(i, st) {
     const acts = [];
-    if (i.action === 'compileLog' || i.action === 'link') acts.push(`<button type="button" class="btn btn-sm btn-primary" data-issue-fix="${esc(i.id)}">바로 반영</button>`);
+    const open = st && st.talkFor === i.id;
+    if (i.action === 'compileLog') acts.push(open ? '' : `<button type="button" class="btn btn-sm btn-primary" data-issue-talk="${esc(i.id)}">바로 반영</button>`);
+    else if (i.action === 'link') acts.push(`<button type="button" class="btn btn-sm btn-primary" data-issue-fix="${esc(i.id)}">바로 연결</button>`);
     if (i.question) {
+      if (!open) acts.push(`<button type="button" class="btn btn-sm btn-primary" data-issue-talk="${esc(i.id)}">바로 답하기</button>`);
       acts.push(askedFor(i)
         ? '<span class="vt-asked">✓ 오늘의 질문에 있어요</span>'
-        : `<button type="button" class="btn btn-sm" data-issue-ask="${esc(i.id)}">질문으로 받기</button>`);
+        : `<button type="button" class="btn btn-sm btn-ghost vt-later" data-issue-ask="${esc(i.id)}">나중에 질문으로</button>`);
     }
     if (i.expId) acts.push(`<a class="btn btn-sm btn-ghost" href="#/card/${encodeURIComponent(i.expId)}">페이지 →</a>`);
     else if (i.projectId) acts.push(`<a class="btn btn-sm btn-ghost" href="#/projects/${encodeURIComponent(i.projectId)}${i.findingId ? '?tab=code' : ''}">프로젝트 →</a>`);
-    return `<li class="wk-issue" data-sev="${i.severity}"><span class="wk-issue-dot"></span><span class="wk-issue-text">${esc(i.text)}</span><span class="wk-issue-actions">${acts.join('')}</span></li>`;
+    return `<li class="wk-issue ${open ? 'is-talking' : ''}" data-sev="${i.severity}"><span class="wk-issue-dot"></span><span class="wk-issue-text">${esc(i.text)}</span><span class="wk-issue-actions">${acts.join('')}</span>
+      ${open ? `<div class="vt-talk-wrap"><button type="button" class="btn btn-ghost btn-sm vt-talk-close" data-act="close-talk" aria-label="닫기">✕</button><div data-vt-talk-slot></div></div>` : ''}</li>`;
+  }
+  // 점검 항목 → 그 자리에서 여는 기록 대화 설정
+  function talkCfg(issue) {
+    if (issue.action === 'compileLog') {
+      const p = App.store.getProject(issue.projectId);
+      const log = p && (p.logs || []).find((l) => l.id === issue.logId);
+      if (!log) return null;
+      return { prefill: log.text, src: { type: 'checkin', projectId: issue.projectId, logId: log.id, logType: log.type, question: log.fromQuestion || '' } };
+    }
+    const q = issue.question; if (!q) return null;
+    const src = q.targetExpId && q.stage ? { type: 'answer', expId: q.targetExpId, stage: q.stage, question: q.text }
+      : q.findingId ? { type: 'answer', projectId: q.targetProjectId, findingId: q.findingId, question: q.text }
+      : { type: 'answer', question: q.text };
+    return {
+      ask: { text: q.text, hint: q.hint || '', label: '위키 점검' }, src,
+      commit: (text, d) => { const qq = App.wiki.askIssue(issue); return App.store.answer(qq.id, text, { decision: d }); },
+    };
   }
   function lintHTML(st) {
     const issues = App.wiki.lint();
@@ -222,7 +243,7 @@
     const fixed = st.fixed && App.wiki.get(st.fixed);
     return `<div class="vt-panel-head"><h2>위키 점검</h2><span class="subtle">${issues.length ? `채우면 좋은 곳 ${issues.length}개` : ''}</span></div>
       ${fixed ? `<div class="vt-fixed">${App.wiki.reportHTML(fixed)}<button type="button" class="btn btn-sm btn-ghost vt-fixed-close" data-act="close-fixed">닫기</button></div>` : ''}
-      ${issues.length ? `<ul class="wk-issues">${shown.map(issueHTML).join('')}</ul>
+      ${issues.length ? `<ul class="wk-issues">${shown.map((i) => issueHTML(i, st)).join('')}</ul>
         ${issues.length > ISSUE_LIMIT ? `<button type="button" class="btn btn-sm btn-ghost vt-more" data-act="more-issues">${st.allIssues ? '접기' : `더 보기 (${issues.length - ISSUE_LIMIT}개)`}</button>` : ''}`
         : '<div class="vt-soft">빈 곳이 없어요. 위키가 잘 정리돼 있어요.</div>'}`;
   }
@@ -290,10 +311,41 @@
       }
 
       // 위키가 바뀐 뒤: 점검·변경 기록·통계·목록 모두 다시
+      // 위키 점검 항목 아래에 펼치는 기록 대화 (한 번에 하나)
+      let talk = null; let talkHost = null;
+      function closeTalk() { if (talk) talk.destroy(); talk = null; talkHost = null; st.talkFor = null; }
+      function openTalk(issue) {
+        closeTalk();
+        const cfg = talkCfg(issue);
+        if (!cfg) { App.ui.toast('이 기록을 찾지 못했어요'); refreshWiki(); return; }
+        st.talkFor = issue.id;
+        talkHost = document.createElement('div'); talkHost.className = 'vt-talk';
+        talk = App.talk.mount(talkHost, Object.assign(cfg, {
+          onDone: (entry) => {
+            setTimeout(() => {
+              closeTalk(); st.fixed = entry ? entry.id : null;
+              App.ui.toast(entry ? '위키에 반영했어요' : '답변을 남겼어요');
+              refreshWiki();
+            }, 900);
+          },
+        }));
+        refreshWiki();
+      }
+      function placeTalk() {
+        if (!st.talkFor) return;
+        const slot = $('[data-vt-talk-slot]');
+        if (!slot || !talkHost) { closeTalk(); return; }
+        slot.appendChild(talkHost);
+        if (talk && talk.phase !== 'propose') { const inp = talkHost.querySelector('[data-tk-in]'); if (inp) try { inp.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
+      }
+
       function refreshWiki() {
         const lintEl = $('[data-vt-lint]');
+        if (talkHost && talkHost.parentNode) talkHost.parentNode.removeChild(talkHost); // 다시 그려도 대화는 유지
+        if (st.talkFor && !App.wiki.lint().some((i) => i.id === st.talkFor)) closeTalk();
         lintEl.innerHTML = lintHTML(st);
-        App.wiki.bindReport(lintEl, (n) => { st.fixed = n ? n.id : null; refreshWiki(); });
+        placeTalk();
+        App.wiki.bindReport(lintEl.querySelector('.vt-fixed'), (n) => { st.fixed = n ? n.id : null; refreshWiki(); });
         $('[data-vt-feed]').innerHTML = feedHTML();
         $('[data-vt-stats]').textContent = statsText();
         $('[data-vt-total]').textContent = App.store.list().length;
@@ -339,6 +391,13 @@
           if (issue && App.wiki.askIssue(issue)) App.ui.toast('오늘의 질문으로 보냈어요. 답하면 이 페이지에 반영돼요.');
           refreshWiki(); return;
         }
+        const tb = t.closest('[data-issue-talk]');
+        if (tb) {
+          const issue = findIssue(tb.getAttribute('data-issue-talk'));
+          if (issue) openTalk(issue); else refreshWiki();
+          return;
+        }
+        if (t.closest('.vt-talk')) return; // 대화 안의 클릭은 대화가 처리
         const fix = t.closest('[data-issue-fix]');
         if (fix) {
           const issue = findIssue(fix.getAttribute('data-issue-fix'));
@@ -361,6 +420,7 @@
         else if (act === 'clear-q') { st.q = ''; const i = $('[data-vt-q]'); i.value = ''; i.focus(); refresh(); }
         else if (act === 'more-issues') { st.allIssues = !st.allIssues; refreshWiki(); }
         else if (act === 'close-fixed') { st.fixed = null; refreshWiki(); }
+        else if (act === 'close-talk') { closeTalk(); refreshWiki(); }
         else if (act === 'view') App.navigate('#/card/' + id);
         else if (act === 'edit') App.navigate('#/card/' + id + '?edit=1');
         else if (act === 'delete') { closeMenus(); confirmDelete(id); }
@@ -387,7 +447,7 @@
       root.addEventListener('keydown', onKey);
       document.addEventListener('click', onDocClick);
       return () => {
-        clearTimeout(qTimer);
+        clearTimeout(qTimer); closeTalk();
         root.removeEventListener('click', onClick); root.removeEventListener('input', onInput);
         root.removeEventListener('change', onChange); root.removeEventListener('keydown', onKey);
         document.removeEventListener('click', onDocClick);

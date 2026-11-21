@@ -76,54 +76,26 @@
     window.scrollTo(0, 0);
   }
 
-  /* ＋ 기록하기 — 무엇을 넣든 입구는 하나. 가벼운 한 줄도, AI와의 긴 대화도, 코드 분석도 같은 경험 위키에 쌓인다 */
+  /* ＋ 기록하기 — 무엇을 넣든 입구는 하나. 한 줄을 말하면 AI가 어느 경험의 어느 칸에 넣을지 제안하고, 사용자가 정한다 */
   function openCapture(preset = {}) {
-    const esc = App.ui.esc; const S = App.store;
-    const projects = S.projects().filter((p) => p.status === 'ongoing').concat(S.projects().filter((p) => p.status !== 'ongoing'));
-    const root = document.getElementById('modal-root');
-    root.innerHTML = `<div class="modal-backdrop"><div class="modal capture-modal">
-      <div class="modal-head">무엇이든 기록해 두세요</div>
-      <div class="modal-body" id="cap-body">
-        <p class="subtle" style="margin:0 0 10px">한 줄이면 충분해요. AI가 비슷한 경험을 찾아 거기에 보태거나, 새 경험 페이지를 만들어요.</p>
-        <textarea class="input" id="cap-text" rows="4" placeholder="예) 오늘 모여봄 배포 전에 설정값 체크리스트를 같이 돌려 봤는데 에러가 한 건도 안 났다">${esc(preset.text || '')}</textarea>
-        <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
-          <span class="subtle" style="font-size:12.5px">어느 프로젝트 이야기인가요?</span>
-          <select class="input" id="cap-proj" style="width:auto;padding:4px 8px;height:auto;font-size:12.5px">
-            <option value="">AI가 알아서 찾기</option>
-            ${projects.map((p) => `<option value="${p.id}" ${preset.projectId === p.id ? 'selected' : ''}>${esc(S.projectName(p))}</option>`).join('')}
-          </select>
-        </div>
-        <div class="capture-more">
-          <div class="subtle" style="font-size:12px;margin:16px 0 8px">더 깊게 기록하고 싶다면 — 결과는 모두 같은 위키에 쌓여요</div>
-          <div class="wk-add-modes">
-            <a class="wk-add-mode" href="#/discover"><span class="wk-src">✦</span><div><b>AI와 대화하며 기록</b><span class="subtle">질문을 따라 답하다 보면 상황·행동·결과가 채워져요</span></div></a>
-            <a class="wk-add-mode" href="${preset.projectId ? `#/projects/${preset.projectId}?tab=code` : '#/projects'}"><span class="wk-src">⌥</span><div><b>GitHub 레포 분석</b><span class="subtle">코드에서 찾은 기술 포인트가 근거로 붙고, 빈 이야기는 질문으로 와요</span></div></a>
-            <a class="wk-add-mode" href="#/card/new"><span class="wk-src">✎</span><div><b>직접 작성</b><span class="subtle">이미 정리해 둔 경험을 칸에 맞춰 옮겨 적어요</span></div></a>
-          </div>
-        </div>
-      </div>
-      <div class="modal-foot"><button class="btn" data-m="cancel">닫기</button><button class="btn btn-primary" data-m="ok">위키에 기록</button></div></div></div>`;
-    const close = () => { root.innerHTML = ''; };
-    root.querySelector('[data-m=cancel]').onclick = close;
-    root.querySelector('.modal-backdrop').onclick = (ev) => { if (ev.target.classList.contains('modal-backdrop') || ev.target.closest('a.wk-add-mode')) close(); };
-    const ok = root.querySelector('[data-m=ok]');
-    ok.onclick = () => {
-      const text = root.querySelector('#cap-text').value.trim();
-      if (!text) { root.querySelector('#cap-text').focus(); return; }
-      const projectId = root.querySelector('#cap-proj').value || null;
-      let entry;
-      if (projectId) {
-        const p = S.getProject(projectId);
-        const log = S.addLog(projectId, { text, type: /결정|선택/.test(text) ? 'decision' : /문제|에러|버그|오류/.test(text) ? 'issue' : /팀원|같이|의견/.test(text) ? 'collab' : /배웠|알게/.test(text) ? 'learning' : 'milestone' });
-        entry = App.wiki.ingestLog(p.id, log.id);
-      } else entry = App.wiki.ingest({ type: 'manual', text });
-      const body = root.querySelector('#cap-body');
-      const paint = (e) => { body.innerHTML = App.wiki.reportHTML(e); App.wiki.bindReport(body, (n) => { paint(n || e); }); };
-      paint(entry);
-      ok.textContent = '하나 더 기록'; ok.onclick = () => openCapture();
-      root.querySelector('[data-m=cancel]').onclick = () => { close(); render(); };
-    };
-    setTimeout(() => { const t = root.querySelector('#cap-text'); if (t) t.focus(); }, 30);
+    const S = App.store;
+    const project = preset.projectId ? S.getProject(preset.projectId) : null;
+    App.talk.open({
+      title: '＋ 기록하기',
+      ask: { text: project ? `「${S.projectName(project)}」에서 어떤 일이 있었나요?` : '무엇을 기록해 둘까요?', hint: '한 줄이면 충분해요. 어느 경험에 어떻게 넣을지는 같이 정해요.' },
+      prefill: preset.text || '',
+      src: project ? { type: 'checkin', projectId: project.id, question: '(직접 기록)' } : { type: 'manual', question: '(직접 기록)' },
+      // 프로젝트를 정해 두고 기록하면 원문은 그 프로젝트 타임라인에도 남는다
+      commit: project ? (text, decision) => {
+        const t = /결정|선택/.test(text) ? 'decision' : /문제|에러|버그|오류/.test(text) ? 'issue' : /팀원|같이|의견/.test(text) ? 'collab' : /배웠|알게/.test(text) ? 'learning' : 'milestone';
+        const log = S.addLog(project.id, { text, type: t });
+        return App.wiki.ingest({ type: 'checkin', text, projectId: project.id, logId: log.id, logType: t, keywords: log.keywords, decision });
+      } : null,
+      footerHTML: `<div class="capture-more"><div class="subtle" style="font-size:12px;margin:4px 0 8px">더 깊게 — 결과는 모두 같은 위키에 쌓여요</div><div class="wk-add-modes">
+        <a class="wk-add-mode" href="#/discover${project ? '?project=' + project.id : ''}"><span class="wk-src">✦</span><div><b>AI와 길게 대화하며 기록</b><span class="subtle">상황→과제→행동→결과 순서로 질문을 따라가며 한 경험을 끝까지 정리</span></div></a>
+        <a class="wk-add-mode" href="${project ? `#/projects/${project.id}?tab=code` : '#/projects'}"><span class="wk-src">⌥</span><div><b>GitHub 레포 분석</b><span class="subtle">코드에서 찾은 기술 포인트가 근거로 붙고, 빈 이야기는 질문으로 와요</span></div></a>
+      </div></div>`,
+    });
   }
   App.capture = openCapture;
   document.addEventListener('click', (ev) => { const b = ev.target.closest('[data-capture]'); if (b) { ev.preventDefault(); openCapture({ projectId: b.getAttribute('data-capture-project') || '' }); } });
