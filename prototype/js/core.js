@@ -21,6 +21,8 @@ window.App = window.App || {};
   const LEGACY_STATUS = { interest: 'preparing', writing: 'preparing', submitted: 'applied', interview: 'applied', done: 'failed' };
   state.applications.forEach((a) => { if (LEGACY_STATUS[a.status]) a.status = LEGACY_STATUS[a.status]; });
   if (!state.resume) state.resume = clone(window.SEED.resume || EMPTY_RESUME());
+  // '건너뛰기'와 '나중에'를 '나중에 답하기' 하나로 합침: 예전 '나중에' 질문은 미뤄 둔 질문(skipped)으로
+  (state.inbox || []).forEach((q) => { if (q.status === 'later') q.status = 'skipped'; });
   const listeners = new Set();
   function persist() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ } }
   function emit() { persist(); listeners.forEach((fn) => fn(state)); }
@@ -114,7 +116,7 @@ window.App = window.App || {};
     deleteQuestion(qid) {
       const q = state.inbox.find((x) => x.id === qid); if (!q) return false;
       if (App.wiki && App.wiki.threads) App.wiki.threads().filter((t) => t.questionId === qid).map((t) => t.id).forEach((id) => App.wiki.deleteThread(id, true));
-      if (q.status === 'pending' || q.status === 'later') q.status = 'skipped'; // 체크인·코드 질문이 바로 다시 도착하지 않게
+      if (q.status === 'pending') q.status = 'skipped'; // 체크인·코드 질문이 바로 다시 도착하지 않게
       q.deleted = true; delete q.answer; delete q.hint;
       emit(); return true;
     },
@@ -180,7 +182,7 @@ window.App = window.App || {};
       return { due: p.status === 'ongoing' && dueDate <= localDay(), dueDate, last };
     },
     // 아직 답하지 않은(대기·나중에) 이 프로젝트의 체크인 질문
-    openCheckin(projectId) { return state.inbox.find((q) => q.checkin && q.targetProjectId === projectId && (q.status === 'pending' || q.status === 'later')) || null; },
+    openCheckin(projectId) { return state.inbox.find((q) => q.checkin && q.targetProjectId === projectId && q.status === 'pending') || null; },
     syncCheckins() {
       let added = false;
       state.projects.forEach((p) => {
@@ -193,7 +195,7 @@ window.App = window.App || {};
           return;
         }
         if (open) return;
-        // 최근 한 주기 안에 이미 물어봤으면(건너뛰기 포함) 다시 묻지 않는다
+        // 최근 한 주기 안에 이미 물어봤으면(미뤄 둔 것 포함) 다시 묻지 않는다
         const since = parseDay(localDay()); since.setDate(since.getDate() - this.checkinDays() + 1);
         if (state.inbox.some((q) => q.checkin && q.targetProjectId === p.id && (q.askedAt || '').slice(0, 10) >= fmtDay(since))) return;
         const bank = window.SEED.projectCheckins; const cnt = {};

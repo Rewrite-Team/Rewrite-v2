@@ -230,7 +230,7 @@
 
   /* ---------- 위키 점검 ---------- */
   function askedFor(issue) {
-    return App.store.state.inbox.some((q) => q.lintId === issue.id && (q.status === 'pending' || q.status === 'later'));
+    return App.store.state.inbox.some((q) => q.lintId === issue.id && q.status === 'pending');
   }
   function issueHTML(i, st) {
     const acts = [];

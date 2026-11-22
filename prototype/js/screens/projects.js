@@ -452,7 +452,7 @@
     </div>`;
   }
   // 이 코드가 근거로 붙은 경험 / 없으면 그 자리에서 이야기를 들려주기
-  const openCodeQ = (fid) => App.store.state.inbox.find((q) => q.findingId === fid && (q.status === 'pending' || q.status === 'later')) || null;
+  const openCodeQ = (fid) => App.store.state.inbox.find((q) => q.findingId === fid && q.status === 'pending') || null;
   function findingWiki(f) {
     const talk = ui.codeTalk === f.id ? `<div data-pj-talk="code:${esc(f.id)}"></div>` : '';
     const exps = App.wiki.cardsForFinding(f.id);

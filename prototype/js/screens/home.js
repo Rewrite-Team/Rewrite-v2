@@ -7,7 +7,7 @@
   let calMonth = null; // 'YYYY-MM' — null이면 이번 달
   let calSel = null;   // 'YYYY-MM-DD' — null이면 오늘
   const WEEK = ['월', '화', '수', '목', '금', '토', '일'];
-  const STATUS_CHIP = { answered: ['답변함', 'is-answered'], skipped: ['건너뜀', 'is-skipped'], later: ['나중에', 'is-later'], pending: ['아직 안 답함', 'is-pending'] };
+  const STATUS_CHIP = { answered: ['답변함', 'is-answered'], skipped: ['미뤄 둠', 'is-skipped'], pending: ['아직 안 답함', 'is-pending'] };
 
   function greetWord() {
     const h = new Date().getHours();
@@ -76,7 +76,7 @@
       <ul class="home-cal-list">${qs.map((q) => {
         const chip = STATUS_CHIP[q.status] || STATUS_CHIP.pending;
         const went = wentOf(q);
-        const open = q.status === 'pending' || q.status === 'later';
+        const open = q.status === 'pending';
         return `<li class="home-cal-item">
           <div class="home-cal-item-top">
             <span class="home-cal-type">${esc(TYPE_LABEL[q.type] || '질문')}</span>

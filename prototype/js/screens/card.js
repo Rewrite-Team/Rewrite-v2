@@ -88,7 +88,7 @@
 
   // 이 경험의 빈 곳 질문이 이미 오늘의 질문함에 있는지
   function gapQueued(e, gap) {
-    return !!gap && App.store.state.inbox.some((q) => q.targetExpId === e.id && q.type === 'deepen' && (q.status === 'pending' || q.status === 'later') && (!q.stage || q.stage === gap.stage));
+    return !!gap && App.store.state.inbox.some((q) => q.targetExpId === e.id && q.type === 'deepen' && q.status === 'pending' && (!q.stage || q.stage === gap.stage));
   }
 
   // 출처 → 그 원문이 나온 대화 (qa 의 threadId, 체크인 로그의 threadId, 아니면 이 페이지로 정리된 대화 중 같은 말을 한 것)

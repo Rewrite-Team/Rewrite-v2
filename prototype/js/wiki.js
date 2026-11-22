@@ -491,7 +491,7 @@
   // 점검 항목을 오늘의 질문으로 받기
   function askIssue(issue) {
     if (!issue || !issue.question) return null;
-    const open = (q) => q.status === 'pending' || q.status === 'later';
+    const open = (q) => q.status === 'pending';
     const qi = issue.question;
     const exists = st().inbox.find((q) => open(q) && (q.lintId === issue.id
       || (qi.targetExpId && q.targetExpId === qi.targetExpId && (!qi.stage || !q.stage || q.stage === qi.stage))

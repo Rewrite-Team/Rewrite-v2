@@ -3,7 +3,7 @@
      room = 'new'            새 대화 (질문에 없는 이야기). ?project=<id> 면 그 프로젝트 기록으로. App.consumeCapturePreset() 로 미리 채운다
                              ?mode=deep&kw|exp|seed|free|cat|project|stage 면 바로 '경험 하나 끝까지 정리하기'(App.deep)로 연다 (옛 #/discover)
      모든 방에는 [✦ 경험 하나 끝까지 정리하기] 가 있다 — 누르면 그 방이 그 자리에서 깊은 대화(App.deep)로 바뀌고, 대화는 같은 방(thread)에 남는다
-     room = 'q_<questionId>' 그 질문의 대화방 (대기·건너뜀·나중에·답변함)
+     room = 'q_<questionId>' 그 질문의 대화방 (대기·미뤄 둠·답변함)
      room = <threadId>       자유 대화방 (질문 없이 시작한 대화). 질문에 딸린 대화면 그 질문의 방으로 연다
    #/ask              기본: 첫 대기 질문 (모바일은 목록만)
    #/daily, #/chat?thread=<id>  옛 주소 */
@@ -17,7 +17,7 @@
     code: { label: '코드 분석에서 온 질문', ico: '⌥' },
   };
   const SRC_ICO = { capture: '✎', checkin: '📌', code: '⌥', check: '🩺', coach: '✦', chat: '✦', daily: '✉' };
-  const STATUS_LABEL = { pending: '대기', answered: '답변함', skipped: '건너뜀', later: '나중에' };
+  const STATUS_LABEL = { pending: '대기', answered: '답변함', skipped: '미뤄 둠' };
   const OUT_LABEL = { applied: '위키 반영', kept: '경험 후보', open: '정리 전' };
   const SECTIONS = [['today', '오늘의 질문'], ['missed', '답하지 못한 질문'], ['past', '지난 대화']];
   const DOW = ['일', '월', '화', '수', '목', '금', '토'];
@@ -188,7 +188,7 @@
         const p = r.projectId && S.getProject(r.projectId);
         const on = r.id === cur;
         const sel = UI.sel.has(r.id);
-        const st = r.kind === 'question' && r.sec === 'missed' ? `<span class="ask-st is-${r.q.status}">${STATUS_LABEL[r.q.status]}</span>` : '';
+        const st = ''; // '답하지 못한 질문' 칸은 모두 미뤄 둔 질문이라 상태 칩을 따로 달지 않는다
         const oc = r.outcome ? `<span class="ask-oc is-${r.outcome}">${OUT_LABEL[r.outcome]}</span>` : '';
         const fresh = r.sec === 'today' && (r.q.askedAt || '').slice(0, 10) === S.localDay() ? '<span class="ask-st is-new">새 질문</span>' : '';
         return `<li><a class="ask-item ${on ? 'is-on' : ''} ${sel ? 'is-sel' : ''}" href="${roomHref(r.id)}" data-room-id="${esc(r.id)}">
@@ -210,7 +210,7 @@
         const filtering = UI.search.trim() || UI.project || UI.kept;
         const empty = {
           today: `<li class="ask-empty-li">오늘 질문은 모두 답했어요 · 다음 질문 ⏰ ${esc(nextTime().label)}</li>`,
-          missed: '<li class="ask-empty-li">건너뛰거나 미뤄 둔 질문이 없어요</li>',
+          missed: '<li class="ask-empty-li">미뤄 둔 질문이 없어요</li>',
           past: '<li class="ask-empty-li">아직 나눈 대화가 없어요</li>',
         };
         return SECTIONS.map(([k, l]) => {
@@ -386,7 +386,7 @@
         return t ? roomThread(t) : roomMissing();
       }
 
-      // ----- 아직 답하지 않은 질문 (대기 · 건너뜀 · 나중에) -----
+      // ----- 아직 답하지 않은 질문 (대기 · 미뤄 둠) -----
       function srcOf(q) {
         if (q.findingId) return { type: 'answer', question: q.text, questionId: q.id, projectId: q.targetProjectId, findingId: q.findingId };
         if (q.targetProjectId && S.getProject(q.targetProjectId)) return { type: 'checkin', question: q.checkinText || q.text, questionId: q.id, projectId: q.targetProjectId, logType: q.checkinType };
@@ -395,11 +395,11 @@
       }
       function roomOpenQ(q) {
         const closed = qThreads(q.id).filter((t) => t.outcome.kind !== 'open');
-        const actions = deepBtn() + (q.status === 'pending' ? `<button type="button" class="btn btn-ghost btn-sm" data-ask-act="skip">건너뛰기</button><button type="button" class="btn btn-ghost btn-sm" data-ask-act="later">나중에</button>` : '') + delBtn(cur);
+        const actions = deepBtn() + (q.status === 'pending' ? `<button type="button" class="btn btn-ghost btn-sm" data-ask-act="skip" title="'답하지 못한 질문'으로 옮겨 두고, 언제든 답할 수 있어요">나중에 답하기</button>` : '') + delBtn(cur);
         roomEl.innerHTML = headHTML({ meta: qMeta(q), h: esc(q.text), actions }) + `
           <div class="ask-room-body" data-ask-body>
             ${closed.length ? `<div class="ask-history"><div class="ask-history-cap">지난 대화</div>${App.talk.roomHTML(closed, { highlight: R.hl })}</div>` : ''}
-            ${q.status === 'skipped' || q.status === 'later' ? `<div class="ask-revisit">${q.status === 'skipped' ? '건너뛴' : '나중에로 미뤄 둔'} 질문이에요. 지금 답해도 괜찮아요.</div>` : ''}
+            ${q.status === 'skipped' ? '<div class="ask-revisit">미뤄 둔 질문이에요. 지금 답해도 괜찮아요.</div>' : ''}
             ${destHTML(q)}
             <div class="ask-talk" data-ask-talk></div>
           </div>`;
@@ -694,9 +694,9 @@
         const a = t.closest('[data-ask-act]'); if (!a) return;
         const act = a.dataset.askAct;
         const q = cur.startsWith('q_') ? S.getQuestion(cur.slice(2)) : null;
-        if ((act === 'skip' || act === 'later') && q) {
-          S.setQuestionStatus(q.id, act === 'skip' ? 'skipped' : 'later');
-          App.ui.toast(act === 'skip' ? '건너뛰었어요. ‘답하지 못한 질문’에서 언제든 답할 수 있어요' : `${nextTime().label}에 다시 물어볼게요`);
+        if (act === 'skip' && q) {
+          S.setQuestionStatus(q.id, 'skipped');
+          App.ui.toast('‘답하지 못한 질문’에 넣어 뒀어요. 언제든 답할 수 있어요');
           const n = nextPendingOf(q.id);
           App.navigate(roomHref(n ? 'q_' + n.id : cur));
         } else if (act === 'reask' && q) reask(q.id);

@@ -889,7 +889,7 @@
             <p class="dc-done-sub">${undone ? '대화 전 상태로 돌려 두었어요.' : `답변 ${n}개를 위키에 반영했어요.
               ${e ? `「${esc(App.wiki.short(e.title, 30))}」 완성도 <b>${e.completeness}%</b>${delta > 0 ? ` (+${delta}%)` : ''}.` : ''} 언제든 이어서 더 채울 수 있어요.`}</p>
             <div class="dc-done-report">${entry ? App.wiki.reportHTML(entry) : ''}</div>
-            ${g ? (() => { const queued = App.store.state.inbox.some((q) => q.targetExpId === e.id && (q.status === 'pending' || q.status === 'later'));
+            ${g ? (() => { const queued = App.store.state.inbox.some((q) => q.targetExpId === e.id && q.status === 'pending');
               return `<div class="dc-done-next"><span class="ai-dot">R</span><div style="flex:1"><div class="dc-done-label">다음에 채우면 좋은 질문</div><div>${esc(g.text)}</div></div>
               ${queued ? '<span class="subtle" style="font-size:12.5px;align-self:center">✓ 오늘의 질문에 있어요</span>' : `<button class="btn btn-sm" data-act="queue-gap" data-stage="${esc(g.stage)}" data-text="${esc(g.text)}" data-exp="${esc(e.id)}" type="button">오늘의 질문으로 받기</button>`}</div>`; })() : ''}
             <div class="dc-done-actions">

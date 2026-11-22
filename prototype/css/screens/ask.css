@@ -60,7 +60,6 @@
 
 .ask-st, .ask-oc { font-size: 11px; font-weight: 600; border-radius: 999px; padding: 0 7px; line-height: 18px; white-space: nowrap; }
 .ask-st.is-skipped { background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border); }
-.ask-st.is-later { background: var(--warn-soft); color: #8a6a08; }
 .ask-st.is-new { background: var(--accent-soft); color: #b25d15; }
 .ask-st.is-answered { background: var(--success-soft); color: var(--success); }
 .ask-oc.is-applied { background: var(--success-soft); color: var(--success); }
