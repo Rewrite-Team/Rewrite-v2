@@ -1,5 +1,5 @@
-/* 홈: 지금 할 일만 — 오늘의 질문(질문함) · 답변 캘린더 · 위키 점검 · 지원 기업.
-   위키 변경 기록은 경험 위키·경험 페이지에서 본다 */
+/* 홈: 지금 할 일만 한 칸에 — 오늘의 질문 · 지원 기업 · 답변 캘린더.
+   위키 점검은 오늘의 질문으로 들어오고(autoQueue) 전체 목록은 경험 위키에서, 변경 기록은 경험 위키·경험 페이지에서 본다 */
 (function (App) {
   const esc = (s) => App.ui.esc(s);
   const TYPE_LABEL = { project: '프로젝트 체크인', deepen: '경험 깊이 파기', recall: '기억 떠올리기', code: '코드 분석에서 온 질문' };
@@ -50,44 +50,6 @@
         </div>
       </div>
     </section>`;
-  }
-
-  /* ---------- 위키 점검 (맛보기) ---------- */
-  function lintIssues() { return App.wiki.lint(); }
-  function lintBlock() {
-    const all = lintIssues();
-    const top = all.filter((i) => i.question).slice(0, 2);
-    return `<section class="card card-pad home-lint">
-      <div class="section-title">위키 점검<a class="more" href="#/vault">점검 전체 보기 →</a></div>
-      ${top.length ? `<p class="subtle home-feed-sub">채울 곳 ${all.length}개 중 먼저 볼 것</p>
-      <ul class="wk-issues">${top.map((i) => `<li class="wk-issue" data-sev="${i.severity}">
-        <span class="wk-issue-dot"></span><span class="wk-issue-text">${esc(i.text)}</span>
-        <span class="wk-issue-actions">
-          <button type="button" class="btn btn-ghost btn-sm home-lint-later" data-home-act="ask" data-issue="${esc(i.id)}">나중에 질문으로</button>
-          <button type="button" class="btn btn-primary btn-sm" data-home-act="talk" data-issue="${esc(i.id)}">바로 답하기</button>
-        </span>
-      </li>`).join('')}</ul>` : '<p class="subtle">지금은 비어 있는 곳이 없어요. 위키가 잘 채워져 있어요.</p>'}
-    </section>`;
-  }
-
-  // 위키 점검 → 그 자리에서 AI와 대화하며 답하기. 답은 오늘의 질문(askIssue)으로도 남아 기록·캘린더에 잡힌다
-  function issueSrc(qi) {
-    if (qi.findingId) return { type: 'answer', question: qi.text, projectId: qi.targetProjectId, findingId: qi.findingId };
-    if (qi.targetExpId) return { type: 'answer', question: qi.text, expId: qi.targetExpId, stage: qi.stage || null };
-    return { type: 'answer', question: qi.text };
-  }
-  function answerIssue(issue) {
-    if (!issue || !issue.question) return;
-    const qi = issue.question;
-    const hint = qi.hint || (qi.targetExpId ? '답하면 이 경험의 비어 있는 칸이 채워져요.' : '');
-    App.talk.open({
-      title: '위키 점검',
-      ask: { text: qi.text, label: '위키 점검', hint },
-      src: issueSrc(qi),
-      thread: { source: 'check' },
-      commit: (text, d, tid) => { const q = App.wiki.askIssue(issue); return App.store.answer(q.id, text, { decision: d, threadId: tid }); },
-      onClose: () => App.rerender(),
-    });
   }
 
   /* ---------- 답변 캘린더 ---------- */
@@ -227,7 +189,7 @@
     render() {
       const st = App.store.state;
       const u = st.user;
-      return `<div class="page home">
+      return `<div class="page page-narrow home">
         <header class="home-hello">
           <div>
             <p class="home-hello-sub">${esc(greetWord())}, ${esc(u.name)}님</p>
@@ -237,15 +199,10 @@
             </div>
           </div>
         </header>
-        <div class="home-grid">
-          <div class="home-col">
-            ${todayCard()}
-            ${calendarBlock()}
-          </div>
-          <aside class="home-col home-side">
-            ${lintBlock()}
-            ${applyBlock()}
-          </aside>
+        <div class="home-col">
+          ${todayCard()}
+          ${applyBlock()}
+          ${calendarBlock()}
         </div>
       </div>`;
     },
@@ -257,13 +214,6 @@
         const btn = ev.target.closest('[data-home-act]');
         if (!btn) return;
         const act = btn.getAttribute('data-home-act');
-        if (act === 'talk') { answerIssue(lintIssues().find((i) => i.id === btn.getAttribute('data-issue'))); return; }
-        if (act === 'ask') {
-          const issue = lintIssues().find((i) => i.id === btn.getAttribute('data-issue'));
-          if (App.wiki.askIssue(issue)) App.ui.toast('오늘의 질문으로 받았어요. 답하면 이 빈칸이 채워져요');
-          swap('.home-today', todayCard()); swapCal();
-          return;
-        }
         if (act === 'cal-prev' || act === 'cal-next') {
           const [y, m] = (calMonth || App.store.localDay().slice(0, 7)).split('-').map(Number);
           const d = new Date(y, m - 1 + (act === 'cal-next' ? 1 : -1), 1);
