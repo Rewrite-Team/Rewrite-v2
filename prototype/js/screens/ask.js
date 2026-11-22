@@ -627,19 +627,25 @@
         });
       }
 
-      // 보관된 대화를 그 자리에서 경험으로 정리
+      // 경험 후보를 그 자리에서 경험으로 확정 — 따로 박스를 띄우지 않고 이 방의 대화 흐름 맨 아래에 이어 쓴다.
+      // 맨 아래 '다시 답하기 / 이어서 이야기하기' 바 자리는 이 대화의 입력창이 된다
       function openOrg(threadId) {
-        if (org) { try { org.destroy(); } catch (e) { /* ignore */ } org = null; }
-        roomEl.querySelectorAll('.ask-org').forEach((x) => x.remove());
+        if (org) return;
         const th = roomEl.querySelector(`[data-thread="${CSS && CSS.escape ? CSS.escape(threadId) : threadId}"]`); if (!th) return;
+        const body = bodyEl(); if (!body) return;
+        roomEl.querySelectorAll('.ask-foot').forEach((x) => x.remove());
+        roomEl.querySelectorAll('[data-room-organize]').forEach((b) => { b.disabled = true; });
         const wrap = document.createElement('div');
-        wrap.className = 'ask-org';
-        wrap.innerHTML = '<div class="ask-org-head"><span>경험으로 확정</span><button type="button" class="btn btn-ghost btn-sm" data-ask-org-close aria-label="닫기">✕</button></div><div class="ask-org-slot"></div>';
-        th.after(wrap);
+        wrap.className = 'ask-cont ask-org-wrap';
+        wrap.innerHTML = '<div class="ask-org-cap"><span>경험으로 확정하는 중</span><button type="button" class="ask-org-stop" data-ask-org-close>그만두기</button></div><div class="ask-org-slot"></div>';
+        body.appendChild(wrap);
+        const cap = wrap.querySelector('.ask-org-cap'); const slot = wrap.querySelector('.ask-org-slot');
         const close = () => { renderRoom(); refreshAll(); };
-        wrap.querySelector('[data-ask-org-close]').onclick = close;
-        org = App.talk.organize(wrap.querySelector('.ask-org-slot'), threadId, {
-          noAutofocus: true,
+        cap.querySelector('[data-ask-org-close]').onclick = close;
+        follow(slot);
+        org = App.talk.organize(slot, threadId, {
+          quietPrefill: true,
+          noAutofocus: isMobile(),
           onDone: () => {
             const t = W.getThread(threadId);
             const fresh = document.createElement('div');
@@ -648,9 +654,9 @@
             if (nt && old) old.replaceWith(nt);
             refreshAll();
           },
-          next: { label: '닫기', onClick: close },
+          next: { label: '확인', onClick: close },
         });
-        wrap.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        requestAnimationFrame(toBottom);
       }
 
       /* ========== 동작 ========== */

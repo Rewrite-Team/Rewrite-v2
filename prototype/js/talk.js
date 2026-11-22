@@ -254,7 +254,8 @@
     }
     if (cfg.ask) ai(`${cfg.ask.label ? `<div class="tk-label">${esc(cfg.ask.label)}</div>` : ''}<div class="tk-q">${esc(cfg.ask.text)}</div>${cfg.ask.hint ? `<div class="tk-hint">💡 ${esc(cfg.ask.hint)}</div>` : ''}`);
     if (cfg.prefill) {
-      if (threadId) { st.msgs.push({ who: 'me', html: esc(cfg.prefill) }); } else me(cfg.prefill); // 이어 쓰는 대화면 원문은 이미 기록돼 있다
+      // 이어 쓰는 대화면 원문은 이미 기록돼 있다. quietPrefill 이면 바로 위에 보이는 내 말을 다시 말풍선으로 되풀이하지 않는다
+      if (threadId) { if (!cfg.quietPrefill) st.msgs.push({ who: 'me', html: esc(cfg.prefill) }); } else me(cfg.prefill);
       propose();
     } else render();
     return ctlOf();
@@ -303,7 +304,7 @@
     return { close };
   }
 
-    // 보관된 대화를 나중에 경험으로 정리 — 같은 대화(thread)에 이어서 쓴다
+  // 경험 후보를 나중에 경험으로 확정 — 같은 대화(thread)에 이어서 쓴다
   function organize(el, threadId, cfg = {}) {
     const t = App.wiki.getThread(threadId); if (!t) return null;
     const text = App.wiki.threadText(t);
