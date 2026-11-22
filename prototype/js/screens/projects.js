@@ -289,7 +289,7 @@
               <div class="pj-log-text">${esc(it.text)}</div>
               ${kws.length ? `<div class="exp-card-kws">${kws.map((k) => App.ui.keywordChip(k)).join('')}</div>` : ''}
               ${chip ? `<div class="pj-log-wiki">${chip}</div>` : ''}
-              ${ui.orgTalk === it.id ? `<div data-pj-talk="org:${esc(it.id)}"></div>` : ''}
+              ${ui.orgTalk === it.id ? `<div class="pj-org-cap"><span>경험으로 확정하는 중</span><button type="button" class="pj-org-stop" data-pj-log="org-stop" data-id="${esc(it.id)}">그만두기</button></div><div data-pj-talk="org:${esc(it.id)}"></div>` : ''}
             </div></div>`;
         }).join('')}</div>`;
     }).join('')}</div>`;
@@ -604,9 +604,10 @@
           });
         }
         if (key.startsWith('org:')) {
-          // 보관된 대화를 이어서 경험으로 정리 — App.talk.organize 가 같은 대화에 이어 쓴다
+          // 경험 후보를 이어서 경험으로 확정 — App.talk.organize 가 같은 대화에 이어 쓴다.
+          // 따로 테두리 친 채팅창을 띄우지 않고 기록 바로 아래로 이어지며, 위에 보이는 내 말은 되풀이하지 않는다
           const tid = key.slice(4); if (!App.wiki.getThread(tid)) return null;
-          return { sig: key, organize: tid, onDone: () => rerenderLocal(), next: { label: '닫기', onClick: closeTalk(key) } };
+          return { sig: key, organize: tid, inline: true, quietPrefill: true, onDone: () => rerenderLocal(), next: { label: '확인', onClick: closeTalk(key) } };
         }
         if (key.startsWith('code:')) {
           const fid = key.slice(5); const f = e.repo && e.repo.findings.find((x) => x.id === fid); if (!f) return null;
@@ -638,7 +639,7 @@
           if (t && cfg && cfg.sig !== t.sig) { dropTalk(key); t = null; }
           if (!t) {
             if (!cfg) return;
-            const host = document.createElement('div'); host.className = 'pj-talk';
+            const host = document.createElement('div'); host.className = cfg.inline ? 'pj-talk is-inline' : 'pj-talk';
             t = talks[key] = { host, sig: cfg.sig, done: false };
             t.ctl = cfg.organize ? App.talk.organize(host, cfg.organize, cfg) : App.talk.mount(host, cfg);
             if (!t.ctl) { delete talks[key]; return; }
@@ -790,9 +791,11 @@
         if (logBtn) {
           const a = logBtn.getAttribute('data-pj-log'); const e = App.store.getProject(id); if (!e) return;
           if (a === 'organize') {
-            // 보관된 대화 아래에서 AI와 어느 경험에 어떻게 넣을지 정한다
+            // 경험 후보 아래에서 AI와 어느 경험에 어떻게 넣을지 정한다
             if (ui.orgTalk) dropTalk('org:' + ui.orgTalk);
             ui.orgTalk = logBtn.getAttribute('data-id'); rerenderLocal();
+          } else if (a === 'org-stop') {
+            closeTalk('org:' + logBtn.getAttribute('data-id'))();
           } else if (a === 'edit') {
             const l = e.logs.find((x) => x.id === logBtn.getAttribute('data-id')); if (!l) return;
             ui.edit = { logId: l.id, type: l.type, text: l.text, date: l.date, kw: kwNew(l.keywords || [], App.ai.extractKeywords(l.text)) };
