@@ -18,7 +18,7 @@
   };
   const SRC_ICO = { capture: '✎', checkin: '📌', code: '⌥', check: '🩺', coach: '✦', chat: '✦', daily: '✉' };
   const STATUS_LABEL = { pending: '대기', answered: '답변함', skipped: '건너뜀', later: '나중에' };
-  const OUT_LABEL = { applied: '위키 반영', kept: '보관 중', open: '정리 전' };
+  const OUT_LABEL = { applied: '위키 반영', kept: '경험 후보', open: '정리 전' };
   const SECTIONS = [['today', '오늘의 질문'], ['missed', '답하지 못한 질문'], ['past', '지난 대화']];
   const DOW = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -66,7 +66,7 @@
     const e = q.compiledTo && App.store.get(q.compiledTo);
     const ee = e || (t && t.outcome && t.outcome.kind === 'applied' && t.outcome.expId && App.store.get(t.outcome.expId)) || (q.targetExpId && App.store.get(q.targetExpId));
     if (ee) out.push({ kind: 'applied', href: '#/card/' + ee.id, text: `「${title(ee.title, 28)}」에 반영됨` });
-    else if (t && t.outcome && t.outcome.kind === 'kept') out.push({ kind: 'kept', href: room, text: '💬 대화에 보관됨' });
+    else if (t && t.outcome && t.outcome.kind === 'kept') out.push({ kind: 'kept', href: room, text: '📝 경험 후보' });
     if (t && !out.some((w) => w.kind === 'kept')) out.push({ kind: 'chat', href: room, text: '대화 보기' });
     return out;
   }
@@ -102,7 +102,7 @@
     const w = dayWord(d); return w === '어제' ? w : w.split(' ')[0];
   }
   // 목록 미리보기: 내가 마지막으로 한 말 (반영 버튼 문구는 빼고)
-  const SYS_ME = /^(이렇게 반영해 주세요|대화에만 보관해 주세요|이대로 충분해요)$/;
+  const SYS_ME = /^(이렇게 반영해 주세요|경험 후보로 보관해 주세요|대화에만 보관해 주세요|이대로 충분해요)$/;
   const lastMine = (t) => { const m = t ? t.msgs.filter((x) => x.who === 'me' && !SYS_ME.test(x.text)).pop() : null; return m ? m.text : ''; };
   const lastAt = (t) => { const m = t.msgs[t.msgs.length - 1]; return `${(m && m.date) || t.date} ${(m && m.at) || t.at || ''}`.trim(); };
 
@@ -145,7 +145,8 @@
   }
 
   // 화면을 다시 그려도 유지되는 목록 상태
-  const UI = { search: '', project: '', collapsed: {}, edit: false, sel: new Set(), scroll: 0 };
+  // kept: 경험 후보(아직 경험으로 확정하지 않은 대화)만 보기 — #/ask?only=kept 로 켜고, 목록의 칩으로 켜고 끈다
+  const UI = { search: '', project: '', kept: false, collapsed: {}, edit: false, sel: new Set(), scroll: 0 };
 
   function resolve(params) {
     let room = params.room || params.thread || '';
@@ -175,6 +176,7 @@
     mount(root, params) {
       const S = App.store; const W = App.wiki;
       const R = resolve(params);
+      if (params.only === 'kept') UI.kept = true;
       let cur = R.room; // 지금 열린 방 id
       let talk = null; let org = null; let mo = null; let deep = null;
       let newProject = null; // 새 대화방이 정해 둔 프로젝트
@@ -201,11 +203,11 @@
       }
       function visibleRooms() {
         const s = UI.search.trim().toLowerCase();
-        return rooms().filter((r) => (!UI.project || r.projectId === UI.project) && (!s || r.search.toLowerCase().includes(s)));
+        return rooms().filter((r) => (!UI.project || r.projectId === UI.project) && (!UI.kept || r.outcome === 'kept') && (!s || r.search.toLowerCase().includes(s)));
       }
       function sectionsHTML() {
         const g = grouped(visibleRooms());
-        const filtering = UI.search.trim() || UI.project;
+        const filtering = UI.search.trim() || UI.project || UI.kept;
         const empty = {
           today: `<li class="ask-empty-li">오늘 질문은 모두 답했어요 · 다음 질문 ⏰ ${esc(nextTime().label)}</li>`,
           missed: '<li class="ask-empty-li">건너뛰거나 미뤄 둔 질문이 없어요</li>',
@@ -253,6 +255,7 @@
                 ${projects.map((p) => `<option value="${esc(p.id)}" ${UI.project === p.id ? 'selected' : ''}>▤ ${esc(projName(p))}</option>`).join('')}
               </select>` : ''}
             </div>
+            ${keptChipHTML()}
           </div>
           <div class="ask-scroll" data-ask-scroll>
             <div data-ask-secs>${sectionsHTML()}</div>
@@ -266,6 +269,13 @@
         inp.addEventListener('input', () => { UI.search = inp.value; refreshSecs(); });
         const sel = listEl.querySelector('[data-ask-project]');
         if (sel) sel.onchange = () => { UI.project = sel.value; refreshSecs(); };
+      }
+      function keptChipHTML() {
+        const n = rooms().filter((r) => r.outcome === 'kept').length;
+        if (!n && !UI.kept) return '';
+        return `<div class="ask-chips">
+          <button type="button" class="ask-chip ${UI.kept ? 'is-on' : ''}" data-ask-kept aria-pressed="${UI.kept}" title="${UI.kept ? '필터 풀기' : '아직 경험으로 확정하지 않은 대화만 보기'}">📝 경험 후보 <b>${n}</b>${UI.kept ? '<span class="ask-chip-x" aria-hidden="true">✕</span>' : ''}</button>
+        </div>`;
       }
       function refreshSecs() {
         const box = listEl.querySelector('[data-ask-secs]'); if (box) box.innerHTML = sectionsHTML();
@@ -289,6 +299,12 @@
         if (it) { ev.preventDefault(); App.navigate(roomHref(it.dataset.roomId)); return; }
         const tg = t.closest('[data-ask-toggle]');
         if (tg) { UI.collapsed[tg.dataset.askToggle] = !UI.collapsed[tg.dataset.askToggle]; refreshSecs(); return; }
+        if (t.closest('[data-ask-kept]')) {
+          UI.kept = !UI.kept;
+          // 링크로 켠 필터를 풀면 주소의 ?only=kept 도 지워서 새로고침해도 다시 걸리지 않게
+          if (!UI.kept && /[?&]only=kept/.test(location.hash)) history.replaceState(null, '', location.hash.replace(/[?&]only=kept/, ''));
+          renderList(); return;
+        }
         if (t.closest('[data-ask-new]')) { App.navigate('#/ask/new'); return; }
         if (t.closest('[data-ask-edit]')) { UI.edit = !UI.edit; UI.sel.clear(); renderList(); return; }
         if (t.closest('[data-ask-selall]')) {
@@ -417,7 +433,7 @@
             ${ths.length ? App.talk.roomHTML(ths, { organize: true, highlight: R.hl })
               : `<div class="tk-thread"><div class="tk-rm ai"><div class="tk-rm-b">${esc(q.text)}</div></div>${q.answer ? `<div class="tk-rm me"><div class="tk-rm-b">${esc(q.answer)}</div></div>` : ''}</div>`}
             ${went.length ? `<div class="ask-went">${went.map((w) => `<a class="ask-target" href="${esc(w.href)}"><span class="ask-target-ico">✓</span><span>${esc(w.text)}</span></a>`).join('')}</div>`
-              : ths.some((t) => t.outcome.kind === 'applied') ? '' : '<div class="ask-went subtle">아직 경험에 반영되지 않은 답이에요. 위의 [경험으로 정리]나 [다시 답하기]로 반영할 수 있어요.</div>'}
+              : ths.some((t) => t.outcome.kind === 'applied') ? '' : '<div class="ask-went subtle">아직 경험에 반영되지 않은 답이에요. 위의 [경험으로 확정]이나 [다시 답하기]로 반영할 수 있어요.</div>'}
           </div>
           <div class="ask-foot"><span class="subtle">다른 답이 떠올랐다면</span><button type="button" class="btn btn-sm" data-ask-act="reask">다시 답하기</button></div>`;
         scrollToHl();
@@ -618,7 +634,7 @@
         const th = roomEl.querySelector(`[data-thread="${CSS && CSS.escape ? CSS.escape(threadId) : threadId}"]`); if (!th) return;
         const wrap = document.createElement('div');
         wrap.className = 'ask-org';
-        wrap.innerHTML = '<div class="ask-org-head"><span>경험으로 정리</span><button type="button" class="btn btn-ghost btn-sm" data-ask-org-close aria-label="닫기">✕</button></div><div class="ask-org-slot"></div>';
+        wrap.innerHTML = '<div class="ask-org-head"><span>경험으로 확정</span><button type="button" class="btn btn-ghost btn-sm" data-ask-org-close aria-label="닫기">✕</button></div><div class="ask-org-slot"></div>';
         th.after(wrap);
         const close = () => { renderRoom(); refreshAll(); };
         wrap.querySelector('[data-ask-org-close]').onclick = close;

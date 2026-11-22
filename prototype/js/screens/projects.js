@@ -255,7 +255,7 @@
       return c ? `<a class="pj-log-card" href="#/card/${esc(c.id)}" title="${esc(c.title)}">→ 「${esc(short(String(c.title).replace(/[「」]/g, ''), 24))}」에 반영</a>` : '<span class="pj-log-out">경험에 반영됨</span>';
     }
     if (!it.thread || ui.orgTalk === it.id) return '';
-    if (o.kind === 'kept') return `<span class="pj-log-out is-kept">💬 대화에 보관 중</span><button type="button" class="btn btn-sm pj-log-org" data-pj-log="organize" data-id="${esc(it.id)}">경험으로 정리</button>`;
+    if (o.kind === 'kept') return `<span class="pj-log-out is-kept">📝 경험 후보</span><button type="button" class="btn btn-sm pj-log-org" data-pj-log="organize" data-id="${esc(it.id)}">경험으로 확정</button>`;
     if (o.kind === 'open') return `<span class="pj-log-out">정리 전 대화</span><button type="button" class="btn btn-sm pj-log-org" data-pj-log="organize" data-id="${esc(it.id)}">이어서 정리</button>`;
     return '';
   }
@@ -327,7 +327,7 @@
             <div class="pj-cardlink-title">${esc(x.title)}</div></a>`).join('')}</div>
             ${cards.length > 4 ? `<button class="pj-link" data-pj-tab="exp">경험 ${cards.length}개 모두 보기 →</button>` : ''}`
           : '<p class="subtle">아직 없어요. 체크인을 남기면 AI가 이야기마다 경험 페이지로 정리해요.</p>'}
-        ${kept ? `<p class="pj-side-hint"><span class="ai-dot">R</span><button class="pj-link" data-pj-tab="timeline">보관 중인 대화 ${kept}개 →</button></p>` : ''}
+        ${kept ? `<p class="pj-side-hint"><span class="ai-dot">R</span><button class="pj-link" data-pj-tab="timeline">경험 후보 ${kept}개 →</button></p>` : ''}
       </div>
       ${ghSideBox(e)}
       <div class="card card-pad">
@@ -513,7 +513,7 @@
         <button class="btn btn-sm btn-primary" data-capture data-capture-project="${esc(e.id)}">＋ 이 프로젝트 기록하기</button></div>
       ${cards.length ? `<div class="pj-exp-grid">${cards.map((x) => App.ui.expCard(x)).join('')}</div>`
         : `<div class="card empty"><div class="big">▣</div>아직 이 프로젝트의 경험이 없어요.<div class="subtle" style="margin-top:4px">체크인을 남기거나 코드를 분석하면 경험 페이지가 생겨요.</div></div>`}
-      ${kept ? `<p class="pj-side-hint"><span class="ai-dot">R</span><button class="pj-link" data-pj-tab="timeline">보관 중인 대화 ${kept}개 →</button></p>` : ''}
+      ${kept ? `<p class="pj-side-hint"><span class="ai-dot">R</span><button class="pj-link" data-pj-tab="timeline">경험 후보 ${kept}개 →</button></p>` : ''}
       ${feed.length ? `<div class="section-title" style="margin-top:20px">최근 위키 반영</div><div class="card card-pad wk-feed">${feed.map((w) => App.wiki.reportHTML(w, { compact: true })).join('')}</div>` : ''}
     </div>`;
   }
@@ -595,7 +595,7 @@
         if (key === 'ck') {
           const c = checkinTalkCfg(e);
           return Object.assign(c, {
-            onDone: (entry) => { talks.ck.done = true; App.ui.toast(c.inbox ? '체크인 완료! 오늘의 질문에서도 답변 완료로 바뀌었어요' : entry && entry.target ? '경험에 반영했어요 · 대화는 타임라인에 남아요' : '대화 기록에 보관했어요 · 타임라인에서 볼 수 있어요'); rerenderLocal(); },
+            onDone: (entry) => { talks.ck.done = true; App.ui.toast(c.inbox ? '체크인 완료! 오늘의 질문에서도 답변 완료로 바뀌었어요' : entry && entry.target ? '경험에 반영했어요 · 대화는 타임라인에 남아요' : '경험 후보로 보관했어요 · 타임라인에서 볼 수 있어요'); rerenderLocal(); },
             next: { label: '다른 체크인 남기기', onClick: () => {
               const Q = window.SEED.projectCheckins;
               if (!App.store.openCheckin(id)) { ui.qIndex[id] = ((ui.qIndex[id] || 0) + 1) % Q.length; ui.type[id] = Q[ui.qIndex[id]].type; }
@@ -857,7 +857,7 @@
         } else if (act === 'finish') {
           App.ui.modal({
             title: '프로젝트를 마무리할까요?', confirmText: '마무리하기',
-            body: `<p>상태가 <b>완성</b>으로 바뀌고 체크인 질문이 멈춰요. ${keptCount(id) ? ` 대화에 보관 중인 이야기 <b>${keptCount(id)}개</b>를 타임라인에서 경험으로 정리해 두면 면접 준비가 훨씬 쉬워져요.` : ''}</p>`,
+            body: `<p>상태가 <b>완성</b>으로 바뀌고 체크인 질문이 멈춰요. ${keptCount(id) ? ` 경험 후보 <b>${keptCount(id)}개</b>를 타임라인에서 경험으로 확정해 두면 면접 준비가 훨씬 쉬워져요.` : ''}</p>`,
             onConfirm() {
               const n = new Date();
               App.store.addLog(id, { type: 'milestone', text: '프로젝트 마무리.' });

@@ -15,6 +15,14 @@
 .ask-dot { color: var(--text-3); }
 .ask-rhythm { margin-left: auto; color: var(--primary); font-weight: 600; }
 .ask-filter { display: flex; gap: 6px; }
+.ask-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.ask-chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: 12.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border: 1px solid var(--border);
+}
+.ask-chip:hover { border-color: var(--border-strong); color: var(--text); }
+.ask-chip.is-on { background: var(--primary-soft); border-color: #dcdcf7; color: var(--primary-ink); }
+.ask-chip-x { margin-left: 2px; font-size: 11px; opacity: .7; }
 .ask-search { flex: 1; min-width: 0; padding: 6px 10px; font-size: 13px; }
 .ask-proj { width: 118px; flex: none; padding: 6px 8px; font-size: 12.5px; text-overflow: ellipsis; }
 

@@ -235,7 +235,7 @@
   }
   function closeThread(threadId, outcome) { const t = getThread(threadId); if (!t) return; t.outcome = Object.assign({}, outcome); persist(); }
   // 대화에서 사용자가 한 말만 (보관된 대화를 나중에 경험으로 정리할 때)
-  function threadText(t) { return (t.msgs || []).filter((m) => m.who === 'me' && !/^(이렇게 반영해 주세요|대화에만 보관해 주세요|이대로 충분해요)$/.test(m.text)).map((m) => m.text).join(' '); }
+  function threadText(t) { return (t.msgs || []).filter((m) => m.who === 'me' && !/^(이렇게 반영해 주세요|경험 후보로 보관해 주세요|대화에만 보관해 주세요|이대로 충분해요)$/.test(m.text)).map((m) => m.text).join(' '); }
   function threadsFor(f = {}) {
     return threads().filter((t) => (!f.projectId || t.projectId === f.projectId) && (!f.expId || t.outcome.expId === f.expId) && (!f.kind || t.outcome.kind === f.kind))
       .slice().sort((a, b) => (a.date + a.at).localeCompare(b.date + b.at));
@@ -256,7 +256,7 @@
         if (log) { log.threadId = t.id; linkedLog.add(log.id); exp = usedBy(log.id); }
       }
       if (exp) { t.outcome = { kind: 'applied', expId: exp.id }; q.compiledTo = exp.id; }
-      t.msgs.push({ who: 'ai', text: exp ? `「${bare(exp.title)}」에 반영했어요.` : '대화 기록에 보관해 둘게요.', at: at || '12:30' });
+      t.msgs.push({ who: 'ai', text: exp ? `「${bare(exp.title)}」에 반영했어요.` : '경험 후보로 보관해 둘게요. 아직 확정한 경험은 아니에요.', at: at || '12:30' });
       s.threads.push(t);
     });
     s.projects.forEach((p) => (p.logs || []).forEach((l) => {
@@ -266,7 +266,7 @@
       const t = { id: 't_' + l.id, date: l.date, at: '21:30', source: 'checkin', label: THREAD_LABEL.checkin, projectId: p.id,
         msgs: [{ who: 'ai', text: `「${S.projectName(p)}」 ${b ? b.text : '최근에 어떤 일이 있었나요?'}`, at: '21:30' }, { who: 'me', text: l.text, at: '21:30' }],
         outcome: exp ? { kind: 'applied', expId: exp.id } : { kind: 'kept' } };
-      t.msgs.push({ who: 'ai', text: exp ? `「${bare(exp.title)}」에 반영했어요.` : '대화 기록에 보관해 둘게요.', at: '21:30' });
+      t.msgs.push({ who: 'ai', text: exp ? `「${bare(exp.title)}」에 반영했어요.` : '경험 후보로 보관해 둘게요. 아직 확정한 경험은 아니에요.', at: '21:30' });
       l.threadId = t.id; s.threads.push(t);
     }));
   }
@@ -567,7 +567,7 @@
       : entry.decided === 'question' || entry.decided === 'edit' ? '이 경험 페이지에 반영했어요'
       : entry.decided === 'user' ? '고른 경험에 반영했어요'
       : entry.decided === 'user-new' ? '새 경험으로 위키에 추가했어요'
-      : entry.decided === 'keep' || entry.decided === 'skip' ? '경험에는 아직 넣지 않고 대화 기록에 보관했어요'
+      : entry.decided === 'keep' || entry.decided === 'skip' ? '아직 경험으로 확정하지 않고 경험 후보로 보관했어요'
       : tgt ? '비슷한 경험을 찾아 거기에 반영했어요'
       : entry.source.type === 'code' ? (entry.changes.length ? '코드 분석 결과를 위키에 반영했어요' : '새로 연결할 경험이 없어요 — 발견 항목은 코드 분석 탭에 그대로 있어요')
       : '위키에 기록했어요';

@@ -264,7 +264,7 @@
     const shown = st.allIssues ? issues : issues.slice(0, ISSUE_LIMIT);
     const fixed = st.fixed && App.wiki.get(st.fixed);
     const kept = App.wiki.threadsFor ? App.wiki.threadsFor({ kind: 'kept' }).length : 0;
-    return `<div class="vt-panel-head"><h2>위키 점검</h2><span class="subtle">${issues.length ? `채우면 좋은 곳 ${issues.length}개` : ''}</span>${kept ? `<a class="vt-kept-link" href="#/ask">💬 보관 중인 대화 ${kept}개 → 질문함</a>` : ''}</div>
+    return `<div class="vt-panel-head"><h2>위키 점검</h2><span class="subtle">${issues.length ? `채우면 좋은 곳 ${issues.length}개` : ''}</span>${kept ? `<a class="vt-kept-link" href="#/ask?only=kept">📝 확정 전 경험 후보 ${kept}개 →</a>` : ''}</div>
       ${fixed ? `<div class="vt-fixed">${App.wiki.reportHTML(fixed)}<button type="button" class="btn btn-sm btn-ghost vt-fixed-close" data-act="close-fixed">닫기</button></div>` : ''}
       ${issues.length ? `<ul class="wk-issues">${shown.map((i) => issueHTML(i, st)).join('')}</ul>
         ${issues.length > ISSUE_LIMIT ? `<button type="button" class="btn btn-sm btn-ghost vt-more" data-act="more-issues">${st.allIssues ? '접기' : `더 보기 (${issues.length - ISSUE_LIMIT}개)`}</button>` : ''}`
