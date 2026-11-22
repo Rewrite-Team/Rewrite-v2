@@ -163,6 +163,14 @@ a.ask-dest:hover { box-shadow: 0 0 0 1px var(--primary) inset; }
 @media (max-width: 900px) {
   .ask { height: calc(100dvh - 140px); }
 }
+/* 대화방 칸이 좁을 때(데스크톱이라도 창이 좁으면): 버튼 줄이 제목을 밀어 글자가 세로로 찌그러지지 않게
+   버튼을 위 줄, 제목을 아래 줄 전체 폭으로 내린다 */
+.ask-room { container-type: inline-size; container-name: askroom; }
+@container askroom (max-width: 620px) {
+  .ask-room-head { flex-wrap: wrap; align-items: center; row-gap: 6px; }
+  .ask-room-actions { margin-left: auto; }
+  .ask-room-titles { order: 3; flex-basis: 100%; }
+}
 /* 모바일: 목록만 → 누르면 대화방이 전체 폭으로 */
 @media (max-width: 767px) {
   .ask-page { padding-left: 0; padding-right: 0; padding-bottom: 0; }
