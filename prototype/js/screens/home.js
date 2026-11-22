@@ -1,4 +1,5 @@
-/* 홈: 하나의 흐름 — 질문함에서 답하거나 새 대화 → 위키에 반영된 변경 → 위키 점검 */
+/* 홈: 지금 할 일만 — 오늘의 질문(질문함) · 답변 캘린더 · 위키 점검 · 지원 기업.
+   위키 변경 기록은 경험 위키·경험 페이지에서 본다 */
 (function (App) {
   const esc = (s) => App.ui.esc(s);
   const TYPE_LABEL = { project: '프로젝트 체크인', deepen: '경험 깊이 파기', recall: '기억 떠올리기', code: '코드 분석에서 온 질문' };
@@ -48,20 +49,6 @@
           <a class="btn btn-primary" href="#/ask/q_${esc(q.id)}">답하러 가기 →</a>
         </div>
       </div>
-    </section>`;
-  }
-
-  /* ---------- 위키 최근 변경 ---------- */
-  function feedBlock() {
-    const list = App.wiki.entries().slice(0, 5);
-    const st = App.wiki.stats();
-    const kept = App.wiki.threadsFor ? App.wiki.threadsFor({ kind: 'kept' }).length : 0;
-    return `<section class="card card-pad home-feed">
-      <div class="section-title">위키 최근 변경<a class="more" href="#/vault">경험 위키 →</a></div>
-      <p class="subtle home-feed-sub">경험 ${st.pages}개 · 이번 주 반영 ${st.updatesThisWeek}번</p>
-      ${kept ? `<a class="home-kept" href="#/ask">💬 보관 중인 대화 ${kept}개 → 질문함</a>` : ''}
-      ${list.length ? `<div class="wk-feed">${list.map((e) => App.wiki.reportHTML(e, { compact: true })).join('')}</div>`
-        : '<p class="home-soft">아직 반영된 기록이 없어요. 질문함에서 오늘의 질문에 답하거나 ＋ 새 대화로 시작해 보세요.</p>'}
     </section>`;
   }
 
@@ -253,7 +240,6 @@
         <div class="home-grid">
           <div class="home-col">
             ${todayCard()}
-            ${feedBlock()}
             ${calendarBlock()}
           </div>
           <aside class="home-col home-side">
