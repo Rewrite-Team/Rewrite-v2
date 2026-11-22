@@ -325,7 +325,6 @@
                 <div class="dc-escapes">
                   <button class="dc-esc" data-act="forgot" type="button">🤔 기억이 잘 안 나요</button>
                   <button class="dc-esc" data-act="skip" type="button">⏭ 이 질문 건너뛰기</button>
-                  <button class="dc-esc" data-act="later" type="button">🔔 나중에 다시 물어봐 줘</button>
                   <button class="dc-esc dc-esc-stop" data-act="stop" type="button">✋ 오늘은 여기까지</button>
                   <span class="dc-kbd">Enter 보내기 · Shift+Enter 줄바꿈</span>
                 </div>
@@ -687,27 +686,6 @@
         (async () => { await advance('좋아요, 넘어갈게요.', sid); focusInput(); })();
       }
 
-      function onLater() {
-        if (S.busy || S.wrap || !S.currentQ) return;
-        if (S.pendingTarget) { App.ui.toast('먼저 위에서 같은 이야기인지 골라 주세요'); scrollDown(); return; }
-        addUser('나중에 다시 물어봐 줘', true);
-        const qText = S.currentQ;
-        withTarget(() => {
-          const hasContent = sessionAnswers() > 0 || !!S.d.id;
-          const id = hasContent ? persist() : null;
-          App.store.pushQuestion({
-            text: qText, type: id ? 'deepen' : 'recall', targetExpId: id,
-            hint: 'AI와 대화하며 기록하다 잠시 미뤄둔 질문이에요. 한두 줄이면 충분해요.',
-          });
-          App.ui.toast('오늘의 질문으로 보내둘게요');
-          const sid = session;
-          (async () => {
-            await advance('알겠어요, 이 질문은 오늘의 질문으로 보내둘게요. 편할 때 한두 줄만 답해 주세요. 다른 걸 물어볼게요.', sid);
-            focusInput();
-          })();
-        });
-      }
-
       function onStop() {
         if (S.busy) return;
         const n = sessionAnswers();
@@ -944,7 +922,6 @@
         if (act === 'send') send();
         else if (act === 'forgot') onForgot();
         else if (act === 'skip') onSkip();
-        else if (act === 'later') onLater();
         else if (act === 'stop') onStop();
         else if (act === 'save') save();
         else if (act === 'another') App.navigate('#/ask/new?mode=deep');
