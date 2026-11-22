@@ -413,6 +413,15 @@
 
   App.screens.card = {
     title: (p) => (p && p.id === 'new' ? '새 경험' : '경험 페이지'),
+    // 경험 위키 › (프로젝트) › 경험 페이지 — 프로젝트에 속한 경험이면 그 프로젝트를 경로에 넣는다
+    crumb(params) {
+      const crumbs = [{ label: '경험 위키', href: '#/vault' }];
+      const e = params && params.id && params.id !== 'new' ? App.store.get(params.id) : null;
+      const pid = (e && e.projectId) || (params && params.id === 'new' && params.projectId);
+      const p = pid && App.store.getProject(pid);
+      if (p) crumbs.push({ label: projShort(p), href: '#/vault/p/' + encodeURIComponent(p.id) });
+      return crumbs;
+    },
     render(params) {
       const st = initialState(params);
       return `<div class="page cd-page" data-cd-root>${bodyHTML(st)}</div>`;
