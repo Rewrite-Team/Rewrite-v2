@@ -75,22 +75,25 @@
   const ghLink = (e) => (e.links || []).find((l) => /github/i.test(l)) || (e.links || [])[0] || '';
   const prettyLink = (u) => String(u).replace(/^https?:\/\//, '').replace(/\/$/, '');
 
-  /* ---------- 프로젝트 카드 (경험 위키의 프로젝트 묶음에서 사용) ---------- */
+  /* ---------- 프로젝트 카드 (경험 위키의 프로젝트 묶음에서 사용) ----------
+     칸 순서·높이 고정: 상태·기간 / 체크인 안내 / 제목(2줄) / 역할(1줄) / 숫자 / 키워드 / 코드 분석(맨 아래).
+     체크인 안내나 코드 분석이 없어도 그 자리는 비워 두어, 카드끼리 같은 요소가 같은 높이에 온다 */
   function projectCard(e) {
-    const last = lastLog(e); const nx = nextCheckin(e);
+    const last = lastLog(e); const nx = e.status === 'ongoing' ? nextCheckin(e) : null;
+    const gh = e.repo ? (() => { const live = liveFindings(e.repo); const added = live.filter((f) => f.status === 'added').length;
+      return `<a class="pj-card-gh" href="${esc(pageHref(e.id, 'code'))}" title="${esc(e.repo.owner + '/' + e.repo.name)} 코드 분석 결과"><span>⌥ 코드 분석 ${live.length}</span>${added ? `<span class="pj-card-gh-n">이력서에 ${added}개 담음</span>` : ''}</a>`; })() : '';
     return `<div class="card pj-card" data-href="${esc(pageHref(e.id))}">
-      <div class="pj-card-top">${statusTag(e.status)}<span class="subtle">${App.ui.period(e.period)}</span>
-        ${e.status === 'ongoing' ? `<span class="pj-due ${nx.due ? 'is-due' : ''}">${nx.due ? '● ' : ''}${esc(nx.text)}</span>` : ''}</div>
-      <div class="pj-card-title">${esc(e.title)}</div>
-      <div class="pj-card-role">${esc(e.role || '역할 미입력')}</div>
-      ${e.repo ? (() => { const live = liveFindings(e.repo); const added = live.filter((f) => f.status === 'added').length;
-        return `<a class="pj-card-gh" href="${esc(pageHref(e.id, 'code'))}" title="${esc(e.repo.owner + '/' + e.repo.name)} 코드 분석 결과"><span>⌥ 코드 분석 ${live.length}</span>${added ? `<span class="pj-card-gh-n">이력서에 ${added}개 담음</span>` : ''}</a>`; })() : ''}
+      <div class="pj-card-top">${statusTag(e.status)}<span class="subtle">${App.ui.period(e.period)}</span></div>
+      <div class="pj-card-due">${nx ? `<span class="pj-due ${nx.due ? 'is-due' : ''}">${nx.due ? '● ' : ''}${esc(nx.text)}</span>` : ''}</div>
+      <div class="pj-card-title" title="${esc(e.title)}">${esc(e.title)}</div>
+      <div class="pj-card-role" title="${esc(e.role || '')}">${esc(e.role || '역할 미입력')}</div>
       <div class="pj-card-stats">
         <div><b>${(e.logs || []).length}</b><span>기록</span></div>
         <div><b>${App.store.cardsOf(e.id).length}</b><span>경험</span></div>
         <div><b>${last ? esc(md(last.date)) : '—'}</b><span>마지막 체크인${last ? ` · ${ago(last.date)}` : ''}</span></div>
       </div>
       <div class="exp-card-kws">${topKeywords(e, 4).map((k) => App.ui.keywordChip(k)).join('') || '<span class="subtle">체크인을 남기면 역량 키워드가 생겨요</span>'}</div>
+      <div class="pj-card-foot">${gh}</div>
     </div>`;
   }
   function openNewModal() {

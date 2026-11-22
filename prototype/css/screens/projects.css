@@ -17,8 +17,15 @@
 .pj-card-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; }
 .pj-due { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--text-3); }
 .pj-due.is-due { color: var(--accent); }
-.pj-card-title { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; }
-.pj-card-role { color: var(--text-2); font-size: 13.5px; margin-top: -4px; }
+.pj-card-top { min-height: 22px; flex-wrap: nowrap; white-space: nowrap; }
+/* 카드 칸 자리 고정: 체크인 안내는 없어도 한 줄 자리를 남기고, 제목은 두 줄·역할은 한 줄 높이로 고정 */
+.pj-card-due { height: 18px; line-height: 18px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-top: -4px; }
+.pj-card-due .pj-due { margin-left: 0; }
+.pj-card-title { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: calc(2 * 1.4em); }
+.pj-card-role { color: var(--text-2); font-size: 13.5px; margin-top: -4px; line-height: 1.4; height: 1.4em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* 코드 분석은 맨 아래: 없으면 같은 높이의 빈 자리 */
+.pj-card-foot { margin-top: auto; min-height: 26px; display: flex; align-items: flex-end; }
 .pj-card-stats { display: flex; gap: 22px; padding: 2px 0; }
 .pj-card-stats div { display: flex; flex-direction: column; }
 .pj-card-stats b { font-size: 15px; font-weight: 700; }
