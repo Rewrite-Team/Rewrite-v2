@@ -23,6 +23,12 @@ window.App = window.App || {};
   if (!state.resume) state.resume = clone(window.SEED.resume || EMPTY_RESUME());
   // '건너뛰기'와 '나중에'를 '나중에 답하기' 하나로 합침: 예전 '나중에' 질문은 미뤄 둔 질문(skipped)으로
   (state.inbox || []).forEach((q) => { if (q.status === 'later') q.status = 'skipped'; });
+  // 시드 프로젝트 이름을 사용자가 실제로 쓸 법한 짧은 이름으로
+  const SHORT_NAME = { '팀 프로젝트 「모여봄」 — 동네 모임 매칭 서비스': '모여봄', '개인 프로젝트 — 가계부 슬랙봇': '슬랙봇', '캡스톤 디자인 「빈강의실」 — 강의실 예약 웹앱': '빈강의실' };
+  (state.projects || []).forEach((p) => { if (SHORT_NAME[p.title]) p.title = SHORT_NAME[p.title]; });
+  const fixSlack = (t) => String(t || '').replace(/「가계부 슬랙봇」/g, '「슬랙봇」');
+  (state.inbox || []).forEach((q) => { q.text = fixSlack(q.text); });
+  (state.experiences || []).forEach((e) => { e.title = fixSlack(e.title); });
   const listeners = new Set();
   function persist() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ } }
   function emit() { persist(); listeners.forEach((fn) => fn(state)); }
@@ -38,7 +44,7 @@ window.App = window.App || {};
 
   App.store = {
     get state() { return state; },
-    // 프로젝트 짧은 이름: 「모여봄」 → 모여봄, '개인 프로젝트 — 가계부 슬랙봇' → 가계부 슬랙봇
+    // 프로젝트 짧은 이름: '모여봄' → 모여봄, '팀 프로젝트 「모여봄」 — …' → 모여봄
     projectName(p) { return projectShort(p && p.title).slice(1, -1); },
     // 로컬 날짜 도우미
     localDay, fmtDay, parseDay,

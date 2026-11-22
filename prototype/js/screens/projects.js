@@ -104,7 +104,7 @@
       body: `<div class="pj-form">
         <p class="pj-form-intro">진행하는 동안 체크인 질문을 보내 드릴게요. 답한 기록은 타임라인에 쌓이고, 이야기마다 경험 페이지로 정리돼요.</p>
         <label class="label" for="pj-f-title">프로젝트 이름 <span class="pj-req">*</span></label>
-        <input class="input" id="pj-f-title" placeholder="예) 팀 프로젝트 「모여봄」" maxlength="60" />
+        <input class="input" id="pj-f-title" placeholder="예) 모여봄" maxlength="60" />
         <label class="label" for="pj-f-role">내 역할</label>
         <input class="input" id="pj-f-role" placeholder="예) 백엔드 (Spring Boot), 4인 팀" maxlength="60" />
         <label class="label" for="pj-f-start">시작한 달</label>

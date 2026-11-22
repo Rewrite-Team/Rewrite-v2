@@ -27,6 +27,8 @@
 
   /* ---------------- 도우미 ---------------- */
   const projShort = (p) => (p ? (p.title.match(/「[^」]+」/) || [p.title.split(' — ')[0]])[0] : '');
+  // 소속: '팀 프로젝트 「모여봄」 — …' 처럼 앞부분이 있을 때만. 이름만 있으면 비워 둔다
+  const projOrg = (p) => (p.title.includes(' — ') ? p.title.split(' — ')[0].replace(/\s*「[^」]+」/, '') : '');
   const ym = (s) => (s ? s.replace('-', '.') : '');
   function fmtPeriod(p) {
     if (!p || !p.start) return '';
@@ -630,7 +632,7 @@
             const title = v('title') || (p ? p.title.split(' — ').pop().replace(/[「」]/g, '') : '');
             if (!title) { App.ui.toast('제목을 적어 주세요'); return false; }
             const e = S().addResumeEntry({
-              section: sec, title, org: v('org') || (p ? p.title.split(' — ')[0].replace(/\s*「[^」]+」/, '') : ''),
+              section: sec, title, org: v('org') || (p ? projOrg(p) : ''),
               role: v('role') || (p ? p.role : ''), projectId: p ? p.id : null,
               period: { start: v('start') || (p ? p.period.start : ''), end: v('end') || (p ? p.period.end : '') },
             });
@@ -642,7 +644,7 @@
         if (sel) sel.onchange = () => {
           const p = S().getProject(sel.value); const set = (k, val) => { const el = document.querySelector(`[data-ae="${k}"]`); if (el) el.value = val || ''; };
           if (!p) return;
-          set('title', p.title.split(' — ').pop().replace(/[「」]/g, '')); set('org', p.title.split(' — ')[0].replace(/\s*「[^」]+」/, '')); set('role', p.role); set('start', p.period.start); set('end', p.period.end);
+          set('title', p.title.split(' — ').pop().replace(/[「」]/g, '')); set('org', projOrg(p)); set('role', p.role); set('start', p.period.start); set('end', p.period.end);
         };
       }
 
