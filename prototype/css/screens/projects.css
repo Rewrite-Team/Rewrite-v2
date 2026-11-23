@@ -15,12 +15,8 @@
 .pj-card { padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; transition: box-shadow .15s, transform .15s, border-color .15s; }
 .pj-card:hover { box-shadow: var(--shadow); border-color: var(--border-strong); transform: translateY(-1px); }
 .pj-card-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; }
-.pj-due { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--text-3); }
-.pj-due.is-due { color: var(--accent); }
 .pj-card-top { min-height: 22px; flex-wrap: nowrap; white-space: nowrap; }
-/* 카드 칸 자리 고정: 체크인 안내는 없어도 한 줄 자리를 남기고, 제목은 두 줄·역할은 한 줄 높이로 고정 */
-.pj-card-due { height: 18px; line-height: 18px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-top: -4px; }
-.pj-card-due .pj-due { margin-left: 0; }
+/* 카드 칸 자리 고정: 제목은 두 줄·역할은 한 줄 높이로 고정 */
 .pj-card-title { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; line-height: 1.4;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: calc(2 * 1.4em); }
 .pj-card-role { color: var(--text-2); font-size: 13.5px; margin-top: -4px; line-height: 1.4; height: 1.4em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -48,7 +44,6 @@
 .pj-back:hover { color: var(--text); }
 .pj-hero { padding: 22px 24px; display: flex; gap: 20px; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
 .pj-hero-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-.pj-hero-main .pj-due { margin-left: 4px; }
 .pj-hero-title { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
 .pj-hero-main .pj-card-role { margin-top: -4px; }
 .pj-hero-side { display: flex; gap: 8px; align-items: center; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
@@ -65,8 +60,8 @@
 .pj-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .pj-side { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 72px; }
 
-.pj-checkin { padding: 20px 22px; border-color: #dcdcf5; box-shadow: 0 0 0 4px rgba(75, 79, 214, 0.05), var(--shadow-sm); }
-.pj-checkin-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.pj-story { padding: 20px 22px; border-color: #dcdcf5; box-shadow: 0 0 0 4px rgba(75, 79, 214, 0.05), var(--shadow-sm); }
+.pj-story-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .pj-types { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 12px; }
 .pj-type { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 99px; border: 1px solid var(--border-strong);
   background: var(--surface); font-size: 13px; font-weight: 600; color: var(--text-2); cursor: pointer; transition: all .12s; }
@@ -75,7 +70,7 @@
 .pj-type.on { background: var(--pj-s); border-color: var(--pj-c); color: var(--pj-c); }
 .pj-type.on .pj-type-ico { background: var(--pj-c); color: #fff; }
 .pj-ta { min-height: 84px; }
-/* 기록 대화 (App.talk) — 체크인 카드 · 타임라인 기록 · 코드 항목 아래 */
+/* 기록 대화 (App.talk) — 프로젝트 이야기 카드 · 타임라인 기록 · 코드 항목 아래 */
 .pj-talk { margin-top: 4px; min-width: 0; }
 .pj-log-body .pj-talk, .pj-gf .pj-talk { margin-top: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); }
 /* 카드에 담기: 박스 없이 기록 바로 아래로 이어지는 대화 (안쪽 스크롤도 없음) */
@@ -149,10 +144,10 @@
   .pj-hero-title { font-size: 20px; }
   .pj-hero-side { width: 100%; }
   .pj-source { flex: 1; max-width: none; min-width: 0; }
-  .pj-checkin { padding: 18px; }
+  .pj-story { padding: 18px; }
 }
 
-/* 역량 키워드 편집기 (체크인·로그 수정) */
+/* 역량 키워드 편집기 (로그 수정) */
 .pj-kwed { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 .pj-kwed-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .pj-kwed-label { font-size: 12px; font-weight: 700; color: var(--text-2); margin-right: 2px; }
@@ -189,14 +184,11 @@
 .pj-cardlink { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); color: inherit; text-decoration: none; }
 .pj-cardlink:hover { border-color: var(--primary); background: var(--primary-soft); }
 .pj-cardlink-top { display: flex; align-items: center; gap: 6px; }
-.pj-cardlink-pct { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--text-3); }
+.pj-cardlink-n { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--text-3); }
 .pj-cardlink-title { font-size: 13.5px; font-weight: 600; color: var(--text); line-height: 1.4; }
 .pj-cards-box .pj-side-hint { margin: 4px 0 12px; }
 .pj-log-card { font-size: 11.5px; font-weight: 700; color: var(--primary); background: var(--primary-soft); padding: 1px 7px; border-radius: 99px; text-decoration: none; }
 .pj-log-card:hover { background: var(--primary); color: #fff; }
-.pj-ck-sync { display: inline-block; font-size: 12px; font-weight: 600; color: #b5651d; background: var(--accent-soft); padding: 4px 10px; border-radius: 99px; text-decoration: none; margin: 2px 0 12px; }
-.pj-ck-sync:hover { filter: brightness(.97); }
-.pj-ck-sync.is-quiet { color: var(--text-3); background: transparent; padding-left: 0; font-weight: 500; }
 
 /* ---------- 탭: 경험 | 타임라인 | 코드 분석 ---------- */
 .pj-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-top: 6px; }

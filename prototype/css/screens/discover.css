@@ -149,10 +149,6 @@
 .dc-cat { border: 1px solid var(--border); background: var(--surface-2); border-radius: 7px; padding: 3px 8px; font-size: 12.5px; font-weight: 600; color: var(--text-2); cursor: pointer; outline: none; }
 .dc-qa-count { margin-left: auto; font-size: 12px; color: var(--text-3); }
 
-.dc-comp { background: var(--surface-2); border-radius: var(--radius); padding: 10px 12px; }
-.dc-comp-top { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text-2); margin-bottom: 6px; }
-.dc-comp-top b { color: var(--primary); font-size: 14px; }
-.dc-comp .progress > span { transition: width .5s cubic-bezier(.2, .8, .2, 1); }
 
 .dc-fields { display: flex; flex-direction: column; gap: 8px; }
 .dc-field { border: 1px solid var(--border); border-radius: var(--radius); padding: 9px 11px; transition: border-color .2s, background .2s; }
@@ -189,7 +185,7 @@
 
 /* ---------- Summary modal ---------- */
 .dc-sum { display: flex; flex-direction: column; gap: 12px; }
-.dc-sum-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.dc-sum-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .dc-sum-stats > div { background: var(--surface-2); border-radius: var(--radius); padding: 10px; text-align: center; display: flex; flex-direction: column; }
 .dc-sum-stats b { font-size: 20px; color: var(--text); }
 .dc-sum-stats span { font-size: 12px; color: var(--text-3); }
@@ -267,8 +263,6 @@
 .dc-edit { align-self: flex-end; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 12.5px; color: var(--text-3); margin-top: -4px; }
 .dc-edit-btn { border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-2); border-radius: 99px; padding: 2px 10px; font: inherit; font-size: 12px; cursor: pointer; }
 .dc-edit-btn:hover { border-color: var(--primary); color: var(--primary); }
-.dc-to-vault { align-self: flex-start; font-size: 13.5px; color: var(--text-2); text-decoration: none; }
-.dc-to-vault:hover { color: var(--primary); }
 
 /* ---------- 대화방 안에 붙은 깊은 대화 (App.deep.mount → .dc-embed) ----------
    질문함의 오른쪽 칸(.ask-deep)을 꽉 채운다. 넓으면 초안을 오른쪽에, 좁으면(칸 폭 기준) 아래에서 올라오는 시트로 */

@@ -207,8 +207,6 @@
 .ap-ritem-exp { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-2); min-width: 0; padding-left: 2px; }
 .ap-ritem-exp:hover .ap-ritem-title { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
 .ap-ritem-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ap-ritem-pct { font-size: 12px; font-weight: 700; color: var(--success); font-variant-numeric: tabular-nums; flex-shrink: 0; }
-.ap-ritem-pct.low { color: var(--warn); }
 .ap-pin { font-size: 11px; flex-shrink: 0; }
 .ap-ritem-exp.none { color: var(--text-3); }
 .ap-ritem-exp.none b { color: var(--primary); }

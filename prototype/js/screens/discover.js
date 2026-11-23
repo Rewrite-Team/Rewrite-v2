@@ -102,12 +102,12 @@
         const b = firstSentence(S.d.star.action, 40);
         return [a, b].filter(Boolean).join(' → ');
       }
-      const asExp = () => ({ star: S.d.star, insights: S.d.insights, summary: S.d.summary || autoSummary(), keywords: allKw() });
-      const comp = () => App.ai.completeness(asExp());
+      // 채운 칸 수 (STAR + 배운 점)
+      const comp = () => STAGES.filter((s) => filled(s.key)).length;
 
       function blankDraft() {
         return {
-          id: null, title: '', titleSource: null, category: '일상', status: 'draft',
+          id: null, title: '', titleSource: null, category: '일상',
           star: { situation: '', task: '', action: '', result: '' }, insights: '', summary: '',
           keywords: [], suggested: [], dismissed: [], qa: [], codeRefs: [],
         };
@@ -125,7 +125,6 @@
         const projects = projectsSorted();
         const list = P.map((p, i) => ({ p, i })).filter((x) => !activeCat || x.p.theme === activeCat);
         const user = App.store.state.user;
-        const drafts = App.store.list().filter((e) => e.status === 'draft');
         const recallCards = list.length
           ? list.map(({ p, i }) => `
             <button class="dc-seed" data-seed="${i}">
@@ -179,7 +178,6 @@
               </form>
             </div>
 
-            ${drafts.length ? `<a class="dc-to-vault" href="#/vault">작성 중인 경험 ${drafts.length}개는 <b>경험 위키</b>에서 이어서 채울 수 있어요 →</a>` : ''}
           </div>`;
         S.picker = { cat: activeCat, onboarding: !!opts.onboarding, projectId: projChoice };
         const input = root.querySelector('#dc-free-input');
@@ -200,7 +198,7 @@
         Object.assign(S, {
           d: blankDraft(), src, stage: 'situation', asked: {}, idx: {}, altTurn: 0,
           currentQ: '', busy: false, wrap: false, answers: 0, kwCooldown: 0, crossedHalf: false, sheet: false,
-          startComp: 0, initialQa: 0, edits: [],
+          initialQa: 0, edits: [],
           // 프로젝트: 'set' = 사용자가 골랐음, 'auto' = 반영할 때 대화에서 찾기
           projectId: null, projectMode: 'auto',
           mergeChecked: false, mergeInto: null, pendingTarget: null, merged: false,
@@ -216,7 +214,7 @@
         if (src.type === 'exp') {
           const e = src.exp;
           Object.assign(S.d, {
-            id: e.id, title: e.title, titleSource: 'user', category: e.category, status: e.status,
+            id: e.id, title: e.title, titleSource: 'user', category: e.category,
             star: Object.assign({ situation: '', task: '', action: '', result: '' }, JSON.parse(JSON.stringify(e.star || {}))),
             insights: e.insights || '', summary: e.summary || '', keywords: (e.keywords || []).slice(), qa: JSON.parse(JSON.stringify(e.qa || [])),
             codeRefs: (e.codeRefs || []).slice(),
@@ -227,7 +225,7 @@
             const F = window.SEED.followups;
             g = { stage: src.stage, text: src.stage === 'insight' ? '이 경험 이후 당신이 다르게 하게 된 것이 있나요?' : F[src.stage][0] };
           }
-          intro = `「${esc(e.title)}」 경험 카드를 이어서 채워 볼게요. 지금 완성도는 <b>${App.ai.completeness(e)}%</b>예요.`;
+          intro = `「${esc(e.title)}」 경험 카드를 이어서 채워 볼게요.`;
           if (src.ask && !src.answer) {
             // 질문함의 질문으로 시작 (그 질문이 겨냥한 칸부터)
             const st = src.stage && STAGE[src.stage] ? src.stage : g ? g.stage : 'situation';
@@ -294,7 +292,6 @@
         // 고른 프로젝트의 맥락(이름·역할)을 첫 질문에 같이 보여 준다
         const ctx = proj && src.type !== 'exp' ? `▤ ${esc(projLabel(proj))}${proj.role ? ` · ${esc(proj.role)}` : ''} 이야기로 기록할게요` : '';
         S.stage = firstStage;
-        S.startComp = comp();
         renderChatShell();
         renderDraft();
         updateMeta();
@@ -314,7 +311,7 @@
             <section class="card dc-chat">
               <header class="dc-chat-head">
                 <ol class="dc-stepper" id="dc-stepper"></ol>
-                <button class="dc-draft-toggle" data-act="sheet" type="button"><span>경험 초안</span><b id="dc-toggle-pct">0%</b></button>
+                <button class="dc-draft-toggle" data-act="sheet" type="button"><span>경험 초안</span><b id="dc-toggle-pct">0/${STAGES.length}</b></button>
               </header>
               <div class="dc-msgs" id="dc-msgs" aria-live="polite">${opts.historyHTML ? `<div class="dc-history"><div class="dc-history-cap">이 방에서 나눈 대화</div>${opts.historyHTML}</div>` : ''}</div>
               <div class="dc-composer">
@@ -355,7 +352,6 @@
       function renderDraft() {
         const el = root.querySelector('#dc-draft'); if (!el) return;
         const d = S.d;
-        const c = comp();
         const sug = d.suggested.filter((k) => !d.keywords.includes(k));
         el.innerHTML = `
           <div class="dc-draft-head">
@@ -375,12 +371,7 @@
               <option value="">${S.projectMode === 'set' ? '프로젝트 밖 경험' : '프로젝트: AI가 찾기'}</option>
               ${projectsSorted().map((p) => `<option value="${esc(p.id)}" ${S.projectId === p.id ? 'selected' : ''}>▤ ${esc(projLabel(p))}</option>`).join('')}
             </select>
-            ${App.ui.statusTag(d.status)}
             <span class="dc-qa-count">답변 ${d.qa.length - S.initialQa}개</span>
-          </div>
-          <div class="dc-comp">
-            <div class="dc-comp-top"><span>완성도</span><b id="dc-comp-num">${c}%</b></div>
-            <div id="dc-comp-bar">${App.ui.progress(c)}</div>
           </div>
           <div class="dc-fields">
             ${STAGES.map((s) => `
@@ -422,10 +413,7 @@
       }
 
       function updateMeta() {
-        const c = comp();
-        const n = root.querySelector('#dc-comp-num'); if (n) n.textContent = c + '%';
-        const b = root.querySelector('#dc-comp-bar'); if (b) b.innerHTML = App.ui.progress(c);
-        const t = root.querySelector('#dc-toggle-pct'); if (t) t.textContent = c + '%';
+        const t = root.querySelector('#dc-toggle-pct'); if (t) t.textContent = `${comp()}/${STAGES.length}`;
         renderStepper();
       }
 
@@ -603,10 +591,10 @@
           S.kwCooldown = 2;
         } else if (stage === 'result' && hasNum(text)) {
           note = '숫자가 들어가니 훨씬 설득력 있어요 👍';
-        } else if (!S.crossedHalf && before < 50 && after >= 50) {
+        } else if (!S.crossedHalf && before < 3 && after >= 3) {
           note = '경험 카드가 벌써 절반 넘게 채워졌어요. 이 페이스 좋아요!';
         }
-        if (after >= 50) S.crossedHalf = true;
+        if (after >= 3) S.crossedHalf = true;
 
         const ack = text.length > 120 ? '자세히 적어 줘서 고마워요!' : text.length < 10 ? '짧아도 괜찮아요.' : pick(ACKS);
         (async () => {
@@ -698,7 +686,6 @@
           });
           return;
         }
-        const c = comp();
         const done = STAGES.filter((s) => filled(s.key));
         App.ui.modal({
           title: '오늘은 여기까지 할까요?',
@@ -708,7 +695,6 @@
               <div class="dc-sum-stats">
                 <div><b>${n}</b><span>답변</span></div>
                 <div><b>${done.length}/5</b><span>채운 칸</span></div>
-                <div><b>${c}%</b><span>완성도</span></div>
               </div>
               <div class="dc-sum-steps">${STAGES.map((s) => `<span class="${filled(s.key) ? 'on' : ''}">${s.label}</span>`).join('')}</div>
               ${allKw().length ? `<div class="dc-sum-kws">${allKw().map((k) => App.ui.keywordChip(k)).join('')}</div>` : ''}
@@ -760,7 +746,7 @@
         });
         const u = App.store.get(e.id);
         Object.assign(d, {
-          id: u.id, title: u.title, titleSource: 'user', category: u.category, status: u.status, star: clone(u.star), insights: u.insights || '',
+          id: u.id, title: u.title, titleSource: 'user', category: u.category, star: clone(u.star), insights: u.insights || '',
           summary: u.summary || '', keywords: u.keywords.slice(), suggested: [], qa: clone(u.qa), codeRefs: (u.codeRefs || []).slice(),
         });
         S.initialQa = u.qa.length - newQa.length;
@@ -787,7 +773,7 @@
           if (cur) { if (S.baseBefore === undefined) S.baseBefore = clone(cur); App.store.update(id, data); }
           else {
             S.baseBefore = null;
-            const e = App.store.create(Object.assign({ status: 'draft', role: proj ? proj.role || '' : '' }, data));
+            const e = App.store.create(Object.assign({ role: proj ? proj.role || '' : '' }, data));
             d.id = id = e.id;
           }
         }
@@ -858,14 +844,12 @@
           : entry.decided === 'user' ? '고른 경험 카드로 옮겼어요'
           : S.merged ? '같은 이야기를 하던 경험 카드에 담았어요'
           : '경험 카드가 더 단단해졌어요';
-        const delta = e && entry && entry.decided !== 'new' ? e.completeness - S.startComp : 0;
         const g = e && !undone ? App.ai.gapQuestion(e) : null;
         root.innerHTML = `
           <div class="dc-done">
             <div class="dc-done-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
             <h1>${head}</h1>
-            <p class="dc-done-sub">${undone ? '대화 전 상태로 돌려 두었어요.' : `답변 ${n}개를 위키에 반영했어요.
-              ${e ? `「${esc(App.wiki.short(e.title, 30))}」 완성도 <b>${e.completeness}%</b>${delta > 0 ? ` (+${delta}%)` : ''}.` : ''} 언제든 이어서 더 채울 수 있어요.`}</p>
+            <p class="dc-done-sub">${undone ? '대화 전 상태로 돌려 두었어요.' : `답변 ${n}개를 위키에 반영했어요. 언제든 이어서 더 채울 수 있어요.`}</p>
             <div class="dc-done-report">${entry ? App.wiki.reportHTML(entry) : ''}</div>
             ${g ? (() => { const queued = App.store.state.inbox.some((q) => q.targetExpId === e.id && q.status === 'pending');
               return `<div class="dc-done-next"><span class="ai-dot">R</span><div style="flex:1"><div class="dc-done-label">다음에 채우면 좋은 질문</div><div>${esc(g.text)}</div></div>

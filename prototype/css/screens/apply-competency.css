@@ -8,12 +8,10 @@
 /* 상태 색 */
 .ac-check-item, .ac-tile, .ac-pill, .ac-dot { --ac-c: var(--text-3); --ac-soft: #f0eee9; }
 .is-ready.ac-check-item, .is-ready.ac-tile, .is-ready.ac-pill, .is-ready.ac-dot { --ac-c: var(--success); --ac-soft: var(--success-soft); }
-.is-weak.ac-check-item, .is-weak.ac-tile, .is-weak.ac-pill, .is-weak.ac-dot { --ac-c: var(--warn); --ac-soft: var(--warn-soft); }
 
 .ac-stars { color: #e0a52a; font-size: 12px; letter-spacing: 1px; white-space: nowrap; }
 .ac-stars-off { color: var(--border-strong); }
 .ac-pill { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 700; background: var(--ac-soft); color: var(--ac-c); white-space: nowrap; }
-.ac-pill.is-weak { color: #8a6a08; }
 .ac-pill.is-none { background: transparent; border: 1px dashed var(--border-strong); color: var(--text-3); }
 
 /* 체크리스트 */
@@ -29,7 +27,6 @@
 .ac-check-item.sel { border-color: var(--primary); background: var(--primary-soft); }
 .ac-mark { width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; font-size: 12px; font-weight: 800; }
 .ac-check-item.is-ready .ac-mark { background: var(--success); color: #fff; }
-.ac-check-item.is-weak .ac-mark { background: var(--warn-soft); color: var(--warn); }
 .ac-check-item.is-none .ac-mark { border: 1.5px dashed var(--border-strong); color: var(--text-3); }
 .ac-check-txt { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
 .ac-check-txt b { font-size: 13.5px; }
@@ -105,8 +102,6 @@
   display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; line-height: 1.55; color: var(--text); }
 .ac-tailor-k { font-size: 11.5px; font-weight: 700; color: var(--primary); }
 .ac-answer-foot { display: flex; justify-content: flex-end; margin-top: 12px; padding-top: 10px; border-top: 1px solid #e3e3f2; }
-.ac-weak { margin-top: 10px; padding: 9px 12px; border-radius: var(--radius-sm); background: var(--warn-soft); color: #7d600b; font-size: 13px;
-  display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 
 .ac-list-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: 20px 0 10px; font-size: 14px; }
 .ac-list-head .subtle { font-size: 12.5px; }
@@ -118,7 +113,6 @@
 .ac-exp-top { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--text-3); }
 .ac-exp-title { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ac-exp-foot { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--text-3); }
-.ac-exp-foot .progress { flex: 1; max-width: 140px; height: 4px; }
 .ac-exp-act { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .ac-rep-badge { font-size: 11.5px; font-weight: 700; color: var(--primary); white-space: nowrap; }
 

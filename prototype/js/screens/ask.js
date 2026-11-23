@@ -13,7 +13,7 @@
   const TYPES = {
     recall: { label: '기억 떠올리기', ico: '🌱' },
     deepen: { label: '경험 깊이 파기', ico: '🔍' },
-    project: { label: '프로젝트 체크인', ico: '📌' },
+    project: { label: '프로젝트 이야기', ico: '📌' },
     code: { label: '코드 분석에서 온 질문', ico: '⌥' },
   };
   const SRC_ICO = { capture: '✎', checkin: '📌', code: '⌥', check: '🩺', coach: '✦', chat: '✦', daily: '✉' };
@@ -388,7 +388,7 @@
       // ----- 아직 답하지 않은 질문 (대기 · 미뤄 둠) -----
       function srcOf(q) {
         if (q.findingId) return { type: 'answer', question: q.text, questionId: q.id, projectId: q.targetProjectId, findingId: q.findingId };
-        if (q.targetProjectId && S.getProject(q.targetProjectId)) return { type: 'checkin', question: q.checkinText || q.text, questionId: q.id, projectId: q.targetProjectId, logType: q.checkinType };
+        if (q.targetProjectId && S.getProject(q.targetProjectId)) return { type: 'checkin', question: q.text, questionId: q.id, projectId: q.targetProjectId, logType: q.logType };
         if (q.targetExpId) return { type: 'answer', question: q.text, questionId: q.id, expId: q.targetExpId, stage: q.stage };
         return { type: 'answer', question: q.text, questionId: q.id };
       }
@@ -581,10 +581,10 @@
             if (qq && qq.status !== 'answered') {
               qq.answer = qq.answer || firstAnswer || ''; qq.answeredAt = S.localDay(); qq.compiledTo = expId;
               if (entryId) qq.wikiEntry = entryId;
-              // 프로젝트 체크인 질문이었다면 짧게 답할 때처럼 첫 답을 프로젝트 타임라인에도 남긴다
-              if (qq.checkin && qq.targetProjectId && S.getProject(qq.targetProjectId) && qq.answer) {
+              // 프로젝트에 대한 질문이었다면 짧게 답할 때처럼 첫 답을 프로젝트 타임라인에도 남긴다
+              if (qq.type === 'project' && !qq.findingId && qq.targetProjectId && S.getProject(qq.targetProjectId) && qq.answer) {
                 const tid = cur && cur !== 'new' && !String(cur).startsWith('q_') ? cur : (W.threadsFor({}).find((t) => t.questionId === qq.id) || {}).id;
-                S.addLog(qq.targetProjectId, Object.assign({ text: qq.answer, type: qq.checkinType || 'milestone', fromQuestion: qq.text }, tid ? { threadId: tid } : {}));
+                S.addLog(qq.targetProjectId, Object.assign({ text: qq.answer, type: qq.logType || 'milestone', fromQuestion: qq.text }, tid ? { threadId: tid } : {}));
               }
               S.setQuestionStatus(qq.id, 'answered');
             }
@@ -670,7 +670,7 @@
         UI.collapsed.today = false;
         if (!cur) App.navigate(roomHref(id)); else refreshAll();
       }
-      // 다시 답하기: 이전 답이 위키에 만든 변화(와 체크인 기록)를 먼저 되돌려 중복 반영을 막고, 같은 방에서 대화를 다시 연다
+      // 다시 답하기: 이전 답이 위키에 만든 변화(와 프로젝트 기록)를 먼저 되돌려 중복 반영을 막고, 같은 방에서 대화를 다시 연다
       function reask(qid) {
         const q = S.getQuestion(qid);
         const prev = q && q.wikiEntry ? W.get(q.wikiEntry) : null;

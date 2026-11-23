@@ -34,10 +34,9 @@ window.SEED = (function () {
     channels: { push: true, email: false, kakao: true },
     questionStyle: 'light',        // light | deep
     quietHours: { start: '23:00', end: '08:00' },
-    projectCheckin: 'every2days',  // daily | every2days | weekly
   };
 
-  // 프로젝트 = 체크인 로그를 담는 그릇. 체크인 하나하나도 경험이고, 경험 카드는 여기서 에피소드 단위로 여러 장 나온다 (card.projectId → project.id)
+  // 프로젝트 = 그 프로젝트에 대한 경험(대화)·기록을 모으는 그릇. 프로젝트 이야기 하나하나도 경험이고, 경험 카드는 여기서 에피소드 단위로 여러 장 나온다 (card.projectId → project.id)
   const projects = [
     {
       id: 'p1', title: '모여봄',
@@ -79,12 +78,12 @@ window.SEED = (function () {
   ];
 
   /* 경험 카드 = 흩어진 경험(끝난 대화) 여러 개를 모아 면접·이력서·자소서에 쓰기 좋게 정리한 STAR 페이지.
-     어떤 경험이 이 카드에 담겼는지는 inbox[].cardIds · chats[].cardIds · sourceLogIds(프로젝트 체크인) 로 정해지고,
+     어떤 경험이 이 카드에 담겼는지는 inbox[].cardIds · chats[].cardIds · sourceLogIds(프로젝트 기록) 로 정해지고,
      카드의 qa(출처)는 파일 아래에서 그 답변들로 채운다 */
   const experiences = [
     {
       id: 'e1', title: '「모여봄」 검색 API 응답 속도 개선 (N+1)', category: '프로젝트',
-      period: { start: '2026-10', end: '2026-10' }, status: 'done', projectId: 'p1', sourceLogIds: ['l3'], codeRefs: ['gf_p1_1'],
+      period: { start: '2026-10', end: '2026-10' }, projectId: 'p1', sourceLogIds: ['l3'], codeRefs: ['gf_p1_1'],
       role: '백엔드 (검색 API 담당)', summary: '모임 검색 API가 느리다는 피드백을 받고, 쿼리 로그로 N+1을 찾아 응답 시간을 1.8초에서 0.3초로 줄였다.',
       star: {
         situation: '4인 팀 프로젝트 「모여봄」에서 프론트 팀원이 모임 검색 화면이 버벅인다고 알려 줌. 검색 한 번에 1.8초가 걸렸음.',
@@ -95,11 +94,11 @@ window.SEED = (function () {
       insights: '성능 문제는 감이 아니라 측정부터 해야 하고, 고친 방법이 만드는 부작용(페이징)까지 확인해야 한다.',
       keywords: ['문제해결', '분석력', '학습능력'], jobs: ['백엔드 개발자'],
       links: ['https://github.com/example/moyeobom'], qa: [],
-      completeness: 92, createdAt: '2026-10-02', updatedAt: '2026-11-05',
+      createdAt: '2026-10-02', updatedAt: '2026-11-05',
     },
     {
       id: 'e8', title: '「모여봄」 API 명세 먼저 합의하기 — 프론트와의 협업', category: '프로젝트',
-      period: { start: '2026-10', end: '2026-11' }, status: 'done', projectId: 'p1', sourceLogIds: ['l4'], codeRefs: ['gf_p1_8'],
+      period: { start: '2026-10', end: '2026-11' }, projectId: 'p1', sourceLogIds: ['l4'], codeRefs: ['gf_p1_8'],
       role: '백엔드', summary: '프론트가 API 응답 형식 변경으로 재작업이 잦자, Swagger 명세를 먼저 합의하고 구현하는 규칙을 제안해 수정 요청을 크게 줄였다.',
       star: {
         situation: '「모여봄」 개발 중 프론트 팀원이 API 응답 형식이 자꾸 바뀌어 힘들다고 이야기함.',
@@ -110,11 +109,11 @@ window.SEED = (function () {
       insights: '협업 문제는 사람이 아니라 합의 시점의 문제일 때가 많다.',
       keywords: ['협업', '주도성', '커뮤니케이션'], jobs: ['백엔드 개발자'],
       links: [], qa: [],
-      completeness: 88, createdAt: '2026-10-15', updatedAt: '2026-11-18',
+      createdAt: '2026-10-15', updatedAt: '2026-11-18',
     },
     {
       id: 'e9', title: '「빈강의실」 중복 예약 버그 해결', category: '프로젝트',
-      period: { start: '2025-04', end: '2025-06' }, status: 'done', projectId: 'p3', sourceLogIds: ['l10', 'l13'], codeRefs: ['gf_p3_1', 'gf_p3_2'],
+      period: { start: '2025-04', end: '2025-06' }, projectId: 'p3', sourceLogIds: ['l10', 'l13'], codeRefs: ['gf_p3_1', 'gf_p3_2'],
       role: '백엔드 + 팀장', summary: '같은 강의실·시간에 예약이 두 건 들어가는 문제를 재현 테스트로 확인하고 DB 제약과 낙관적 락으로 막아, 시범 운영 동안 중복 예약 0건을 지켰다.',
       star: {
         situation: '캡스톤 「빈강의실」 테스트 중 같은 강의실·시간에 예약이 두 건 들어가는 중복 예약이 발생함.',
@@ -125,11 +124,11 @@ window.SEED = (function () {
       insights: '동시성 문제는 코드만 봐서는 안 보이고, 재현 테스트를 먼저 만들어야 잡힌다.',
       keywords: ['문제해결', '꼼꼼함', '분석력'], jobs: ['백엔드 개발자'],
       links: ['https://github.com/example/empty-classroom'], qa: [],
-      completeness: 100, createdAt: '2025-06-20', updatedAt: '2026-11-12',
+      createdAt: '2025-06-20', updatedAt: '2026-11-12',
     },
     {
       id: 'e2', title: '카페 아르바이트 — 주문 대기 줄 줄이기', category: '아르바이트',
-      period: { start: '2024-03', end: '2025-02' }, status: 'done',
+      period: { start: '2024-03', end: '2025-02' },
       role: '바리스타 (주말 오픈조)', summary: '주말 피크 타임 대기 줄이 길어지는 문제를 보고, 주문 수를 직접 세어 근거를 만든 뒤 사전 준비와 역할 고정을 제안해 대기 시간을 줄였다.',
       star: {
         situation: '주말 오전 10~12시에 주문이 몰리면 대기 줄이 매장 밖까지 이어지고, 기다리다 그냥 나가는 손님도 있었음.',
@@ -140,11 +139,11 @@ window.SEED = (function () {
       insights: '평범한 알바에서도 "세어보기"만으로 개선 포인트를 찾을 수 있고, 바쁠수록 역할을 나눠야 덜 꼬인다.',
       keywords: ['고객지향', '분석력', '주도성', '커뮤니케이션'], jobs: ['백엔드 개발자', '서비스 기획자'],
       links: [], qa: [],
-      completeness: 95, createdAt: '2026-11-02', updatedAt: '2026-11-11',
+      createdAt: '2026-11-02', updatedAt: '2026-11-11',
     },
     {
       id: 'e3', title: '알고리즘 스터디 운영', category: '동아리',
-      period: { start: '2025-03', end: '2025-12' }, status: 'done',
+      period: { start: '2025-03', end: '2025-12' },
       role: '스터디장, 6명', summary: '흐지부지되던 알고리즘 스터디를 맡아, 빠진 사람들에게 이유를 직접 묻고 난이도·진행 방식을 바꿔 10개월 동안 유지했다.',
       star: {
         situation: '학과 알고리즘 스터디가 3주 만에 참여율이 절반으로 떨어짐.',
@@ -155,11 +154,11 @@ window.SEED = (function () {
       insights: '사람이 떠나는 이유를 직접 묻는 게 가장 빠르다.',
       keywords: ['리더십', '커뮤니케이션', '끈기'], jobs: ['백엔드 개발자'],
       links: [], qa: [],
-      completeness: 90, createdAt: '2026-10-20', updatedAt: '2026-11-17',
+      createdAt: '2026-10-20', updatedAt: '2026-11-17',
     },
     {
       id: 'e4', title: '데이터베이스 수업 팀과제 — 연락 끊긴 팀원과 역할 재분배', category: '수업·과제',
-      period: { start: '2025-09', end: '2025-12' }, status: 'done',
+      period: { start: '2025-09', end: '2025-12' },
       role: '팀원 (ERD 설계)', summary: '팀원 한 명이 2주째 연락이 안 되던 상황에서 남은 셋이 역할을 다시 나누고, 교수님께 미리 알려 마감 안에 과제를 제출했다.',
       star: {
         situation: '4인 팀과제에서 한 명이 2주째 연락이 닿지 않음. 카톡과 학과 메일 모두 답이 없었음.',
@@ -170,11 +169,11 @@ window.SEED = (function () {
       insights: '문제가 생기면 혼자 떠안기보다 빨리 알리고 다시 나누는 게 낫다.',
       keywords: ['갈등조정', '책임감', '협업'], jobs: [],
       links: [], qa: [],
-      completeness: 80, createdAt: '2026-11-15', updatedAt: '2026-11-15',
+      createdAt: '2026-11-15', updatedAt: '2026-11-15',
     },
     {
       id: 'e6', title: '교내 해커톤 — 24시간 안에 MVP', category: '대외활동',
-      period: { start: '2025-05', end: '2025-05' }, status: 'done',
+      period: { start: '2025-05', end: '2025-05' },
       role: '백엔드 + 발표', summary: '교내 해커톤에서 기능 범위를 과감히 줄이자고 제안해 분실물 찾기 서비스 데모를 완성하고 장려상을 받았다.',
       star: {
         situation: '24시간 교내 해커톤, 3인 팀. 시작 8시간쯤 지난 중간 점검에서 계획한 기능의 절반도 못 만든 상태였음.',
@@ -184,11 +183,11 @@ window.SEED = (function () {
       },
       insights: '완벽함보다 범위를 줄이는 결정이 중요할 때가 있다.',
       keywords: ['의사결정', '협업', '커뮤니케이션'], jobs: ['백엔드 개발자'],
-      links: [], qa: [], completeness: 90, createdAt: '2026-10-28', updatedAt: '2026-11-16',
+      links: [], qa: [], createdAt: '2026-10-28', updatedAt: '2026-11-16',
     },
     {
       id: 'e7', title: '편의점 야간 아르바이트 — 재고 실수 줄이기', category: '아르바이트',
-      period: { start: '2023-07', end: '2023-12' }, status: 'done',
+      period: { start: '2023-07', end: '2023-12' },
       role: '야간 근무자', summary: '야간 검수 때 자주 생기던 재고 누락의 원인을 찾아 품목별 검수표를 만들었고, 한 달 만에 누락이 거의 사라졌다.',
       star: {
         situation: '새벽 2시쯤 들어오는 물류를 검수하는데, 아침에 보면 몇 개씩 비어 있어 아침 근무자와 자주 부딪힘.',
@@ -198,11 +197,11 @@ window.SEED = (function () {
       },
       insights: '실수는 사람보다 절차의 빈틈에서 생긴다.',
       keywords: ['꼼꼼함', '주도성', '책임감'], jobs: [], links: [], qa: [],
-      completeness: 85, createdAt: '2026-11-14', updatedAt: '2026-11-17',
+      createdAt: '2026-11-14', updatedAt: '2026-11-17',
     },
     {
       id: 'e10', title: '「모여봄」 JWT + Refresh Token 인증 설계', category: '프로젝트',
-      period: { start: '2026-09', end: '2026-09' }, status: 'draft', projectId: 'p1', sourceLogIds: ['l2'], codeRefs: ['gf_p1_3'],
+      period: { start: '2026-09', end: '2026-09' }, projectId: 'p1', sourceLogIds: ['l2'], codeRefs: ['gf_p1_3'],
       role: '백엔드 (인증 담당)', summary: '모바일 확장을 고려해 세션 대신 JWT + Refresh Token 인증을 고르고, 장단점을 표로 정리해 팀에 공유했다.',
       star: {
         situation: '「모여봄」 인증 방식을 정해야 했는데 팀원마다 세션과 JWT 의견이 갈림.',
@@ -211,11 +210,11 @@ window.SEED = (function () {
         result: '팀이 같은 기준으로 인증 방식을 합의했고, 탈취된 Refresh Token은 한 번만 쓰일 수 있게 막음.',
       },
       insights: '', keywords: ['의사결정', '커뮤니케이션', '꼼꼼함'], jobs: ['백엔드 개발자'], links: [], qa: [],
-      completeness: 70, createdAt: '2026-09-19', updatedAt: '2026-11-18',
+      createdAt: '2026-09-19', updatedAt: '2026-11-18',
     },
     {
       id: 'e11', title: '「모여봄」 배포 후 업로드 500 에러와 배포 체크리스트', category: '프로젝트',
-      period: { start: '2026-11', end: '2026-11' }, status: 'draft', projectId: 'p1', sourceLogIds: ['l5'], codeRefs: ['gf_p1_5'],
+      period: { start: '2026-11', end: '2026-11' }, projectId: 'p1', sourceLogIds: ['l5'], codeRefs: ['gf_p1_5'],
       role: '백엔드', summary: '배포 직후 이미지 업로드가 500 에러로 실패한 원인을 찾고, 같은 실수를 막는 배포 체크리스트를 만들어 팀이 함께 쓰게 했다.',
       star: {
         situation: '「모여봄」 배포 직후 이미지 업로드가 500 에러로 실패함.',
@@ -224,11 +223,11 @@ window.SEED = (function () {
         result: '이후 배포에서 같은 설정 실수가 다시 생기지 않았고, 팀원들도 실수가 줄었다고 함.',
       },
       insights: '', keywords: ['문제해결', '꼼꼼함', '책임감'], jobs: ['백엔드 개발자'], links: [], qa: [],
-      completeness: 65, createdAt: '2026-11-10', updatedAt: '2026-11-19',
+      createdAt: '2026-11-10', updatedAt: '2026-11-19',
     },
     {
       id: 'e12', title: '「슬랙봇」 쓰는 사람에 맞춘 설계 — 슬랙 봇과 Postgres', category: '프로젝트',
-      period: { start: '2026-10', end: '2026-11' }, status: 'draft', projectId: 'p2', sourceLogIds: ['l7'], codeRefs: [],
+      period: { start: '2026-10', end: '2026-11' }, projectId: 'p2', sourceLogIds: ['l7'], codeRefs: [],
       role: '1인 개발', summary: '친구들이 슬랙에서 바로 쓰고 싶다는 말에 웹 대신 슬랙 봇으로 방향을 바꾸고, 여럿이 동시에 입력하는 상황을 고려해 SQLite 대신 Postgres를 골랐다.',
       star: {
         situation: '친구 3명과 공동 생활비를 관리할 가계부 서비스를 만들기로 함. 친구들이 실제로 쓰겠다고 함.',
@@ -237,11 +236,11 @@ window.SEED = (function () {
         result: '',
       },
       insights: '', keywords: ['의사결정', '고객지향'], jobs: ['백엔드 개발자'], links: [], qa: [],
-      completeness: 55, createdAt: '2026-10-21', updatedAt: '2026-11-04',
+      createdAt: '2026-10-21', updatedAt: '2026-11-04',
     },
     {
       id: 'e16', title: '「슬랙봇」 지출이 두 번씩 저장되던 문제 해결', category: '프로젝트',
-      period: { start: '2026-11', end: '2026-11' }, status: 'done', projectId: 'p2', sourceLogIds: [], codeRefs: [],
+      period: { start: '2026-11', end: '2026-11' }, projectId: 'p2', sourceLogIds: [], codeRefs: [],
       role: '1인 개발', summary: '지출이 두 번씩 저장되던 문제를 요청 로그로 추적해 슬랙의 3초 재시도 때문인 걸 찾고, 먼저 응답하기와 이벤트 id 중복 체크로 막았다.',
       star: {
         situation: '친구 3명이 쓰는 가계부 슬랙봇에서 지출을 한 번 입력했는데 두 번씩 저장돼, 생활비가 두 배로 집계됨.',
@@ -251,11 +250,11 @@ window.SEED = (function () {
       },
       insights: '외부 서비스와 연동할 때는 같은 요청이 여러 번 올 수 있다는 걸 전제로 만들어야 한다.',
       keywords: ['문제해결', '끈기', '학습능력'], jobs: ['백엔드 개발자'], links: [], qa: [],
-      completeness: 90, createdAt: '2026-11-06', updatedAt: '2026-11-06',
+      createdAt: '2026-11-06', updatedAt: '2026-11-06',
     },
     {
       id: 'e13', title: '「빈강의실」 PDF 시간표 파싱으로 강의실 데이터 만들기', category: '프로젝트',
-      period: { start: '2025-03', end: '2025-04' }, status: 'draft', projectId: 'p3', sourceLogIds: ['l9'], codeRefs: ['gf_p3_3'],
+      period: { start: '2025-03', end: '2025-04' }, projectId: 'p3', sourceLogIds: ['l9'], codeRefs: ['gf_p3_3'],
       role: '백엔드 + 팀장', summary: '학과 시간표 API가 없어서, PDF 시간표를 파싱해 학기마다 다시 쓸 수 있는 강의실 데이터를 만들었다.',
       star: {
         situation: '빈 강의실을 찾으려면 시간표 데이터가 필요했지만 학과에 시간표 API가 없었음.',
@@ -264,11 +263,11 @@ window.SEED = (function () {
         result: '',
       },
       insights: '', keywords: ['문제해결', '의사결정', '꼼꼼함'], jobs: ['백엔드 개발자'], links: [], qa: [],
-      completeness: 60, createdAt: '2025-03-24', updatedAt: '2026-11-08',
+      createdAt: '2025-03-24', updatedAt: '2026-11-08',
     },
     {
       id: 'e14', title: '「빈강의실」 일정이 밀렸을 때 기능 범위 조율', category: '프로젝트',
-      period: { start: '2025-04', end: '2025-04' }, status: 'draft', projectId: 'p3', sourceLogIds: ['l11'], codeRefs: [],
+      period: { start: '2025-04', end: '2025-04' }, projectId: 'p3', sourceLogIds: ['l11'], codeRefs: [],
       role: '팀장', summary: '중간발표 전 팀원 일정이 밀려 의견이 갈리자, 탓하지 않고 각자 가능한 양을 먼저 묻고 기능을 검색·예약·취소 3개로 줄이자고 조율했다.',
       star: {
         situation: '중간발표를 앞두고 팀원 한 명의 일정이 밀려 무엇을 먼저 할지 의견이 갈림.',
@@ -277,11 +276,11 @@ window.SEED = (function () {
         result: '',
       },
       insights: '', keywords: ['갈등조정', '리더십', '커뮤니케이션'], jobs: ['백엔드 개발자'], links: [], qa: [],
-      completeness: 60, createdAt: '2025-04-28', updatedAt: '2026-11-06',
+      createdAt: '2025-04-28', updatedAt: '2026-11-06',
     },
     {
       id: 'e15', title: '「빈강의실」 사용자 테스트로 예약 동선 고치기', category: '프로젝트',
-      period: { start: '2025-05', end: '2025-06' }, status: 'draft', projectId: 'p3', sourceLogIds: ['l12'], codeRefs: [],
+      period: { start: '2025-05', end: '2025-06' }, projectId: 'p3', sourceLogIds: ['l12'], codeRefs: [],
       role: '백엔드 + 팀장', summary: '실사용자 테스트와 시범 운영에서 받은 피드백으로 예약 취소·예약 확인 동선을 고쳤다.',
       star: {
         situation: '실사용자 5명 테스트에서 "예약 취소가 어디 있는지 모르겠다"는 피드백이 나왔고, 시범 운영 중에는 "예약이 됐는지 확인이 안 된다"는 말도 들음.',
@@ -290,16 +289,15 @@ window.SEED = (function () {
         result: '',
       },
       insights: '기능보다 사용자가 찾을 수 있는지가 먼저라는 걸 배움.', keywords: ['고객지향'], jobs: ['백엔드 개발자'], links: [], qa: [],
-      completeness: 45, createdAt: '2025-05-19', updatedAt: '2026-11-13',
+      createdAt: '2025-05-19', updatedAt: '2026-11-13',
     },
   ];
 
   /* 서비스가 먼저 보내는 "오늘의 질문" 인박스. 답한 질문 하나 = 대화 하나 = 경험 하나.
      cardIds: 이 경험이 담긴 경험 카드 (빈 배열 = 아직 카드로 모으지 않은 경험) · keywords: 이 경험의 역량 키워드
-     followups: 같은 대화에서 이어진 꼬리 질문과 답 · aboutProjectId: 체크인은 아니지만 이 프로젝트 이야기인 경우 */
+     followups: 같은 대화에서 이어진 꼬리 질문과 답 · aboutProjectId: 프로젝트 질문은 아니지만 이 프로젝트 이야기인 경우 */
   const inbox = [
     { id: 'h1', text: '요즘 "이건 꼭 기록해 두고 싶다" 싶었던 장면이 있었나요?', type: 'recall', targetExpId: null, hint: '', status: 'answered', askedAt: '2026-11-19 21:30', answer: '모여봄 회의에서 배포 체크리스트를 같이 보면서 다들 실수가 줄었다고 해서 뿌듯했어요.', answeredAt: '2026-11-19', cardIds: ['e11'], keywords: ['꼼꼼함', '협업'] },
-    { id: 'q1', text: '「모여봄」 이번 주에 팀원과 의견이 갈렸던 순간이 있었나요?', type: 'project', targetExpId: null, targetProjectId: 'p1', checkin: true, checkinType: 'collab', checkinText: '이번 주에 팀원과 의견이 갈렸던 순간이 있었나요?', hint: '작은 의견 차이도 좋아요. 변수명, 일정, 기술 선택 같은 것도요.', status: 'pending', askedAt: '2026-11-19 12:30' },
     { id: 'q2', text: '편의점 야간 알바에서 재고 누락이 생겼을 때, 아침 근무자분과는 어떻게 이야기했어요?', type: 'deepen', targetExpId: 'e7', hint: '서로 어떤 말을 주고받았는지 떠올려 보세요.', status: 'pending', askedAt: '2026-11-18 21:30' },
     { id: 'h54', text: '「모여봄」 코드에서 「JWT + Spring Security 인증 구현」을 찾았어요. 왜 이렇게 만들게 됐나요?', type: 'code', targetExpId: null, targetProjectId: 'p1', findingId: 'gf_p1_3', hint: '어떤 문제가 있었는지 한두 줄이면 돼요.', status: 'answered', askedAt: '2026-11-18 21:00', answer: '나중에 모바일 앱도 붙일 생각이라 세션보다 JWT가 낫다고 봤어요. 다만 팀원들이 토큰이 털리면 어떡하냐고 걱정해서 Refresh Token을 같이 두기로 했어요.', answeredAt: '2026-11-18', cardIds: ['e10'], keywords: ['의사결정', '꼼꼼함'],
       followups: [{ ai: 'Refresh Token은 어디에 두고, 탈취는 어떻게 막았어요?', me: 'Redis에 사용자별로 저장하고, 재발급할 때마다 새 토큰으로 바꿔서 털린 토큰은 한 번만 쓸 수 있게 했어요.' }] },
@@ -317,25 +315,23 @@ window.SEED = (function () {
         { ai: '마감은 지킬 수 있었어요?', me: '빠듯했는데 교수님께 미리 상황을 말씀드리고 중간 점검 일정을 받아서 제때 냈어요. 결과는 B+였어요.' },
       ] },
     { id: 'h8', text: '평소에 남들보다 꼼꼼하게 챙기는 일이 있나요?', type: 'recall', targetExpId: null, hint: '', status: 'answered', askedAt: '2026-11-14 21:30', answer: '편의점 야간 알바할 때 검수표를 따로 만들어서 들어온 물건을 하나씩 체크했어요.', answeredAt: '2026-11-14', cardIds: ['e7'], keywords: ['꼼꼼함', '주도성'] },
-    { id: 'h7', text: '「슬랙봇」 이번 주에 새로 배운 기술이나 방법이 있나요?', type: 'project', targetExpId: null, targetProjectId: 'p2', checkin: true, checkinType: 'learning', checkinText: '이번 주에 새로 배운 기술이나 방법이 있나요?', hint: '', status: 'skipped', askedAt: '2026-11-14 12:30' },
     { id: 'h9', text: '「빈강의실」 시범 운영 중에 사용자에게 받은 피드백 중 기억나는 게 있나요?', type: 'deepen', targetExpId: 'e15', hint: '', status: 'answered', askedAt: '2026-11-13 21:30', answer: '학생들이 예약이 됐는지 확인이 안 된다고 해서, 예약 완료 화면에 강의실이랑 시간을 크게 다시 보여 주게 바꿨어요.', answeredAt: '2026-11-13', cardIds: ['e15'], keywords: ['고객지향'] },
     { id: 'h10', text: '최근에 계획대로 안 됐지만 끝까지 해낸 일이 있나요?', type: 'recall', targetExpId: null, hint: '', status: 'skipped', askedAt: '2026-11-13 12:30' },
     { id: 'h11', text: '중복 예약을 재현 테스트로 확인할 때, 어떻게 동시 요청을 만들었어요?', type: 'deepen', targetExpId: 'e9', hint: '사용한 도구나 방법을 떠올려 보세요.', status: 'answered', askedAt: '2026-11-12 12:30', answer: 'CountDownLatch로 스레드 10개를 동시에 출발시켜서 같은 강의실을 예약하게 했어요. 락 넣기 전엔 10번 중 3~4번은 중복이 생겼어요.', answeredAt: '2026-11-12', cardIds: ['e9'], keywords: ['문제해결', '꼼꼼함', '분석력'] },
     { id: 'h12', text: '샷을 미리 준비하자고 했을 때, 점장님을 어떻게 설득했어요?', type: 'deepen', targetExpId: 'e2', hint: '', status: 'answered', askedAt: '2026-11-11 21:30', answer: '일주일 동안 센 메뉴별 주문 수를 보여 드렸더니 한번 해 보자고 하셨어요.', answeredAt: '2026-11-11', cardIds: ['e2'], keywords: ['커뮤니케이션', '분석력'] },
     { id: 'h13', text: '최근에 실수를 하고 나서 다시 안 생기게 바꾼 게 있나요?', type: 'recall', targetExpId: null, hint: '', status: 'answered', askedAt: '2026-11-11 12:30', answer: '이미지 업로드 에러 이후로 배포 전에 설정값을 확인하는 체크리스트를 만들어서 쓰고 있어요.', answeredAt: '2026-11-11', cardIds: ['e11'], keywords: ['꼼꼼함', '책임감'] },
-    { id: 'h14', text: '「모여봄」 최근에 막혔던 문제가 있었나요? 원인은 무엇이었나요?', type: 'project', targetExpId: null, targetProjectId: 'p1', checkin: true, checkinType: 'issue', checkinText: '최근에 막혔던 문제가 있었나요? 원인은 무엇이었나요?', hint: '', status: 'answered', askedAt: '2026-11-10 21:30', answer: '배포 후 이미지 업로드 500 에러. 파일 크기 제한 설정 누락이었음. 체크리스트 만듦.', answeredAt: '2026-11-10', cardIds: ['e11'] },
+    { id: 'h14', text: '「모여봄」 최근에 막혔던 문제가 있었나요? 원인은 무엇이었나요?', type: 'project', targetExpId: null, targetProjectId: 'p1', logType: 'issue', hint: '', status: 'answered', askedAt: '2026-11-10 21:30', answer: '배포 후 이미지 업로드 500 에러. 파일 크기 제한 설정 누락이었음. 체크리스트 만듦.', answeredAt: '2026-11-10', cardIds: ['e11'] },
     { id: 'h15', text: '요즘 가장 시간을 많이 쓰고 있는 일은 뭐예요?', type: 'recall', targetExpId: null, hint: '', status: 'answered', askedAt: '2026-11-10 12:30', answer: '모여봄 배포 준비랑 코테 공부를 번갈아 하고 있어요.', answeredAt: '2026-11-10', cardIds: [], keywords: ['학습능력'], aboutProjectId: 'p1' },
     { id: 'h16', text: '스터디 참여자 인터뷰를 할 때, 어떤 질문을 했어요?', type: 'deepen', targetExpId: 'e3', hint: '', status: 'answered', askedAt: '2026-11-09 21:30', answer: '"언제 제일 그만두고 싶었는지"를 물어봤어요. 대부분 문제를 못 풀고 발표만 듣는 날이라고 했어요.', answeredAt: '2026-11-09', cardIds: ['e3'], keywords: ['커뮤니케이션', '분석력'] },
     { id: 'h17', text: '처음 보는 사람들과 금방 친해졌던 경험이 있나요?', type: 'recall', targetExpId: null, hint: '', status: 'answered', askedAt: '2026-11-09 12:30', answer: '부트캠프 첫 주에 조 편성이 됐는데, 제가 먼저 점심 같이 먹자고 해서 금방 친해졌어요.', answeredAt: '2026-11-09', cardIds: [], keywords: ['주도성', '협업'] },
     { id: 'h52', text: 'PDF 시간표를 파싱할 때 가장 까다로웠던 부분은 뭐였어요?', type: 'deepen', targetExpId: 'e13', hint: '', status: 'answered', askedAt: '2026-11-08 21:30', answer: '강의실 이름 표기가 과목마다 달랐어요. 「공학관 301」이라고 쓴 데도 있고 「공301」이라고 쓴 데도 있어서 별칭 표를 따로 만들어 맞췄어요.', answeredAt: '2026-11-08', cardIds: ['e13'], keywords: ['문제해결', '꼼꼼함'] },
     { id: 'h19', text: '최근에 다른 사람의 부탁을 들어준 일이 있나요?', type: 'recall', targetExpId: null, hint: '', status: 'answered', askedAt: '2026-11-07 21:30', answer: '친구 졸업작품 서버가 자꾸 죽는다고 해서 같이 로그를 봐 줬어요. 메모리가 부족해서 죽는 거였어요.', answeredAt: '2026-11-07', cardIds: [], keywords: ['문제해결', '협업'] },
-    { id: 'h18', text: '「슬랙봇」 팀원과 의견을 맞추거나 도움을 주고받은 순간이 있었나요?', type: 'project', targetExpId: null, targetProjectId: 'p2', checkin: true, checkinType: 'collab', checkinText: '팀원과 의견을 맞추거나 도움을 주고받은 순간이 있었나요?', hint: '', status: 'skipped', askedAt: '2026-11-07 12:30' },
     { id: 'h53', text: '「빈강의실」 기능을 3개로 줄이자고 했을 때, 일정이 밀린 팀원과는 어떻게 이야기했어요?', type: 'deepen', targetExpId: 'e14', hint: '', status: 'answered', askedAt: '2026-11-06 21:30', answer: '탓하는 말은 빼고, 남은 3주 동안 각자 할 수 있는 양을 먼저 물어봤어요. 그 팀원이 취소 기능은 끝까지 맡겠다고 했어요.', answeredAt: '2026-11-06', cardIds: ['e14'], keywords: ['갈등조정', '커뮤니케이션', '리더십'] },
     { id: 'h20', text: '마감에 쫓기면서 우선순위를 정해야 했던 적이 있나요?', type: 'recall', targetExpId: null, hint: '', status: 'skipped', askedAt: '2026-11-06 12:30' },
     { id: 'h21', text: '인덱스를 추가할 때, 어떤 컬럼에 걸지 어떻게 정했어요?', type: 'deepen', targetExpId: 'e1', hint: '실행 계획(EXPLAIN)을 봤는지도 떠올려 보세요.', status: 'answered', askedAt: '2026-11-05 21:30', answer: '검색 조건으로 제일 많이 쓰는 지역이랑 카테고리 컬럼을 골랐어요. EXPLAIN으로 풀 스캔이 사라진 걸 확인했어요.', answeredAt: '2026-11-05', cardIds: ['e1'], keywords: ['분석력', '문제해결'] },
     { id: 'h22', text: '혼자 힘으로 끝까지 파고들어 해결한 일이 있나요?', type: 'recall', targetExpId: null, hint: '', status: 'answered', askedAt: '2026-11-05 12:30', answer: '슬랙봇 이벤트가 두 번씩 들어오는 문제를 공식 문서 뒤져서 재시도 헤더 때문인 걸 찾았어요.', answeredAt: '2026-11-05', cardIds: ['e16'], keywords: ['끈기', '학습능력', '문제해결'],
       followups: [{ ai: '재시도 헤더를 찾고 나서 어떻게 고쳤어요?', me: 'X-Slack-Retry-Num 헤더가 있으면 바로 200을 돌려주고, 이벤트 id를 DB에 저장해서 같은 id는 한 번만 처리하게 했어요.' }] },
-    { id: 'h23', text: '「슬랙봇」 이번 주에 내린 기술적·기획적 결정이 있나요? 다른 선택지는 무엇이었나요?', type: 'project', targetExpId: null, targetProjectId: 'p2', checkin: true, checkinType: 'decision', checkinText: '이번 주에 내린 기술적·기획적 결정이 있나요? 다른 선택지는 무엇이었나요?', hint: '', status: 'answered', askedAt: '2026-11-04 21:30', answer: 'DB를 SQLite로 할지 Postgres로 할지 → 동시 입력 고려해서 Postgres.', answeredAt: '2026-11-04', cardIds: ['e12'] },
+    { id: 'h23', text: '「슬랙봇」 DB는 어떻게 정했나요? 다른 선택지는 무엇이었나요?', type: 'project', targetExpId: null, targetProjectId: 'p2', logType: 'decision', hint: '', status: 'answered', askedAt: '2026-11-04 21:30', answer: 'DB를 SQLite로 할지 Postgres로 할지 → 동시 입력 고려해서 Postgres.', answeredAt: '2026-11-04', cardIds: ['e12'] },
     { id: 'h24', text: '돈이나 시간을 아끼려고 직접 방법을 만들어 본 적이 있나요?', type: 'recall', targetExpId: null, hint: '', status: 'answered', askedAt: '2026-11-04 12:30', answer: '친구들이랑 생활비 나누는 게 귀찮아서 엑셀 대신 슬랙봇을 만들고 있어요.', answeredAt: '2026-11-04', cardIds: [], keywords: ['주도성', '창의성'], aboutProjectId: 'p2' },
     { id: 'h25', text: '해커톤에서 기능을 3개로 줄이자고 한 건 몇 시쯤이었고, 왜 그때였어요?', type: 'deepen', targetExpId: 'e6', hint: '', status: 'answered', askedAt: '2026-11-03 21:30', answer: '시작하고 8시간쯤 지났을 때요. 중간 점검에서 절반도 못 만든 걸 보고 이대로는 안 되겠다 싶었어요.', answeredAt: '2026-11-04', cardIds: ['e6'], keywords: ['의사결정', '리더십'] },
     { id: 'h26', text: '해커톤에서 발표를 맡았을 때 어떻게 준비했어요?', type: 'deepen', targetExpId: 'e6', hint: '', status: 'answered', askedAt: '2026-11-03 12:30', answer: '데모가 중간에 멈출까 봐 화면 녹화본을 따로 만들어 뒀어요.', answeredAt: '2026-11-03', cardIds: ['e6'], keywords: ['꼼꼼함', '책임감'] },
@@ -343,13 +339,11 @@ window.SEED = (function () {
       followups: [{ ai: '손님이 나가는 걸 보고 먼저 뭘 해 봤어요?', me: '바로 바꾸진 못했고, 일주일 동안 메뉴별로 몇 잔 나가는지 메모했어요. 아메리카노랑 라떼가 70% 정도였어요.' }] },
     { id: 'h28', text: '손님이나 사용자를 상대하면서 기억에 남는 일이 있나요?', type: 'recall', targetExpId: null, hint: '', status: 'answered', askedAt: '2026-11-02 12:30', answer: '카페에서 단골손님이 주문 기다리는 시간이 줄었다고 먼저 말해 준 적이 있어요.', answeredAt: '2026-11-02', cardIds: ['e2'], keywords: ['고객지향'] },
     { id: 'h29', text: '스터디 난이도를 3단계로 나눈 뒤, 참여율이 언제부터 회복됐어요?', type: 'deepen', targetExpId: 'e3', hint: '', status: 'answered', askedAt: '2026-10-31 21:30', answer: '바꾸고 2주쯤 지나니까 빠지던 사람들이 다시 나오기 시작했어요.', answeredAt: '2026-10-31', cardIds: ['e3'], keywords: ['끈기', '리더십'] },
-    { id: 'h30', text: '「모여봄」 이번 주에 완성하거나 배포한 것이 있나요?', type: 'project', targetExpId: null, targetProjectId: 'p1', checkin: true, checkinType: 'milestone', checkinText: '이번 주에 완성하거나 배포한 것이 있나요?', hint: '', status: 'skipped', askedAt: '2026-10-31 12:30' },
     { id: 'h31', text: '최근에 새로 시작한 습관이 있나요?', type: 'recall', targetExpId: null, hint: '', status: 'answered', askedAt: '2026-10-30 21:30', answer: '아침마다 알고리즘 문제 하나씩 풀고 깃허브에 올리고 있어요.', answeredAt: '2026-10-30', cardIds: [], keywords: ['끈기', '학습능력'] },
     { id: 'h32', text: '다른 사람의 의견을 듣고 생각을 바꾼 적이 있나요?', type: 'recall', targetExpId: null, hint: '', status: 'answered', askedAt: '2026-10-30 12:30', answer: '슬랙봇을 웹으로 만들려다가 친구들이 슬랙에서 바로 쓰고 싶다고 해서 봇으로 바꿨어요.', answeredAt: '2026-10-30', cardIds: ['e12'], keywords: ['고객지향', '의사결정'] },
     { id: 'h33', text: 'N+1을 찾기 전에 의심했던 다른 원인이 있었나요?', type: 'deepen', targetExpId: 'e1', hint: '', status: 'skipped', askedAt: '2026-10-29 21:30' },
     { id: 'h34', text: '처음 맡아 본 역할 때문에 부담됐던 적이 있나요?', type: 'recall', targetExpId: null, hint: '', status: 'skipped', askedAt: '2026-10-29 12:30' },
     { id: 'h35', text: '대회나 공모전에 나가 본 적이 있나요?', type: 'recall', targetExpId: null, hint: '교내 행사, 해커톤, 아이디어 공모전도 좋아요.', status: 'answered', askedAt: '2026-10-28 21:30', answer: '작년 교내 해커톤에서 분실물 찾기 서비스를 24시간 안에 만들어서 장려상 받았어요.', answeredAt: '2026-10-28', cardIds: ['e6'], keywords: ['협업', '책임감'] },
-    { id: 'h36', text: '「슬랙봇」 최근에 막혔던 문제가 있었나요? 원인은 무엇이었나요?', type: 'project', targetExpId: null, targetProjectId: 'p2', checkin: true, checkinType: 'issue', checkinText: '최근에 막혔던 문제가 있었나요? 원인은 무엇이었나요?', hint: '', status: 'skipped', askedAt: '2026-10-28 12:30' },
     { id: 'h37', text: '모임에서 정해 둔 규칙을 바꿔 본 적이 있나요?', type: 'recall', targetExpId: null, hint: '', status: 'answered', askedAt: '2026-10-27 21:30', answer: '스터디 발표 순서인 사람이 자주 빠져서, 못 오면 다음 사람이랑 바꾸는 규칙을 추가했어요.', answeredAt: '2026-10-27', cardIds: [], keywords: ['리더십', '책임감'] },
     { id: 'h38', text: '오래 붙잡고 있던 일을 결국 해낸 경험이 있나요?', type: 'recall', targetExpId: null, hint: '', status: 'answered', askedAt: '2026-10-26 21:30', answer: '골드 문제 하나를 일주일 넘게 붙잡다가 결국 풀었을 때가 기억나요.', answeredAt: '2026-10-26', cardIds: [], keywords: ['끈기'] },
     { id: 'h39', text: '요즘 가장 재미있게 하고 있는 일은 뭐예요?', type: 'recall', targetExpId: null, hint: '', status: 'answered', askedAt: '2026-10-26 12:30', answer: '가계부 슬랙봇이요. 친구들이 실제로 써 주니까 기능 하나 붙일 때마다 재밌어요.', answeredAt: '2026-10-26', cardIds: [], keywords: ['고객지향'], aboutProjectId: 'p2' },
@@ -362,9 +356,8 @@ window.SEED = (function () {
     { id: 'h46', text: '스터디 참여율이 떨어졌을 때, 가장 먼저 한 일은 뭐였어요?', type: 'deepen', targetExpId: 'e3', hint: '', status: 'answered', askedAt: '2026-10-22 21:30', answer: '빠진 사람들한테 한 명씩 따로 연락해서 왜 안 나오는지 물어봤어요.', answeredAt: '2026-10-22', cardIds: ['e3'], keywords: ['주도성', '커뮤니케이션'],
       followups: [{ ai: '연락해 보니 어떤 이유가 가장 많았어요?', me: '문제가 너무 어려워서 혼자 못 풀고 오면 민망하다는 얘기가 제일 많았어요.' }] },
     { id: 'h47', text: '최근에 새로 시작한 프로젝트나 공부가 있나요?', type: 'recall', targetExpId: null, hint: '', status: 'answered', askedAt: '2026-10-22 12:30', answer: '친구들이랑 쓸 가계부 슬랙봇을 혼자 만들기 시작했어요.', answeredAt: '2026-10-22', cardIds: [], keywords: ['주도성'], aboutProjectId: 'p2' },
-    { id: 'h48', text: '「슬랙봇」 이번 주에 완성하거나 배포한 것이 있나요?', type: 'project', targetExpId: null, targetProjectId: 'p2', checkin: true, checkinType: 'milestone', checkinText: '이번 주에 완성하거나 배포한 것이 있나요?', hint: '', status: 'answered', askedAt: '2026-10-21 21:30', answer: '아이디어 시작. 친구 3명이 실제로 쓰겠다고 함.', answeredAt: '2026-10-21', cardIds: ['e12'], keywords: ['고객지향'] },
+    { id: 'h48', text: '「슬랙봇」 처음 만들기 시작했을 때 주변 반응은 어땠어요?', type: 'project', targetExpId: null, targetProjectId: 'p2', logType: 'milestone', hint: '', status: 'answered', askedAt: '2026-10-21 21:30', answer: '아이디어 시작. 친구 3명이 실제로 쓰겠다고 함.', answeredAt: '2026-10-21', cardIds: ['e12'], keywords: ['고객지향'] },
     { id: 'h49', text: '사람들을 모아서 무언가를 해 본 적이 있나요?', type: 'recall', targetExpId: null, hint: '', status: 'answered', askedAt: '2026-10-21 12:30', answer: '스터디원들 시간 맞춰서 매주 모이게 하는 게 제 일이었어요.', answeredAt: '2026-10-21', cardIds: [], keywords: ['리더십', '협업'] },
-    { id: 'h50', text: '「모여봄」 팀원과 의견을 맞추거나 도움을 주고받은 순간이 있었나요?', type: 'project', targetExpId: null, targetProjectId: 'p1', checkin: true, checkinType: 'collab', checkinText: '팀원과 의견을 맞추거나 도움을 주고받은 순간이 있었나요?', hint: '', status: 'skipped', askedAt: '2026-10-20 21:30' },
     { id: 'h51', text: '무언가를 꾸준히 오래 해 본 경험이 있나요?', type: 'recall', targetExpId: null, hint: '', status: 'skipped', askedAt: '2026-10-20 12:30' },
   ];
 
@@ -398,7 +391,7 @@ window.SEED = (function () {
     },
   ];
 
-  // 경험 카드의 출처(qa) = 그 카드에 담긴 경험(대화)의 질문·답. 프로젝트 체크인은 sourceLogIds 로 이어지므로 qa 에 넣지 않는다
+  // 경험 카드의 출처(qa) = 그 카드에 담긴 경험(대화)의 질문·답. 프로젝트 질문의 답은 sourceLogIds(프로젝트 기록)로 이어지므로 qa 에 넣지 않는다
   (function linkCardSources() {
     const card = (id) => experiences.find((e) => e.id === id);
     inbox.filter((q) => q.status === 'answered' && q.answer && q.type !== 'project').forEach((q) => {
@@ -459,13 +452,13 @@ window.SEED = (function () {
     ],
   };
 
-  // 프로젝트 체크인 질문 (로그 유형별)
-  const projectCheckins = [
-    { type: 'decision', text: '이번 주에 내린 기술적·기획적 결정이 있나요? 다른 선택지는 무엇이었나요?' },
-    { type: 'issue', text: '최근에 막혔던 문제가 있었나요? 원인은 무엇이었나요?' },
+  // 프로젝트 이야기를 남길 때 AI가 먼저 건네는 질문 (기록 유형별) — 주기적으로 보내지 않고, 프로젝트 화면에서 기록할 때만 쓴다
+  const projectPrompts = [
+    { type: 'decision', text: '이 프로젝트에서 내린 기술적·기획적 결정이 있나요? 다른 선택지는 무엇이었나요?' },
+    { type: 'issue', text: '막혔던 문제가 있었나요? 원인은 무엇이었나요?' },
     { type: 'collab', text: '팀원과 의견을 맞추거나 도움을 주고받은 순간이 있었나요?' },
-    { type: 'milestone', text: '이번 주에 완성하거나 배포한 것이 있나요?' },
-    { type: 'learning', text: '이번 주에 새로 배운 기술이나 방법이 있나요?' },
+    { type: 'milestone', text: '완성하거나 배포한 것이 있나요?' },
+    { type: 'learning', text: '새로 배운 기술이나 방법이 있나요?' },
   ];
 
   // 자소서·면접 질문 예시 (확장 기능)
@@ -535,5 +528,5 @@ window.SEED = (function () {
     },
   ];
 
-  return { keywords, categories, user, settings, projects, experiences, inbox, chats, applications, recallPrompts, followups, projectCheckins, sampleQuestions };
+  return { keywords, categories, user, settings, projects, experiences, inbox, chats, applications, recallPrompts, followups, projectPrompts, sampleQuestions };
 })();

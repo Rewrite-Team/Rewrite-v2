@@ -12,7 +12,6 @@
     learning: { label: '배움', ico: '✎' },
   };
   const TYPE_ORDER = ['decision', 'issue', 'collab', 'milestone', 'learning'];
-  const CADENCE = { daily: [1, '매일'], every2days: [2, '이틀마다'], weekly: [7, '매주'] };
 
   /* ---------- 날짜 유틸 (로컬 기준) ---------- */
   const pad = (n) => String(n).padStart(2, '0');
@@ -39,17 +38,6 @@
   /* ---------- 프로젝트 파생 데이터 ---------- */
   const sortedLogs = (e) => (e.logs || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const lastLog = (e) => sortedLogs(e)[0] || null;
-  // 체크인 일정은 store 와 공유 (오늘의 질문함과 같은 기준)
-  function nextCheckin(e) {
-    const [, label] = CADENCE[App.store.state.settings.projectCheckin] || CADENCE.every2days;
-    const { dueDate, last } = App.store.checkinDue(e);
-    if (App.store.openCheckin(e.id)) return { due: true, text: last ? '오늘 체크인할 차례예요' : '첫 체크인을 남겨 주세요', label };
-    if (!last) return { due: true, text: '첫 체크인을 남겨 주세요', label };
-    const next = toDate(dueDate);
-    const diff = daysBetween(todayD(), next);
-    if (diff <= 0) return { due: true, text: '오늘 체크인할 차례예요', label };
-    return { due: false, text: diff === 1 ? '내일 체크인' : `${diff}일 뒤 체크인 (${next.getMonth() + 1}/${next.getDate()})`, label };
-  }
   function logKeywordCounts(e) {
     const m = {};
     (e.logs || []).forEach((l) => (l.keywords || []).forEach((k) => { m[k] = (m[k] || 0) + 1; }));
@@ -70,29 +58,28 @@
   const short = (t, n) => App.wiki.short(t, n);
   const shortName = (t) => { const m = String(t || '').match(/「[^」]+」/); return m ? m[0] : String(t || '').split(' — ')[0]; };
   const pageHref = (id, tab) => '#/vault/p/' + encodeURIComponent(id) + (tab ? '?tab=' + tab : '');
-  // 프로젝트 상태 태그: 진행중 / 완료 (경험 카드의 '완성'과 구분)
+  // 프로젝트 상태 태그: 진행중 / 완료
   const statusTag = (st) => (st === 'done' ? '<span class="tag tag-done">완료</span>' : App.ui.statusTag(st));
   const ghLink = (e) => (e.links || []).find((l) => /github/i.test(l)) || (e.links || [])[0] || '';
   const prettyLink = (u) => String(u).replace(/^https?:\/\//, '').replace(/\/$/, '');
 
   /* ---------- 프로젝트 카드 (경험 위키의 프로젝트 묶음에서 사용) ----------
-     칸 순서·높이 고정: 상태·기간 / 체크인 안내 / 제목(2줄) / 역할(1줄) / 숫자 / 키워드 / 코드 분석(맨 아래).
-     체크인 안내나 코드 분석이 없어도 그 자리는 비워 두어, 카드끼리 같은 요소가 같은 높이에 온다 */
+     칸 순서·높이 고정: 상태·기간 / 제목(2줄) / 역할(1줄) / 숫자 / 키워드 / 코드 분석(맨 아래).
+     코드 분석이 없어도 그 자리는 비워 두어, 카드끼리 같은 요소가 같은 높이에 온다 */
   function projectCard(e) {
-    const last = lastLog(e); const nx = e.status === 'ongoing' ? nextCheckin(e) : null;
+    const last = lastLog(e);
     const gh = e.repo ? (() => { const live = liveFindings(e.repo); const added = live.filter((f) => f.status === 'added').length;
       return `<a class="pj-card-gh" href="${esc(pageHref(e.id, 'code'))}" title="${esc(e.repo.owner + '/' + e.repo.name)} 코드 분석 결과"><span>⌥ 코드 분석 ${live.length}</span>${added ? `<span class="pj-card-gh-n">이력서에 ${added}개 담음</span>` : ''}</a>`; })() : '';
     return `<div class="card pj-card" data-href="${esc(pageHref(e.id))}">
       <div class="pj-card-top">${statusTag(e.status)}<span class="subtle">${App.ui.period(e.period)}</span></div>
-      <div class="pj-card-due">${nx ? `<span class="pj-due ${nx.due ? 'is-due' : ''}">${nx.due ? '● ' : ''}${esc(nx.text)}</span>` : ''}</div>
       <div class="pj-card-title" title="${esc(e.title)}">${esc(e.title)}</div>
       <div class="pj-card-role" title="${esc(e.role || '')}">${esc(e.role || '역할 미입력')}</div>
       <div class="pj-card-stats">
         <div><b>${(e.logs || []).length}</b><span>기록</span></div>
         <div><b>${App.store.cardsOf(e.id).length}</b><span>경험</span></div>
-        <div><b>${last ? esc(md(last.date)) : '—'}</b><span>마지막 체크인${last ? ` · ${ago(last.date)}` : ''}</span></div>
+        <div><b>${last ? esc(md(last.date)) : '—'}</b><span>마지막 기록${last ? ` · ${ago(last.date)}` : ''}</span></div>
       </div>
-      <div class="exp-card-kws">${topKeywords(e, 4).map((k) => App.ui.keywordChip(k)).join('') || '<span class="subtle">체크인을 남기면 역량 키워드가 생겨요</span>'}</div>
+      <div class="exp-card-kws">${topKeywords(e, 4).map((k) => App.ui.keywordChip(k)).join('') || '<span class="subtle">이야기를 남기면 역량 키워드가 생겨요</span>'}</div>
       <div class="pj-card-foot">${gh}</div>
     </div>`;
   }
@@ -102,7 +89,7 @@
       title: '새 프로젝트 시작하기',
       confirmText: '프로젝트 만들기',
       body: `<div class="pj-form">
-        <p class="pj-form-intro">진행하는 동안 체크인 질문을 보내 드릴게요. 답한 대화는 하나하나 경험으로 타임라인에 쌓이고, 경험 카드로 모을 수 있어요.</p>
+        <p class="pj-form-intro">이 프로젝트에 대해 AI와 나눈 대화는 하나하나 경험으로 타임라인에 쌓이고, 경험 카드로 모을 수 있어요.</p>
         <label class="label" for="pj-f-title">프로젝트 이름 <span class="pj-req">*</span></label>
         <input class="input" id="pj-f-title" placeholder="예) 모여봄" maxlength="60" />
         <label class="label" for="pj-f-role">내 역할</label>
@@ -142,7 +129,7 @@
   // report: { pid, id(위키 반영 entry), where:'code' } — 코드 분석을 위키에 반영한 결과를 그 자리에 보여 준다
   // orgTalk / codeTalk: 타임라인의 경험(대화)·코드 항목 아래에 열어 둔 기록 대화 (threadId / findingId)
   // autoAnalyze: { pid, url } — 새 프로젝트를 만들며 레포를 넣었으면 상세 화면에 들어가자마자 분석
-  const ui = { qIndex: {}, type: {}, typeQ: {}, edit: null, tab: {}, gh: {}, ghView: null, report: null, orgTalk: null, codeTalk: null, autoAnalyze: null };
+  const ui = { qIndex: {}, type: {}, edit: null, tab: {}, gh: {}, ghView: null, report: null, orgTalk: null, codeTalk: null, autoAnalyze: null };
   const reportAt = (pid, where) => {
     const r = ui.report; if (!r || r.pid !== pid || r.where !== where) return '';
     return App.wiki.reportHTML(App.wiki.get(r.id));
@@ -181,20 +168,13 @@
 
   function pickInitialQuestion(e) {
     // AI가 가장 덜 기록된 유형의 질문부터 골라요
-    const c = typeCounts(e); const Q = window.SEED.projectCheckins;
+    const c = typeCounts(e); const Q = window.SEED.projectPrompts;
     let best = 0;
     Q.forEach((q, i) => { if ((c[q.type] || 0) < (c[Q[best].type] || 0)) best = i; });
     return best;
   }
   function currentQ(e) {
-    // 체크인할 때가 됐으면 오늘의 질문함에 도착한 바로 그 질문을 보여 준다
-    const oq = App.store.openCheckin(e.id);
-    if (oq) {
-      // 질문이 바뀔 때만 유형을 질문에 맞추고, 그 뒤 사용자가 고른 유형은 그대로 둔다
-      const k = oq.id + ':' + oq.checkinType;
-      if (ui.typeQ[e.id] !== k) { ui.type[e.id] = oq.checkinType || 'milestone'; ui.typeQ[e.id] = k; }
-      return { type: oq.checkinType, text: oq.checkinText || oq.text, inbox: oq }; }
-    const Q = window.SEED.projectCheckins;
+    const Q = window.SEED.projectPrompts;
     if (ui.qIndex[e.id] == null) ui.qIndex[e.id] = pickInitialQuestion(e);
     const q = Q[ui.qIndex[e.id] % Q.length];
     if (!ui.type[e.id]) ui.type[e.id] = q.type;
@@ -207,14 +187,12 @@
     return '지금 단계에서 남겨 두면 좋은 질문이에요.';
   }
 
-  function checkinCard(e) {
-    const q = currentQ(e); const sel = ui.type[e.id];
-    const { dueDate } = App.store.checkinDue(e);
-    return `<div class="card pj-checkin ${q.inbox ? 'is-due' : ''}">
-      <div class="pj-checkin-head"><span class="ai-badge"><span class="ai-dot">R</span>${q.inbox ? '오늘의 체크인' : '체크인 남기기'}</span>
+  // 이 프로젝트 이야기 남기기: AI가 질문 하나를 건네고, 끝낸 대화는 이 프로젝트의 경험이 된다
+  function storyCard(e) {
+    const sel = ui.type[e.id]; currentQ(e);
+    return `<div class="card pj-story">
+      <div class="pj-story-head"><span class="ai-badge"><span class="ai-dot">R</span>이 프로젝트 이야기 남기기</span>
         <button class="btn btn-ghost btn-sm" data-pj="next-q">↻ 다른 질문</button></div>
-      ${q.inbox ? `<a class="pj-ck-sync" href="#/ask/q_${esc(q.inbox.id)}">✉ 질문함에도 같은 질문이 도착했어요 · 어디서 답해도 함께 완료돼요</a>`
-        : `<div class="pj-ck-sync is-quiet">다음 체크인 질문은 ${esc(md(dueDate))}에 드릴게요. 지금 자유롭게 남겨도 좋아요.</div>`}
       <div class="pj-types" role="radiogroup" aria-label="기록 유형">
         ${TYPE_ORDER.map((t) => `<button class="pj-type ${sel === t ? 'on' : ''}" data-type="${t}" data-pj-type="${t}" role="radio" aria-checked="${sel === t}">
           <span class="pj-type-ico">${TYPES[t].ico}</span>${TYPES[t].label}</button>`).join('')}
@@ -222,24 +200,21 @@
       <div data-pj-talk="ck"></div>
     </div>`;
   }
-  // 체크인 대화: 질문함에 온 체크인이면 그 질문에 답한 것으로, 아니면 프로젝트 기록을 남기고 위키에 반영 (대화 원문은 타임라인에 남는다)
-  function checkinTalkCfg(e) {
-    const q = currentQ(e); const oq = q.inbox; const pid = e.id;
-    const typeOf = () => ui.type[pid] || (oq && oq.checkinType) || 'milestone';
+  // 프로젝트 이야기 대화: 프로젝트 기록을 남기고 위키에 반영 (대화 원문은 타임라인에 남는다). thread source 'checkin' 은 내부 키
+  function storyTalkCfg(e) {
+    const q = currentQ(e); const pid = e.id;
+    const typeOf = () => ui.type[pid] || 'milestone';
     return {
-      sig: oq ? `q:${oq.id}:${q.text}` : `b:${q.text}`,
+      sig: `b:${q.text}`,
       ask: { label: (TYPES[q.type] || TYPES.milestone).label, text: q.text, hint: whyQuestion(e, q) },
       placeholder: '한두 줄이면 충분해요. 예) JWT와 세션 중 고민하다가 모바일 확장 때문에 JWT로 결정했어요.',
       noAutofocus: true,
       thread: { source: 'checkin' },
-      src: oq ? { type: 'checkin', question: oq.checkinText || oq.text, questionId: oq.id, projectId: pid, logType: typeOf() }
-        : { type: 'checkin', projectId: pid, logType: typeOf(), question: '(직접 기록)' },
-      commit: oq ? (text, d) => App.store.answer(oq.id, text, { decision: d, type: typeOf() })
-        : (text, d, threadId) => {
-          const t = typeOf(); const log = App.store.addLog(pid, { type: t, text, threadId });
-          return App.wiki.ingest({ type: 'checkin', text, projectId: pid, logId: log.id, logType: t, keywords: log.keywords, decision: d });
-        },
-      inbox: !!oq,
+      src: { type: 'checkin', projectId: pid, logType: typeOf(), question: q.text },
+      commit: (text, d, threadId) => {
+        const t = typeOf(); const log = App.store.addLog(pid, { type: t, text, threadId, fromQuestion: q.text });
+        return App.wiki.ingest({ type: 'checkin', text, projectId: pid, logId: log.id, logType: t, keywords: log.keywords, decision: d });
+      },
     };
   }
   // 방금 반영한 결과 (자리마다 하나)
@@ -265,7 +240,7 @@
   }
   function timeline(e) {
     const items = App.wiki.projectTimeline(e.id).slice().reverse();
-    if (!items.length) return '<div class="card empty"><div class="big">✎</div>아직 기록이 없어요. 첫 체크인을 남겨 볼까요?</div>';
+    if (!items.length) return '<div class="card empty"><div class="big">✎</div>아직 기록이 없어요. 이 프로젝트 이야기를 남겨 볼까요?</div>';
     const groups = [];
     items.forEach((it) => {
       const ws = fmt(weekStart(it.date));
@@ -327,10 +302,10 @@
       <div class="card card-pad pj-cards-box">
         <div class="section-title">이 프로젝트의 경험 카드 <span class="subtle">${cards.length}</span></div>
         ${cards.length ? `<div class="pj-cards">${cards.slice(0, 4).map((x) => `<a class="pj-cardlink" href="#/card/${esc(x.id)}">
-            <div class="pj-cardlink-top">${App.ui.statusTag(x.status)}<span class="pj-cardlink-pct">${x.completeness}%</span></div>
+            <div class="pj-cardlink-top"><span class="subtle">${esc(x.category)}</span><span class="pj-cardlink-n">경험 ${App.ai.expCounts()[x.id] || 0}</span></div>
             <div class="pj-cardlink-title">${esc(x.title)}</div></a>`).join('')}</div>
             ${cards.length > 4 ? `<button class="pj-link" data-pj-tab="exp">경험 카드 ${cards.length}개 모두 보기 →</button>` : ''}`
-          : '<p class="subtle">아직 없어요. 체크인을 남기면 경험이 쌓이고, 경험을 모아 카드로 만들 수 있어요.</p>'}
+          : '<p class="subtle">아직 없어요. 이 프로젝트 이야기를 남기면 경험이 쌓이고, 경험을 모아 카드로 만들 수 있어요.</p>'}
         ${kept ? `<p class="pj-side-hint"><span class="ai-dot">R</span><button class="pj-link" data-pj-tab="timeline">카드에 안 담긴 경험 ${kept}개 →</button></p>` : ''}
       </div>
       ${ghSideBox(e)}
@@ -338,10 +313,10 @@
         <div class="section-title">이 프로젝트에서 드러난 역량</div>
         ${kc.length ? `<div class="pj-comp">${kc.slice(0, 6).map(([k, n]) => `<div class="pj-comp-row">
             ${App.ui.keywordChip(k)}<div class="pj-comp-bar" data-tone="${App.keywords.tone(k)}"><span style="width:${Math.round((n / max) * 100)}%"></span></div><span class="pj-comp-n">${n}</span></div>`).join('')}</div>`
-          : '<p class="subtle">체크인을 남기면 로그에서 역량 키워드를 찾아 보여 드려요.</p>'}
+          : '<p class="subtle">이야기를 남기면 기록에서 역량 키워드를 찾아 보여 드려요.</p>'}
         <div class="divider"></div>
         <div class="pj-types-sum">${TYPE_ORDER.map((t) => `<div data-type="${t}"><span class="pj-dot"></span>${TYPES[t].label}<b>${c[t] || 0}</b></div>`).join('')}</div>
-        ${missing.length ? `<p class="pj-side-hint"><span class="ai-dot">R</span>‘${TYPES[missing[0]].label}’ 기록이 아직 없어요. 면접에서 자주 묻는 부분이라 다음 체크인에서 여쭤볼게요.</p>` : ''}
+        ${missing.length ? `<p class="pj-side-hint"><span class="ai-dot">R</span>‘${TYPES[missing[0]].label}’ 기록이 아직 없어요. 면접에서 자주 묻는 부분이라 위에서 이 유형으로 남겨 두면 좋아요.</p>` : ''}
       </div>
       ${e.status === 'done' ? `<div class="card card-pad pj-done-box"><b>마무리한 프로젝트예요</b>
           <p class="subtle">다시 진행해야 한다면 언제든 이어서 기록할 수 있어요.</p>
@@ -513,10 +488,10 @@
     const feed = App.wiki.entries({ projectId: e.id }).filter((w) => w.target).slice(0, 5);
     const kept = keptCount(e.id);
     return `<div class="pj-exp">
-      <div class="pj-exp-head"><p class="subtle">체크인·AI와 대화·코드 분석에서 나온 이 프로젝트의 경험 카드예요. 경험을 담을수록 같은 카드가 채워져요.</p>
+      <div class="pj-exp-head"><p class="subtle">프로젝트 이야기·AI와 대화·코드 분석에서 나온 이 프로젝트의 경험 카드예요. 경험을 담을수록 같은 카드가 채워져요.</p>
         <button class="btn btn-sm btn-primary" data-capture data-capture-project="${esc(e.id)}">＋ 이 프로젝트 기록하기</button></div>
       ${cards.length ? `<div class="pj-exp-grid">${cards.map((x) => App.ui.expCard(x)).join('')}</div>`
-        : `<div class="card empty"><div class="big">▣</div>아직 이 프로젝트의 경험 카드가 없어요.<div class="subtle" style="margin-top:4px">체크인을 남기거나 코드를 분석하면 경험 카드가 생겨요.</div></div>`}
+        : `<div class="card empty"><div class="big">▣</div>아직 이 프로젝트의 경험 카드가 없어요.<div class="subtle" style="margin-top:4px">이 프로젝트 이야기를 남기거나 코드를 분석하면 경험 카드가 생겨요.</div></div>`}
       ${kept ? `<p class="pj-side-hint"><span class="ai-dot">R</span><button class="pj-link" data-pj-tab="timeline">카드에 안 담긴 경험 ${kept}개 →</button></p>` : ''}
       ${feed.length ? `<div class="section-title" style="margin-top:20px">최근 위키 반영</div><div class="card card-pad wk-feed">${feed.map((w) => App.wiki.reportHTML(w, { compact: true })).join('')}</div>` : ''}
     </div>`;
@@ -528,15 +503,14 @@
       return `<div class="page"><div class="card empty"><div class="big">▤</div>프로젝트를 찾을 수 없어요. 경험 위키로 이동할게요.
         <div style="margin-top:14px"><a class="btn" href="#/vault">← 경험 위키로</a></div></div></div>`;
     }
-    const gh = ghLink(e); const nx = nextCheckin(e);
+    const gh = ghLink(e);
     const tab = ui.tab[e.id] || (App.store.cardsOf(e.id).length ? 'exp' : 'timeline');
     const ghUrl = ghUrlOf(e);
     return `<div class="page pj">
       <a class="pj-back" href="#/vault">← 경험 위키</a>
       <div class="card pj-hero">
         <div class="pj-hero-main">
-          <div class="pj-card-top">${statusTag(e.status)}<span class="subtle">${App.ui.period(e.period)}</span>
-            ${e.status === 'ongoing' ? `<span class="pj-due ${nx.due ? 'is-due' : ''}">${esc(nx.label)} 체크인 · ${esc(nx.text)}</span>` : ''}</div>
+          <div class="pj-card-top">${statusTag(e.status)}<span class="subtle">${App.ui.period(e.period)}</span></div>
           <h1 class="pj-hero-title">${esc(e.title)}</h1>
           <div class="pj-card-role">${esc(e.role || '역할 미입력')}</div>
         </div>
@@ -549,7 +523,7 @@
       </div>
       <div class="pj-layout">
         <div class="pj-main">
-          ${e.status !== 'done' ? checkinCard(e) : ''}
+          ${e.status !== 'done' ? storyCard(e) : ''}
           <div class="pj-tabs" role="tablist">
             <button type="button" class="pj-tab ${tab === 'exp' ? 'on' : ''}" data-pj-tab="exp" role="tab" aria-selected="${tab === 'exp'}">경험 카드 <span>${App.store.cardsOf(e.id).length}</span></button>
             <button type="button" class="pj-tab ${tab === 'timeline' ? 'on' : ''}" data-pj-tab="timeline" role="tab" aria-selected="${tab === 'timeline'}">원본 기록 <span>${App.wiki.projectTimeline(e.id).length}</span></button>
@@ -566,9 +540,7 @@
   App.ui.projectCard = projectCard;
   App.ui.projectStatusTag = statusTag;
   App.ui.openNewProject = openNewModal;
-  App.ui.projectCheckin = nextCheckin;
   App.ui.projectHref = pageHref;
-  App.ui.checkinCadence = () => (CADENCE[App.store.state.settings.projectCheckin] || CADENCE.every2days)[1];
 
   const projectOf = (params) => (params && params.id ? App.store.getProject(params.id) : null);
   App.screens.projects = {
@@ -597,12 +569,12 @@
       function talkCfg(key) {
         const e = App.store.getProject(id); if (!e) return null;
         if (key === 'ck') {
-          const c = checkinTalkCfg(e);
+          const c = storyTalkCfg(e);
           return Object.assign(c, {
-            onDone: (entry) => { talks.ck.done = true; App.ui.toast(c.inbox ? '체크인 완료! 오늘의 질문에서도 답변 완료로 바뀌었어요' : entry && entry.target ? '경험으로 저장하고 카드에 담았어요 · 대화는 타임라인에 남아요' : '경험으로 저장했어요 · 타임라인에서 볼 수 있어요'); rerenderLocal(); },
-            next: { label: '다른 체크인 남기기', onClick: () => {
-              const Q = window.SEED.projectCheckins;
-              if (!App.store.openCheckin(id)) { ui.qIndex[id] = ((ui.qIndex[id] || 0) + 1) % Q.length; ui.type[id] = Q[ui.qIndex[id]].type; }
+            onDone: (entry) => { talks.ck.done = true; App.ui.toast(entry && entry.target ? '경험으로 저장하고 카드에 담았어요 · 대화는 타임라인에 남아요' : '경험으로 저장했어요 · 타임라인에서 볼 수 있어요'); rerenderLocal(); },
+            next: { label: '다른 이야기 남기기', onClick: () => {
+              const Q = window.SEED.projectPrompts;
+              ui.qIndex[id] = ((ui.qIndex[id] || 0) + 1) % Q.length; ui.type[id] = Q[ui.qIndex[id]].type;
               dropTalk('ck'); rerenderLocal();
             } },
           });
@@ -651,7 +623,7 @@
           ph.replaceWith(t.host);
         });
       }
-      // 체크인 대화를 아직 시작하지 않았는지 (유형을 바꾸면 질문도 바꿔도 되는지)
+      // 프로젝트 이야기 대화를 아직 시작하지 않았는지 (유형을 바꾸면 질문도 바꿔도 되는지)
       const ckUntouched = () => { const t = talks.ck; if (!t) return true; const inp = t.host.querySelector('[data-tk-in]'); return !t.done && t.ctl.phase === 'ask' && !(inp && inp.value.trim()); };
       // 방금 반영한 결과 카드: 되돌리기·옮기기 후 새 entry 로 다시 그린다
       const bindReports = () => root.querySelectorAll('[data-pj-report]').forEach((box) => {
@@ -826,11 +798,10 @@
         if (typeBtn) {
           const t = typeBtn.getAttribute('data-pj-type');
           ui.type[id] = t;
-          // 아직 답하기 전이면 그 유형에 맞는 질문으로 (오늘의 질문함의 질문도 함께) — 대화를 시작했으면 기록 유형만 바꾼다
+          // 아직 답하기 전이면 그 유형에 맞는 질문으로 — 대화를 시작했으면 기록 유형만 바꾼다
           if (ckUntouched()) {
-            const qi = window.SEED.projectCheckins.findIndex((q) => q.type === t);
-            const oq = App.store.openCheckin(id);
-            if (qi >= 0) { if (oq) App.store.changeCheckin(oq.id, qi); else ui.qIndex[id] = qi; }
+            const qi = window.SEED.projectPrompts.findIndex((q) => q.type === t);
+            if (qi >= 0) ui.qIndex[id] = qi;
           }
           rerenderLocal();
           return;
@@ -840,10 +811,8 @@
         if (act === 'new') return openNewModal();
         if (!e) return;
         if (act === 'next-q') {
-          const Q = window.SEED.projectCheckins;
-          const oq = App.store.openCheckin(id);
-          if (oq) App.store.changeCheckin(oq.id, ((oq.bankIndex != null ? oq.bankIndex : Q.findIndex((x) => x.type === oq.checkinType)) + 1) % Q.length);
-          else { ui.qIndex[id] = ((ui.qIndex[id] || 0) + 1) % Q.length; ui.type[id] = Q[ui.qIndex[id]].type; }
+          const Q = window.SEED.projectPrompts;
+          ui.qIndex[id] = ((ui.qIndex[id] || 0) + 1) % Q.length; ui.type[id] = Q[ui.qIndex[id]].type;
           dropTalk('ck'); rerenderLocal();
         } else if (act === 'close-report') {
           ui.report = null; rerenderLocal();
@@ -864,7 +833,7 @@
         } else if (act === 'finish') {
           App.ui.modal({
             title: '프로젝트를 마무리할까요?', confirmText: '마무리하기',
-            body: `<p>상태가 <b>완성</b>으로 바뀌고 체크인 질문이 멈춰요. ${keptCount(id) ? ` 카드에 안 담긴 경험 <b>${keptCount(id)}개</b>를 타임라인에서 카드에 담아 두면 면접 준비가 훨씬 쉬워져요.` : ''}</p>`,
+            body: `<p>상태가 <b>완료</b>로 바뀌어요.${keptCount(id) ? ` 카드에 안 담긴 경험 <b>${keptCount(id)}개</b>를 타임라인에서 카드에 담아 두면 면접 준비가 훨씬 쉬워져요.` : ''}</p>`,
             onConfirm() {
               const n = new Date();
               App.store.addLog(id, { type: 'milestone', text: '프로젝트 마무리.' });

@@ -1,10 +1,10 @@
-/* 기록 대화 — 오늘의 질문 · 위키 점검 · ＋기록하기 · 체크인이 모두 같이 쓰는 "AI와 대화하며 적는 곳"
+/* 기록 대화 — 오늘의 질문 · ＋기록하기 · 프로젝트 이야기가 모두 같이 쓰는 "AI와 대화하며 적는 곳"
    흐름: AI 질문 → 사용자 답 → (필요하면 꼬리질문 1번) → 대화는 언제나 경험 하나로 저장 → AI 제안 "어느 경험 카드의 어느 칸에, 이런 문장으로" → 사용자가 고르거나 말로 고침 → 담기
    직접 수정(경험 카드의 ✎ 수정)은 이 대화를 쓰지 않는다 — 사용자가 쓴 그대로 저장.
 
    App.talk.mount(el, {
      ask: { text, hint?, label? },      // AI 첫 질문 (prefill 이 있으면 생략 가능)
-     prefill?: '원문',                   // 이미 적힌 기록(체크인 로그 등) → 바로 제안부터
+     prefill?: '원문',                   // 이미 적힌 기록(프로젝트 로그 등) → 바로 제안부터
      src: { type, question, questionId, expId, stage, projectId, logId, logType, findingId },
      commit?: (text, decision) => entry, // 기본: App.wiki.ingest({ ...src, text, decision }) — 대화 id 는 자동으로 이어진다
      thread?: { source, label },         // 대화 기록에 남길 출처 (생략하면 src 로 추정). threadId 를 주면 그 대화를 이어서 쓴다
@@ -286,7 +286,7 @@
     }).join('');
   }
 
-  // 모달로 띄우기 (위키 점검·홈·경험 카드 등에서 그 자리에서 답하기)
+  // 모달로 띄우기 (홈·경험 카드 등에서 그 자리에서 답하기)
   function open(cfg) {
     const root = document.getElementById('modal-root');
     root.innerHTML = `<div class="modal-backdrop"><div class="modal tk-modal ${cfg.room === false ? '' : 'has-room'}">

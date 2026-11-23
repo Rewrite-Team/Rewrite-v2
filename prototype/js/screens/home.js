@@ -1,8 +1,8 @@
 /* 홈: 지금 할 일만 한 칸에 — 오늘의 질문 · 지원 기업 · 답변 캘린더.
-   위키 점검은 오늘의 질문으로 들어오고(autoQueue) 전체 목록은 경험 위키에서, 변경 기록은 경험 위키·경험 카드에서 본다 */
+   변경 기록은 경험 위키·경험 카드에서 본다 */
 (function (App) {
   const esc = (s) => App.ui.esc(s);
-  const TYPE_LABEL = { project: '프로젝트 체크인', deepen: '경험 깊이 파기', recall: '기억 떠올리기', code: '코드 분석에서 온 질문' };
+  const TYPE_LABEL = { project: '프로젝트 이야기', deepen: '경험 깊이 파기', recall: '기억 떠올리기', code: '코드 분석에서 온 질문' };
   // 답변 캘린더 상태 (화면을 떠났다 와도 유지)
   let calMonth = null; // 'YYYY-MM' — null이면 이번 달
   let calSel = null;   // 'YYYY-MM-DD' — null이면 오늘

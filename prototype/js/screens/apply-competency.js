@@ -1,7 +1,6 @@
 /* 지원 기업 상세 > 역량 맵 탭 — 기업별 요구 역량 · 대표 경험 · 30초 답변 · 면접 준비 체크리스트 */
 (function (App) {
   const esc = (s) => App.ui.esc(s);
-  const READY = 70;
   // 앱별로 선택한 역량 기억 (탭 재렌더 시 유지)
   const selected = {};
 
@@ -20,7 +19,6 @@
   const shortTitle = (t) => String(t || '').split(' — ')[0];
   const STATE = {
     ready: { label: '준비됨', mark: '✓' },
-    weak: { label: '보완 필요', mark: '!' },
     none: { label: '경험 없음', mark: '+' },
   };
 
@@ -30,14 +28,14 @@
     const reasons = {};
     (app.competencies || []).forEach((c) => { reasons[c.name] = c.reason || ''; });
     const comps = rd.competencies.map((c) => {
-      const state = c.exp ? (c.exp.completeness >= READY ? 'ready' : 'weak') : 'none';
+      const state = c.ready ? 'ready' : 'none'; // 그 역량의 경험 카드가 하나라도 있으면 준비됨
       return Object.assign({}, c, { reason: reasons[c.name] || '', state });
     }).sort((a, b) => (b.weight - a.weight));
     return { comps, rd };
   }
   // 해당 키워드 경험 목록 (고정된 경험이 키워드를 잃었더라도 함께 보여 줌)
   function expsFor(kw, pinnedId) {
-    const list = App.store.list().filter((e) => e.keywords.includes(kw)).sort((a, b) => b.completeness - a.completeness);
+    const list = App.ai.rankCards(App.store.list().filter((e) => e.keywords.includes(kw)));
     if (pinnedId && !list.some((e) => e.id === pinnedId)) { const p = App.store.get(pinnedId); if (p) list.unshift(p); }
     return list;
   }
@@ -88,7 +86,7 @@
       <div class="ac-check-bar">${App.ui.progress(Math.round((done / comps.length) * 100))}</div>
       <div class="ac-check-items">${comps.map((c) => `<button type="button" class="ac-check-item is-${c.state} ${c.name === sel ? 'sel' : ''}" data-ac-kw="${esc(c.name)}">
         <span class="ac-mark">${STATE[c.state].mark}</span>
-        <span class="ac-check-txt"><b>#${esc(c.name)}</b><span>${c.state === 'ready' ? esc(shortTitle(c.exp.title)) : c.state === 'weak' ? `보완 필요 · 완성도 ${c.exp.completeness}%` : '경험을 찾아봐요'}</span></span>
+        <span class="ac-check-txt"><b>#${esc(c.name)}</b><span>${c.state === 'ready' ? esc(shortTitle(c.exp.title)) : '경험을 찾아봐요'}</span></span>
       </button>`).join('')}</div>
     </div>`;
   }
@@ -104,8 +102,7 @@
 
   function legend() {
     return `<div class="ac-legend">
-      <span><i class="ac-dot is-ready"></i>준비됨 (완성도 ${READY}% 이상)</span>
-      <span><i class="ac-dot is-weak"></i>보완 필요</span>
+      <span><i class="ac-dot is-ready"></i>준비됨 (그 역량의 경험 카드가 있어요)</span>
       <span><i class="ac-dot is-none"></i>경험 없음</span></div>`;
   }
 
@@ -161,8 +158,6 @@
         <span class="ac-step-v">${v ? esc(v) : '<span class="ac-muted">아직 비어 있어요</span>'}</span></li>`).join('')}</ol>
       <div class="ac-tailor"><span class="ac-tailor-k">이 기업에 맞춰 말하기</span><span>${tailor(app, c, e)}</span></div>
       <div class="ac-answer-foot"><a class="ac-link" href="#/card/${esc(e.id)}">경험 카드에서 고치기 →</a></div>
-      ${e.completeness < READY ? `<div class="ac-weak"><span>완성도 ${e.completeness}%예요. 비어 있는 부분을 채우면 답변이 훨씬 단단해져요.</span>
-        <a class="ac-link" href="#/ask/new?mode=deep&exp=${encodeURIComponent(e.id)}">AI와 이어서 채우기 →</a></div>` : ''}
     </div>`;
 
     const rows = list.map((x) => {
@@ -173,9 +168,9 @@
       else actions = `<button type="button" class="btn btn-sm" data-ac-pin="${esc(x.id)}">대표로 고정</button>`;
       return `<div class="ac-exp ${isRep ? 'rep' : ''}">
         <div class="ac-exp-main" data-href="#/card/${esc(x.id)}">
-          <div class="ac-exp-top">${App.ui.statusTag(x.status)}<span>${esc(x.category)}</span></div>
+          <div class="ac-exp-top"><span>${esc(x.category)}</span></div>
           <div class="ac-exp-title">${esc(x.title)}</div>
-          <div class="ac-exp-foot"><span>완성도 ${x.completeness}%</span>${App.ui.progress(x.completeness)}</div>
+          <div class="ac-exp-foot"><span>경험 ${App.ai.expCounts()[x.id] || 0}개</span></div>
         </div>
         <div class="ac-exp-act">${actions}</div>
       </div>`;

@@ -10,7 +10,6 @@
     { key: 'action', letter: 'A', label: '행동', hint: '내가 직접 한 행동과 그렇게 판단한 이유는요?' },
     { key: 'result', letter: 'R', label: '결과', hint: '무엇이 달라졌나요? 숫자로 말할 수 있으면 더 좋아요.' },
   ];
-  const STATUS_OPTS = [['draft', '작성중'], ['done', '완성']];
   const LOG_TYPES = {
     decision: ['의사결정', '◆'], issue: ['이슈', '!'], collab: ['협업', '◎'], milestone: ['마일스톤', '★'], learning: ['배움', '✎'],
   };
@@ -37,13 +36,13 @@
     const kw = params.kw ? [params.kw] : [];
     return {
       id: null, title: '', category: (params.category && window.SEED.categories.includes(params.category)) ? params.category : '프로젝트',
-      period: { start: '', end: '' }, status: 'draft', projectId: params.project || null, sourceLogIds: [], role: '', summary: '',
-      star: { situation: '', task: '', action: '', result: '' }, insights: '', keywords: kw, jobs: [], links: [], qa: [], completeness: 0,
+      period: { start: '', end: '' }, projectId: params.project || null, sourceLogIds: [], role: '', summary: '',
+      star: { situation: '', task: '', action: '', result: '' }, insights: '', keywords: kw, jobs: [], links: [], qa: [],
     };
   }
 
   const clone = (o) => JSON.parse(JSON.stringify(o));
-  // 이 경험이 속한 프로젝트와, 근거로 연결된 체크인 로그
+  // 이 경험이 속한 프로젝트와, 근거로 연결된 프로젝트 기록(로그)
   function projectOf(e) { return e.projectId ? App.store.getProject(e.projectId) : null; }
   function sourceLogs(e) {
     const p = projectOf(e); if (!p) return [];
@@ -63,26 +62,6 @@
     return parts.join(' ');
   }
 
-  function ring(pct) {
-    const r = 26, c = 2 * Math.PI * r, off = c * (1 - pct / 100);
-    const tone = pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--primary)' : 'var(--accent)';
-    return `<div class="cd-ring" title="완성도 ${pct}%">
-      <svg viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
-        <circle cx="32" cy="32" r="${r}" fill="none" stroke="#eeebe5" stroke-width="6"/>
-        <circle cx="32" cy="32" r="${r}" fill="none" stroke="${tone}" stroke-width="6" stroke-linecap="round"
-          stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${off.toFixed(2)}" transform="rotate(-90 32 32)"/>
-      </svg><div class="cd-ring-num"><b>${pct}</b><span>%</span></div></div>`;
-  }
-
-  function nextHint(e) {
-    const missing = STAR.filter((s) => !(e.star[s.key] || '').trim()).map((s) => s.label);
-    if (missing.length) return `${missing.join('·')}을(를) 채우면 완성도가 올라가요`;
-    if (!/\d/.test(e.star.result || '')) return '결과에 숫자를 넣으면 설득력이 커져요';
-    if (!e.insights) return '배운 점을 적으면 카드가 완성돼요';
-    if (!e.keywords.length) return '역량 키워드를 1개 이상 붙여 주세요';
-    return '면접에서 바로 꺼내 쓸 수 있는 경험이에요';
-  }
-
   /* ---------------- View ---------------- */
   const projShort = (p) => (p.title.match(/「[^」]+」/) || [p.title.split(' — ')[0]])[0];
   const fmtDate = (d) => String(d || '').replace(/^(\d{4})-(\d{2})-(\d{2}).*$/, '$1.$2.$3');
@@ -92,7 +71,7 @@
     return !!gap && App.store.state.inbox.some((q) => q.targetExpId === e.id && q.type === 'deepen' && q.status === 'pending' && (!q.stage || q.stage === gap.stage));
   }
 
-  // 담긴 경험 → 그 원문이 나온 대화 (qa 의 threadId, 체크인 로그의 threadId, 아니면 이 카드로 정리된 대화 중 같은 말을 한 것)
+  // 담긴 경험 → 그 원문이 나온 대화 (qa 의 threadId, 프로젝트 로그의 threadId, 아니면 이 카드로 정리된 대화 중 같은 말을 한 것)
   function threadOfSource(e, s, mine) {
     const W = App.wiki; if (!W.getThread) return null;
     const ok = (id) => (id && W.getThread(id) ? id : null);
@@ -210,7 +189,7 @@
     return `
     <div class="cd-head card">
       <div class="cd-head-main">
-        <div class="cd-meta">${App.ui.statusTag(e.status)}<span class="cd-meta-cat">${esc(e.category)}</span><span class="cd-dot">·</span><span>${App.ui.period(e.period)}</span></div>
+        <div class="cd-meta"><span class="cd-meta-cat">${esc(e.category)}</span><span class="cd-dot">·</span><span>${App.ui.period(e.period)}</span></div>
         ${p || codeN || expN ? `<div class="cd-origin">
           ${p ? `<a class="cd-proj-badge" href="#/vault/p/${encodeURIComponent(p.id)}">▤ ${esc(projShort(p))} 프로젝트의 경험 카드</a>` : ''}
           ${codeN ? `<a class="wk-srcchip cd-code-chip" href="#/vault/p/${encodeURIComponent(codeHits[0].project.id)}?tab=code">⌥ 코드 근거 ${codeN}</a>` : ''}
@@ -219,10 +198,6 @@
         <h1 class="cd-title">${esc(e.title || '제목 없는 경험 카드')}</h1>
         ${e.role ? `<div class="cd-role"><span class="cd-role-lb">역할</span>${esc(e.role)}</div>` : ''}
         <p class="cd-summary ${e.summary ? '' : 'is-empty'}">${esc(e.summary || '아직 한 줄 요약이 없어요. 질문에 답하면 AI가 채워요.')}</p>
-      </div>
-      <div class="cd-head-side">
-        ${ring(e.completeness)}
-        <div class="cd-comp-text"><div class="cd-comp-lb">완성도</div><div class="cd-comp-hint">${esc(nextHint(e))}</div></div>
       </div>
       <div class="cd-head-actions">
         <a class="btn btn-primary btn-sm" href="#/ask/new?mode=deep&exp=${encodeURIComponent(e.id)}">✦ 끝까지 정리하기</a>
@@ -297,7 +272,7 @@
           const siblings = App.store.cardsOf(p.id).filter((x) => x.id !== e.id);
           return siblings.length ? `<section class="card card-pad cd-sec">
             <div class="section-title">${esc(projShort(p))} 프로젝트의 다른 경험 카드</div>
-            <div class="cd-siblings">${siblings.map((x) => `<a class="cd-sibling" href="#/card/${encodeURIComponent(x.id)}">${App.ui.statusTag(x.status)}<span>${esc(x.title)}</span></a>`).join('')}</div>
+            <div class="cd-siblings">${siblings.map((x) => `<a class="cd-sibling" href="#/card/${encodeURIComponent(x.id)}"><span>${esc(x.title)}</span></a>`).join('')}</div>
           </section>` : '';
         })() : ''}
       </div>
@@ -365,11 +340,10 @@
         ${field('제목', `<input class="input" name="title" placeholder="예) 카페 아르바이트 — 주문 대기 줄 줄이기" value="${esc(d.title)}">`)}
         <div class="cd-form-grid">
           ${field('유형', `<select class="select" name="category">${window.SEED.categories.map((c) => `<option ${c === d.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>`)}
-          ${field('상태', `<select class="select" name="status">${STATUS_OPTS.map(([v, l]) => `<option value="${v}" ${v === d.status ? 'selected' : ''}>${l}</option>`).join('')}</select>`)}
           ${field('시작', `<input class="input" type="month" name="start" value="${esc(d.period.start)}">`)}
           ${field('종료', `<input class="input" type="month" name="end" value="${esc(d.period.end)}"><div class="cd-help">비워 두면 ‘진행중’으로 표시돼요</div>`)}
         </div>
-        ${field('프로젝트', `<select class="select" name="projectId"><option value="">없음 (프로젝트 밖 경험)</option>${App.store.projects().map((p) => `<option value="${esc(p.id)}" ${p.id === d.projectId ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}</select><div class="cd-help">한 프로젝트에 경험 페이지를 여러 개 둘 수 있어요. 진행 중인 일은 경험 위키의 <a class="cd-link" href="#/vault">프로젝트 페이지</a>에서 체크인하세요.</div>`)}
+        ${field('프로젝트', `<select class="select" name="projectId"><option value="">없음 (프로젝트 밖 경험)</option>${App.store.projects().map((p) => `<option value="${esc(p.id)}" ${p.id === d.projectId ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}</select><div class="cd-help">한 프로젝트에 경험 페이지를 여러 개 둘 수 있어요. 진행 중인 일은 경험 위키의 <a class="cd-link" href="#/vault">프로젝트 페이지</a>에서 그 프로젝트 이야기를 모아 볼 수 있어요.</div>`)}
         ${field('역할', `<input class="input" name="role" placeholder="예) 백엔드 담당, 4인 팀" value="${esc(d.role)}">`)}
         ${field('한 줄 요약', `<input class="input" name="summary" placeholder="이 경험을 한 문장으로 소개한다면요?" value="${esc(d.summary)}">`)}
       </section>
@@ -479,7 +453,7 @@
         const f = root.querySelector('.cd-form'); if (!f) return;
         const v = (n) => (f.elements[n] ? f.elements[n].value : '');
         const d = st.draft;
-        d.title = v('title').trim(); d.category = v('category'); d.status = v('status');
+        d.title = v('title').trim(); d.category = v('category');
         d.period = { start: v('start'), end: v('end') };
         if (f.elements.projectId) { const pid = v('projectId') || null; if (pid !== d.projectId) d.sourceLogIds = []; d.projectId = pid; }
         d.role = v('role').trim(); d.summary = v('summary').trim(); d.insights = v('insights').trim();
@@ -525,7 +499,7 @@
         }
         if (d.period.start && d.period.end && d.period.end < d.period.start) { App.ui.toast('종료 시점이 시작보다 빨라요'); return; }
         const patch = {
-          title: d.title, category: d.category, status: d.status, period: d.period, projectId: d.projectId, sourceLogIds: d.sourceLogIds || [], role: d.role, summary: d.summary,
+          title: d.title, category: d.category, period: d.period, projectId: d.projectId, sourceLogIds: d.sourceLogIds || [], role: d.role, summary: d.summary,
           star: d.star, insights: d.insights, keywords: d.keywords, jobs: d.jobs, links: d.links,
         };
         if (!st.id) {
@@ -575,7 +549,7 @@
         const e = App.store.get(st.id); if (!e) return;
         App.ui.modal({
           title: '이 경험 카드를 삭제할까요?',
-          body: `<p><b>${esc(e.title)}</b></p><p style="margin-top:6px">STAR 정리와 카드가 삭제되고 되돌릴 수 없어요. 담긴 경험(대화 원문)은 질문함에 그대로 남아요.${projectOf(e) ? ' 프로젝트의 체크인 로그는 그대로 남아요.' : ''}</p>`,
+          body: `<p><b>${esc(e.title)}</b></p><p style="margin-top:6px">STAR 정리와 카드가 삭제되고 되돌릴 수 없어요. 담긴 경험(대화 원문)은 질문함에 그대로 남아요.${projectOf(e) ? ' 프로젝트 기록은 그대로 남아요.' : ''}</p>`,
           confirmText: '삭제하기', danger: true,
           onConfirm() { App.store.remove(e.id); App.ui.toast('경험 카드를 삭제했어요'); App.navigate('#/vault'); },
         });

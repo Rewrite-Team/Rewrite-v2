@@ -1,6 +1,6 @@
 /* 경험 위키 엔진 — 카파시의 "LLM 위키" 구조를 프로토타입으로 흉내 낸다.
    ┌ 대화 기록(원문, 바뀌지 않음) ─ AI와 나눈 모든 대화를 채팅방처럼 보관 (state.threads)
-   │                              오늘의 질문 · 위키 점검 · ＋기록하기 · 프로젝트 체크인 · 코드 질문 — 경험이 안 된 대화도 여기 남는다
+   │                              오늘의 질문 · ＋기록하기 · 프로젝트 이야기 · 코드 질문 — 경험이 안 된 대화도 여기 남는다
    ├ 위키(AI가 정리·유지) ── 경험 카드(state.experiences, 경험 여러 개를 모은 것) + 프로젝트 페이지(state.projects)
    └ 꺼내 쓰기(질의) ────── 이력서 · 자소서 · 면접 — 위키 페이지를 근거로 인용
 
@@ -26,7 +26,7 @@
   const uid = (p) => p + Math.random().toString(36).slice(2, 8);
   const st = () => S.state;
   const FIELD_LABEL = { situation: '상황', task: '과제', action: '행동', result: '결과', insights: '배운 점', summary: '요약' };
-  const SOURCE_LABEL = { answer: '오늘의 질문 답변', checkin: '프로젝트 체크인', chat: 'AI와 대화', code: '코드 분석', manual: '직접 작성', compose: '경험 담기' };
+  const SOURCE_LABEL = { answer: '오늘의 질문 답변', checkin: '프로젝트 이야기', chat: 'AI와 대화', code: '코드 분석', manual: '직접 작성', compose: '경험 담기' };
   const SOURCE_ICO = { answer: '✉', checkin: '▤', chat: '✦', code: '⌥', manual: '✎', compose: '＋' };
   // 코드 분석 카테고리 → 역량 키워드
   const CODE_KW = { '성능': ['문제해결', '분석력'], '인증·보안': ['꼼꼼함', '책임감'], '데이터': ['문제해결', '꼼꼼함'], '아키텍처': ['의사결정'], '테스트': ['꼼꼼함'], '인프라': ['책임감', '학습능력'], '배포·인프라': ['책임감', '학습능력'], '품질': ['꼼꼼함'], '협업': ['협업', '커뮤니케이션'] };
@@ -151,20 +151,19 @@
     if (opts.question || opts.source === 'answer' || opts.source === 'chat') e.qa.push({ q: opts.question || '(직접 기록)', a: text, date: S.localDay(), source: opts.source, qid: opts.questionId || null, threadId: opts.threadId || null });
     if (opts.logId && !e.sourceLogIds.includes(opts.logId)) e.sourceLogIds.push(opts.logId);
     (opts.findingIds || []).forEach((f) => { if (!e.codeRefs.includes(f)) e.codeRefs.push(f); });
-    if (opts.logId || (opts.findingIds || []).length) changes.push({ kind: 'evidence', expId: e.id, text: opts.logId ? '체크인 기록 연결' : '코드 근거 연결' });
+    if (opts.logId || (opts.findingIds || []).length) changes.push({ kind: 'evidence', expId: e.id, text: opts.logId ? '프로젝트 기록 연결' : '코드 근거 연결' });
     if (opts.projectId && !e.projectId) { e.projectId = opts.projectId; changes.push({ kind: 'link', expId: e.id, projectId: opts.projectId }); }
     e.updatedAt = S.localDay();
-    e.completeness = App.ai.completeness(e);
   }
   function newCard(text, opts, changes) {
     const project = opts.projectId ? S.getProject(opts.projectId) : detectProject(text);
     const finding = opts.finding || null;
     const title = opts.title || (finding ? finding.title : (project ? `「${S.projectName(project)}」 ` : '') + short(text, 24));
     const e = {
-      id: uid('e'), title: title.trim(), category: guessCategory(text, project), period: { start: S.localDay().slice(0, 7), end: '' }, status: 'draft',
+      id: uid('e'), title: title.trim(), category: guessCategory(text, project), period: { start: S.localDay().slice(0, 7), end: '' },
       projectId: project ? project.id : null, sourceLogIds: [], codeRefs: [], role: project ? (project.role || '') : '', summary: '',
       star: { situation: '', task: '', action: '', result: '' }, insights: '', keywords: [], jobs: [], links: [], qa: [],
-      completeness: 0, createdAt: S.localDay(), updatedAt: S.localDay(),
+      createdAt: S.localDay(), updatedAt: S.localDay(),
     };
     if (finding) { e.star.action = sentence(finding.bullet || finding.title); e.keywords = (CODE_KW[finding.category] || ['문제해결']).slice(); }
     st().experiences.push(e);
@@ -208,7 +207,7 @@
   /* ---------- 대화 기록 (원문 층) ----------
      thread = { id, date:'YYYY-MM-DD', at:'HH:MM', source:'daily'|'check'|'capture'|'checkin'|'code'|'coach'|'chat', label, projectId?, questionId?, expId?, findingId?,
                 msgs:[{ who:'ai'|'me', text, at }], outcome:{ kind:'open'|'applied'|'kept', expId?, entryId?, field?, mode? } } */
-  const THREAD_LABEL = { daily: '오늘의 질문', check: '위키 점검', capture: '기록하기', checkin: '프로젝트 체크인', code: '코드 분석 질문', coach: 'AI 코치', chat: 'AI와 길게 대화' };
+  const THREAD_LABEL = { daily: '오늘의 질문', check: '오늘의 질문', capture: '기록하기', checkin: '프로젝트 이야기', code: '코드 분석 질문', coach: 'AI 코치', chat: 'AI와 길게 대화' };
   const nowHM = () => new Date().toTimeString().slice(0, 5);
   function threads() { ensure(); return st().threads; }
   function getThread(id) { return (st().threads || []).find((t) => t.id === id) || null; }
@@ -241,10 +240,10 @@
     return threads().filter((t) => (!f.projectId || t.projectId === f.projectId) && (!f.expId || t.outcome.expId === f.expId) && (!f.kind || t.outcome.kind === f.kind))
       .slice().sort((a, b) => (a.date + a.at).localeCompare(b.date + b.at));
   }
-  /* 시드 대화: 지난 질문·답변, 프로젝트 체크인, AI와 길게 나눈 대화를 대화방으로 옮겨 둔다.
+  /* 시드 대화: 지난 질문·답변, 프로젝트 이야기(로그), AI와 길게 나눈 대화를 대화방으로 옮겨 둔다.
      답한 대화 하나 = 경험 하나. 경험 카드에 담긴 대화는 outcome 'applied'(첫 카드) + cardIds, 아직 안 모은 대화는 'kept' */
   function seedThreads() {
-    const s = st(); const SEED = window.SEED || {}; const bank = SEED.projectCheckins || [];
+    const s = st(); const SEED = window.SEED || {}; const bank = SEED.projectPrompts || [];
     const exists = (id) => s.experiences.some((e) => e.id === id);
     const cardsOfLog = (logId) => s.experiences.filter((e) => (e.sourceLogIds || []).includes(logId)).map((e) => e.id);
     const closing = (ids) => ids.length ? `${ids.map((id) => `「${bare(S.get(id).title)}」`).join(', ')} 카드에 담았어요.` : '경험으로 저장했어요.';
@@ -465,7 +464,7 @@
     persist(); return entry;
   }
 
-  // 체크인 로그 하나를 위키에 반영 (트래커에서 직접 기록했을 때 / 아직 경험이 안 된 기록 정리)
+  // 프로젝트 로그 하나를 위키에 반영 (트래커에서 직접 기록했을 때 / 아직 경험이 안 된 기록 정리)
   function ingestLog(projectId, logId) {
     const p = S.getProject(projectId); const log = p && p.logs.find((l) => l.id === logId); if (!log) return null;
     const entry = ingest({ type: 'checkin', text: log.text, projectId, logId, logType: log.type, keywords: log.keywords, question: log.fromQuestion || '' });
@@ -503,74 +502,19 @@
     };
   }
 
-  /* ---------- 위키 점검 (lint) ----------
-     issue = { id, kind, severity:1~3, text, expId?, projectId?, logId?, findingId?, question?:{ text, stage, ... }, action?:'link' } */
-  function lint() {
-    ensure();
-    const out = [];
-    const exps = st().experiences;
-    exps.forEach((e) => {
-      const brief = `「${short(e.title.replace(/[「」]/g, ''), 22)}」`;
-      if (!e.star.result) out.push({ id: 'nr_' + e.id, kind: 'no-result', severity: 3, expId: e.id, text: `${brief}에 결과가 비어 있어요`, question: { text: `${short(e.title, 30)} — 그 결과 무엇이 달라졌나요?`, stage: 'result', targetExpId: e.id } });
-      else if (!/\d/.test(e.star.result)) out.push({ id: 'nn_' + e.id, kind: 'no-number', severity: 2, expId: e.id, text: `${brief}의 결과에 숫자가 없어요`, question: { text: `${short(e.title, 30)} — 결과를 숫자로 말해 본다면요? (시간, 건수, 사람 수…)`, stage: 'result', targetExpId: e.id } });
-      if (!e.star.action) out.push({ id: 'na_' + e.id, kind: 'no-action', severity: 3, expId: e.id, text: `${brief}에서 내가 한 행동이 아직 없어요`, question: { text: `${short(e.title, 30)} — 그때 가장 먼저 한 행동은 무엇이었나요?`, stage: 'action', targetExpId: e.id } });
-      if (!e.projectId && e.category === '프로젝트') { const p = detectProject(e.title + ' ' + e.summary); if (p) out.push({ id: 'lk_' + e.id, kind: 'unlinked', severity: 1, expId: e.id, projectId: p.id, action: 'link', text: `${brief}이 「${S.projectName(p)}」 이야기 같아요. 프로젝트에 연결할까요?` }); }
-    });
-    st().projects.forEach((p) => {
-      const linked = new Set(exps.flatMap((e) => e.codeRefs || []));
-      ((p.repo && p.repo.findings) || []).filter((f) => f.status !== 'dismissed' && !linked.has(f.id)).forEach((f) => {
-        out.push({ id: 'cf_' + f.id, kind: 'code-unlinked', severity: f.confidence === 'high' ? 2 : 1, projectId: p.id, findingId: f.id, text: `코드 분석 「${short(f.title, 28)}」을 뒷받침할 경험 이야기가 없어요`, question: codeQuestion(p, f) });
-      });
-    });
-    // 지원 기업이 요구하는 역량 중 근거가 없는 것
-    const counts = App.keywords.counts();
-    const wanted = new Set((st().applications || []).filter((a) => a.status === 'preparing' || a.status === 'applied').flatMap((a) => (a.competencies || []).map((c) => c.name)));
-    wanted.forEach((k) => { if (!counts[k]) { const kk = App.keywords.get(k); out.push({ id: 'kw_' + k, kind: 'no-evidence', severity: 2, keyword: k, text: `지원 기업이 찾는 #${k}을 보여 줄 경험이 아직 없어요`, question: { text: `최근에 ${String(kk.desc || k).replace(/ 경험$/, ' 적이 있나요?')}`, type: 'recall' } }); } });
-    return out.sort((a, b) => b.severity - a.severity);
-  }
-  // 점검 항목을 오늘의 질문으로 받기
-  function askIssue(issue) {
-    if (!issue || !issue.question) return null;
-    const open = (q) => q.status === 'pending';
-    const qi = issue.question;
-    const exists = st().inbox.find((q) => open(q) && (q.lintId === issue.id
-      || (qi.targetExpId && q.targetExpId === qi.targetExpId && (!qi.stage || !q.stage || q.stage === qi.stage))
-      || (qi.findingId && q.findingId === qi.findingId)));
-    if (exists) return exists;
-    const qq = issue.question;
-    const q = Object.assign({ id: uid('q'), status: 'pending', askedAt: S.localDay() + ' ' + new Date().toTimeString().slice(0, 5), hint: '' },
-      qq.findingId ? qq : { type: qq.type || (qq.targetExpId ? 'deepen' : 'recall'), text: qq.text, targetExpId: qq.targetExpId || null, stage: qq.stage || null, hint: qq.targetExpId ? '답하면 이 경험의 비어 있는 칸이 채워져요.' : '' },
-      { lintId: issue.id });
-    st().inbox.unshift(q); persist(); return q;
-  }
-  function fixIssue(issue) {
-    if (issue.action === 'link') { const before = clone(S.get(issue.expId)); S.get(issue.expId).projectId = issue.projectId; return recordEdit('manual', issue.expId, before); }
-    return null;
-  }
-  // 하루 한 번, 질문함이 비어 갈 때 위키의 빈 곳에서 질문 하나를 자동으로 만든다 (코드 분석 → 빈 결과 순)
-  function autoQueue() {
-    ensure();
-    const today = S.localDay();
-    if (st().wikiMeta.lastQueue === today) return;
-    if (st().inbox.filter((q) => q.status === 'pending').length >= 3) return;
-    st().wikiMeta.lastQueue = today;
-    const issue = lint().find((i) => i.question && (i.kind === 'code-unlinked' || i.kind === 'no-result' || i.kind === 'no-number'));
-    if (issue) askIssue(issue); else persist();
-  }
-
   // ---------- 조회 ----------
   function entries(filter = {}) {
     ensure();
     return st().wikiLog.filter((w) => !w.undone && (!filter.expId || w.target === filter.expId || w.changes.some((c) => c.expId === filter.expId)) && (!filter.projectId || w.source.projectId === filter.projectId || w.changes.some((c) => c.projectId === filter.projectId)));
   }
-  // 경험 카드의 모든 출처를 한 줄로 (답변·대화·체크인·코드) — 카드에 담긴 경험(experienceItems 의 cardIds)도 빠짐없이
+  // 경험 카드의 모든 출처를 한 줄로 (답변·대화·프로젝트 기록·코드) — 카드에 담긴 경험(experienceItems 의 cardIds)도 빠짐없이
   function sourcesOf(e) {
     const out = [];
     (e.qa || []).forEach((x) => { const t = x.threadId ? getThread(x.threadId) : (x.qid ? (st().threads || []).find((th) => th.questionId === x.qid) : null); out.push({ type: x.source || 'answer', date: x.date, q: x.q, text: x.a, threadId: t ? t.id : null }); });
     const p = e.projectId && S.getProject(e.projectId);
     const qaThreads = new Set(out.map((x) => x.threadId).filter(Boolean));
     (e.sourceLogIds || []).forEach((id) => { const l = p && p.logs.find((x) => x.id === id); if (l && !(l.threadId && qaThreads.has(l.threadId))) out.push({ type: 'checkin', date: l.date, q: l.fromQuestion || '', text: l.text, logType: l.type, href: '#/vault/p/' + p.id + '?tab=timeline', threadId: l.threadId || null }); });
-    // 카드에 담겼지만 qa·체크인으로는 안 이어진 경험 (thread.outcome.expId / thread.cardIds 로만 연결된 것)
+    // 카드에 담겼지만 qa·프로젝트 기록으로는 안 이어진 경험 (thread.outcome.expId / thread.cardIds 로만 연결된 것)
     const seen = new Set(out.map((x) => x.threadId).filter(Boolean));
     experienceItems().filter((it) => it.cardIds.includes(e.id) && !seen.has(it.id)).forEach((it) => {
       seen.add(it.id);
@@ -583,7 +527,7 @@
   function stats() {
     ensure();
     const exps = st().experiences;
-    return { pages: exps.length, projects: st().projects.length, sources: exps.reduce((n, e) => n + sourcesOf(e).length, 0), issues: lint().length, updatesThisWeek: entries().filter((w) => (Date.now() - new Date(w.date + 'T00:00:00')) < 7 * 864e5).length };
+    return { pages: exps.length, projects: st().projects.length, sources: exps.reduce((n, e) => n + sourcesOf(e).length, 0), updatesThisWeek: entries().filter((w) => (Date.now() - new Date(w.date + 'T00:00:00')) < 7 * 864e5).length };
   }
 
   function persist() { S.touch(); }
@@ -725,7 +669,7 @@
     });
   }
 
-  App.wiki = { experienceItems, composeCard, addToCard, withThread, activeThread: () => activeThread, threads, getThread, startThread, addMsg, closeThread, deleteThread, threadText, threadsFor, projectTimeline, hasStory, THREAD_LABEL, canUndo, plan, polish, currentOf, ingest, ingestLog, ingestCode, recordEdit, undo, reroute, match, detectProject, inferField, lint, askIssue, fixIssue, autoQueue, entries, sourcesOf, cardsForFinding, stats, reportHTML, bindReport, codeQuestion, get: (id) => (st().wikiLog || []).find((w) => w.id === id) || null, SOURCE_LABEL, SOURCE_ICO, FIELD_LABEL, short };
+  App.wiki = { experienceItems, composeCard, addToCard, withThread, activeThread: () => activeThread, threads, getThread, startThread, addMsg, closeThread, deleteThread, threadText, threadsFor, projectTimeline, hasStory, THREAD_LABEL, canUndo, plan, polish, currentOf, ingest, ingestLog, ingestCode, recordEdit, undo, reroute, match, detectProject, inferField, entries, sourcesOf, cardsForFinding, stats, reportHTML, bindReport, codeQuestion, get: (id) => (st().wikiLog || []).find((w) => w.id === id) || null, SOURCE_LABEL, SOURCE_ICO, FIELD_LABEL, short };
   ensure();
   // 시드: 이미 분석된 레포의 발견 항목 중 같은 이야기를 하는 경험이 있으면 코드 근거로 조용히 연결
   if (!st().wikiMeta.seededCode) {

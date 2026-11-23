@@ -88,7 +88,7 @@
       return c ? `<a class="rs-src rs-src-card" href="#/card/${encodeURIComponent(c.id)}" title="${esc(c.title)}"><span class="rs-src-ico">▦</span>경험</a>`
         : '<span class="rs-src rs-src-card is-gone"><span class="rs-src-ico">▦</span>경험 (삭제됨)</span>';
     }
-    if (s.type === 'log') return `<button type="button" class="rs-src rs-src-log" data-act="src" ${data} title="체크인 기록 보기"><span class="rs-src-ico">✎</span>체크인 기록</button>`;
+    if (s.type === 'log') return `<button type="button" class="rs-src rs-src-log" data-act="src" ${data} title="프로젝트 기록 보기"><span class="rs-src-ico">✎</span>프로젝트 기록</button>`;
     return '<span class="rs-src rs-src-manual">직접 작성</span>';
   }
 
@@ -118,10 +118,10 @@
       const p = S().getProject(s.projectId);
       const l = p && p.logs.find((x) => x.id === s.logId);
       App.ui.modal({
-        title: '체크인 기록에서 나온 한 줄',
+        title: '프로젝트 기록에서 나온 한 줄',
         body: `<div class="rs-srcm">
           <p class="rs-srcm-line">“${esc(b.text)}”</p>
-          <div class="rs-srcm-lb">${p ? esc(projShort(p)) + ' 체크인 로그' : '체크인 로그'}</div>
+          <div class="rs-srcm-lb">${p ? esc(projShort(p)) + ' 프로젝트 기록' : '프로젝트 기록'}</div>
           ${l ? `<div class="rs-log"><div class="rs-log-top"><span class="tag">${esc(LOG_LABEL[l.type] || '기록')}</span><span class="subtle">${esc(l.date)}</span></div><div>${esc(l.text)}</div></div>` : '<div class="subtle">원래 기록을 찾을 수 없어요. 삭제되었을 수 있어요.</div>'}
         </div>`,
         cancelText: '닫기', confirmText: p ? '프로젝트 원본 기록 →' : '확인',
@@ -151,7 +151,7 @@
     App.ui.modal({
       title: '이력서에 한 줄로 담기',
       body: `<div class="rs-form">
-        <div class="rs-form-src">${App.ui.statusTag(exp.status)}<b>${esc(exp.title)}</b></div>
+        <div class="rs-form-src"><b>${esc(exp.title)}</b></div>
         <label class="label" for="rk-text">이력서 한 줄 <span class="rs-ai-mini">AI</span> <span class="subtle">경험의 행동·결과로 만든 초안이에요</span></label>
         <textarea class="textarea" id="rk-text" data-rk-text rows="3">${esc(oneLiner(exp))}</textarea>
         <div class="rs-help">무엇을 했는지 + 숫자로 된 결과가 한 줄에 보이면 좋아요. 담은 뒤에도 마스터 이력서에서 고칠 수 있어요.</div>
@@ -261,7 +261,9 @@
       if (p.repo) anyRepo = true;
       fs.filter((f) => f.status !== 'dismissed' && !rf.findings.has(f.id)).forEach((f) => items.push({ kind: 'github', p, f }));
     });
-    S().list().filter((e) => e.status === 'done' && !rf.cards.has(e.id) && !hiddenCards.has(e.id)).forEach((e) => items.push({ kind: 'card', e }));
+    // 경험이 하나라도 담긴 경험 카드 → 이력서 재료
+    const counts = App.ai.expCounts();
+    S().list().filter((e) => (counts[e.id] || 0) > 0 && !rf.cards.has(e.id) && !hiddenCards.has(e.id)).forEach((e) => items.push({ kind: 'card', e }));
     return { items, anyRepo };
   }
 
@@ -298,7 +300,7 @@
           </div>
         </div>`).join('')}</div>
         ${items.length > 3 ? `<button type="button" class="rs-inbox-more" data-act="inbox-more">${ui.inboxAll ? '접기' : `${items.length - 3}개 더 보기`}</button>` : ''}`
-        : '<div class="rs-inbox-empty">새 재료를 모두 확인했어요. 체크인과 답변은 경험 위키의 경험이 되고, 경험을 완성하면 여기에 이력서 재료로 쌓여요.</div>'}
+        : '<div class="rs-inbox-empty">새 재료를 모두 확인했어요. 프로젝트 이야기와 답변은 경험 위키의 경험이 되고, 경험을 카드로 모으면 여기에 이력서 재료로 쌓여요.</div>'}
       ${!gh ? `<div class="rs-inbox-cta"><span>${anyRepo ? '연결된 레포에서 새로 찾은 코드가 없어요.' : 'GitHub 레포를 연결하면 코드에서 이력서 한 줄을 찾아 드려요.'}</span><a class="cd-link rs-link" href="#/vault">경험 위키의 프로젝트에서 코드 분석하기 →</a></div>` : ''}
     </section>`;
   }

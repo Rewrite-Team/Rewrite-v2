@@ -63,14 +63,13 @@
     }
 
     rd.competencies.filter((c) => !c.ready).slice(0, 3).forEach((c) => {
-      const none = !c.exp;
       rows.push(`<li class="ai2-fp-row is-weak">
         <span class="ai2-fp-ico" aria-hidden="true">⚠️</span>
         <div class="ai2-fp-body">
-          <div class="ai2-fp-main">${App.ui.keywordChip(c.name)} 질문이 나오면 쓸 경험이 ${none ? '아직 없어요' : '약해요'}</div>
-          <div class="ai2-fp-sub">${none ? '떠오르는 경험이 있는지 같이 찾아봐요.' : `「${esc(shortTitle(c.exp))}」 완성도 ${c.exp.completeness}% — 결과와 숫자를 채우면 단단해져요.`}</div>
+          <div class="ai2-fp-main">${App.ui.keywordChip(c.name)} 질문이 나오면 쓸 경험이 아직 없어요</div>
+          <div class="ai2-fp-sub">떠오르는 경험이 있는지 같이 찾아봐요.</div>
         </div>
-        <a class="btn btn-sm ai2-fp-cta" href="${none ? `#/ask/new?mode=deep&kw=${encodeURIComponent(c.name)}` : `#/card/${esc(c.exp.id)}`}">${none ? '✦ 경험 정리하기' : '보강하기'}</a>
+        <a class="btn btn-sm ai2-fp-cta" href="#/ask/new?mode=deep&kw=${encodeURIComponent(c.name)}">✦ 경험 정리하기</a>
       </li>`);
     });
 

@@ -56,10 +56,11 @@
   // 저장된 문항 키워드 기준 추천 (core analyzeQuestion 과 같은 점수식, 기업 요구 역량 가산)
   function recommend(q, app) {
     const kws = q.keywords || []; const focus = compNames(app);
+    const counts = App.ai.expCounts();
     return App.store.state.experiences.map((e) => {
       const hit = e.keywords.filter((k) => kws.includes(k)).length;
       const fhit = e.keywords.filter((k) => focus.includes(k) && !kws.includes(k)).length;
-      const score = Math.min(98, Math.round(hit * 30 + fhit * 6 + e.completeness * 0.35 + (e.status === 'done' ? 6 : 0)));
+      const score = Math.min(98, Math.round(hit * 30 + fhit * 6 + Math.min(5, counts[e.id] || 0) * 7));
       const companyKws = e.keywords.filter((k) => focus.includes(k));
       return { exp: e, score, matched: e.keywords.filter((k) => kws.includes(k)), companyKws };
     }).filter((r) => r.matched.length).sort((a, b) => b.score - a.score);
@@ -143,7 +144,7 @@
       <span class="ae-link-ico ok">✓</span>
       <div class="ae-link-body">
         <a class="ae-link-title" href="#/card/${esc(e.id)}">${esc(e.title)}</a>
-        <div class="ae-link-meta"><span>완성도 ${e.completeness}%</span>${App.ui.progress(e.completeness)}</div>
+        <div class="ae-link-meta"><span>${esc(e.category)} · 경험 ${App.ai.expCounts()[e.id] || 0}개</span></div>
       </div>
       <button class="btn btn-sm btn-ghost" data-ae-unlink="${esc(q.id)}">연결 해제</button>
     </div>`;
@@ -175,7 +176,7 @@
       <div class="ae-rec-top">
         <span class="ae-rank">${i + 1}</span>
         <div class="ae-rec-head">
-          <div class="ae-rec-meta">${App.ui.statusTag(e.status)}<span>${esc(e.category)}</span>${usedIn.length ? `<span class="ae-used">${usedIn.join('·')}번 문항에 사용 중</span>` : ''}</div>
+          <div class="ae-rec-meta"><span>${esc(e.category)}</span>${usedIn.length ? `<span class="ae-used">${usedIn.join('·')}번 문항에 사용 중</span>` : ''}</div>
           <div class="ae-rec-title">${esc(e.title)}</div>
         </div>
         <div class="ae-score"><b>${r.score}<small>%</small></b><span>적합도</span></div>

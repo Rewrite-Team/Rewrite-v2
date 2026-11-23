@@ -1,7 +1,7 @@
 /* App core: store, router, ui helpers, mock AI. 모든 화면이 이 API만 사용한다. */
 window.App = window.App || {};
 (function (App) {
-  const LS_KEY = 'rewrite-proto-v8'; // v8: 경험(대화) → 경험 카드 모델, 경험 후보 삭제, v7: 대화 기록(원문 채팅방) + 대화형 이전 체크인 정리, v6: 경험 위키 (모든 기록 → ingest → 경험 페이지, 변경 기록·점검), v5: 깃허브 레포 분석 + 마스터 이력서, v2: 프로젝트와 경험 카드 분리 (1 프로젝트 : N 카드), v3: 완료 프로젝트 예시 추가, v4: 지난 질문 기록 시드 + 연속 기록을 답변 날짜에서 계산
+  const LS_KEY = 'rewrite-proto-v9'; // v9: 위키 점검·완성도·체크인 제거, v8: 경험(대화) → 경험 카드 모델, 경험 후보 삭제, v7: 대화 기록(원문 채팅방) + 대화형 이전 기록 정리, v6: 경험 위키 (모든 기록 → ingest → 경험 페이지, 변경 기록·점검), v5: 깃허브 레포 분석 + 마스터 이력서, v2: 프로젝트와 경험 카드 분리 (1 프로젝트 : N 카드), v3: 완료 프로젝트 예시 추가, v4: 지난 질문 기록 시드 + 연속 기록을 답변 날짜에서 계산
   const clone = (o) => JSON.parse(JSON.stringify(o));
 
   /* ---------------- Store ---------------- */
@@ -25,14 +25,13 @@ window.App = window.App || {};
   (state.inbox || []).forEach((q) => { if (q.status === 'later') q.status = 'skipped'; });
   const listeners = new Set();
   function persist() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ } }
-  function emit() { persist(); listeners.forEach((fn) => fn(state)); }
+  function emit() { if (App.ai) App.ai._ec = null; persist(); listeners.forEach((fn) => fn(state)); }
   const today = () => new Date().toISOString().slice(0, 10);
-  // 체크인 일정은 로컬 날짜 기준
+  // 날짜는 로컬 기준
   const pad2 = (n) => String(n).padStart(2, '0');
   const fmtDay = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
   const localDay = () => fmtDay(new Date());
   const parseDay = (s) => { const [y, m, d] = String(s).split('-').map(Number); return new Date(y || 1970, (m || 1) - 1, d || 1); };
-  const CHECKIN_DAYS = { daily: 1, every2days: 2, weekly: 7 };
   const projectShort = (t) => { const m = String(t || '').match(/「[^」]+」/); if (m) return m[0]; const parts = String(t || '').split(' — '); return `「${parts[parts.length - 1]}」`; };
   const uid = (p) => p + Math.random().toString(36).slice(2, 8);
 
@@ -53,17 +52,15 @@ window.App = window.App || {};
     cardsOf(projectId) { return this.list().filter((e) => e.projectId === projectId); },
     create(partial = {}) {
       const exp = Object.assign({
-        id: uid('e'), title: '제목 없는 경험', category: '일상', period: { start: '', end: '' }, status: 'draft', projectId: null, sourceLogIds: [],
+        id: uid('e'), title: '제목 없는 경험', category: '일상', period: { start: '', end: '' }, projectId: null, sourceLogIds: [],
         role: '', summary: '', star: { situation: '', task: '', action: '', result: '' }, insights: '',
-        keywords: [], jobs: [], links: [], qa: [], completeness: 0, createdAt: today(), updatedAt: today(),
+        keywords: [], jobs: [], links: [], qa: [], createdAt: today(), updatedAt: today(),
       }, clone(partial));
-      exp.completeness = App.ai.completeness(exp);
       state.experiences.push(exp); emit(); return exp;
     },
     update(id, patch) {
       const exp = this.get(id); if (!exp) return null;
       Object.assign(exp, clone(patch), { updatedAt: today() });
-      exp.completeness = App.ai.completeness(exp);
       emit(); return exp;
     },
     remove(id) { state.experiences = state.experiences.filter((e) => e.id !== id); emit(); },
@@ -72,7 +69,7 @@ window.App = window.App || {};
       exp.qa.push({ q, a, date: today() }); exp.updatedAt = today(); emit();
     },
 
-    // 프로젝트 (체크인 로그의 그릇). status: ongoing | done
+    // 프로젝트 (이 프로젝트에 대한 경험(대화)·기록을 모으는 그릇). status: ongoing | done
     projects() { return state.projects.slice().sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')); },
     getProject(id) { return state.projects.find((p) => p.id === id) || null; },
     createProject(partial = {}) {
@@ -116,11 +113,11 @@ window.App = window.App || {};
     deleteQuestion(qid) {
       const q = state.inbox.find((x) => x.id === qid); if (!q) return false;
       if (App.wiki && App.wiki.threads) App.wiki.threads().filter((t) => t.questionId === qid).map((t) => t.id).forEach((id) => App.wiki.deleteThread(id, true));
-      if (q.status === 'pending') q.status = 'skipped'; // 체크인·코드 질문이 바로 다시 도착하지 않게
+      if (q.status === 'pending') q.status = 'skipped'; // 코드 질문이 바로 다시 도착하지 않게
       q.deleted = true; delete q.answer; delete q.hint;
       emit(); return true;
     },
-    // opts (프로젝트 체크인일 때): { type, keywords } — 트래커에서 답하면 사용자가 고른 유형·키워드를 그대로 쓴다
+    // opts (프로젝트 질문일 때): { type, keywords } — 프로젝트 화면에서 답하면 사용자가 고른 유형·키워드를 그대로 쓴다
     // opts.decision: 대화에서 사용자가 정한 반영 방법 { mode:'update'|'new'|'timeline'|'skip', expId, field, text, title } — App.wiki.plan 참고
     // 답변은 모두 경험 위키를 지난다 (App.wiki.ingest). 반환값: 위키 반영 결과 entry — 화면은 App.wiki.reportHTML(entry) 로 보여 준다
     answer(qid, text, opts = {}) {
@@ -128,12 +125,12 @@ window.App = window.App || {};
       q.status = 'answered'; q.answer = text; q.answeredAt = localDay();
       let entry = null;
       if (q.targetProjectId && this.getProject(q.targetProjectId) && !q.findingId) {
-        // 프로젝트 체크인: 원문은 타임라인(로그)에, 이야기는 위키의 경험 페이지에
-        const t = opts.type || q.checkinType || (/결정|선택/.test(q.text) ? 'decision' : /문제|이슈|에러/.test(q.text) ? 'issue' : /팀원|의견|협업/.test(q.text) ? 'collab' : 'milestone');
+        // 프로젝트에 대한 질문: 원문은 타임라인(로그)에, 이야기는 위키의 경험 페이지에
+        const t = opts.type || q.logType || (/결정|선택/.test(q.text) ? 'decision' : /문제|이슈|에러/.test(q.text) ? 'issue' : /팀원|의견|협업/.test(q.text) ? 'collab' : 'milestone');
         const p = this.getProject(q.targetProjectId);
-        const log = { id: uid('l'), date: localDay(), type: t, text, keywords: opts.keywords || App.ai.extractKeywords(text), fromQuestion: q.checkinText || q.text };
+        const log = { id: uid('l'), date: localDay(), type: t, text, keywords: opts.keywords || App.ai.extractKeywords(text), fromQuestion: q.text };
         p.logs.push(log); p.updatedAt = localDay();
-        entry = App.wiki.ingest({ type: 'checkin', text, question: q.checkinText || q.text, questionId: q.id, projectId: p.id, logId: log.id, logType: t, keywords: log.keywords, decision: opts.decision, threadId: opts.threadId });
+        entry = App.wiki.ingest({ type: 'checkin', text, question: q.text, questionId: q.id, projectId: p.id, logId: log.id, logType: t, keywords: log.keywords, decision: opts.decision, threadId: opts.threadId });
         const tid = opts.threadId || App.wiki.activeThread(); if (tid) log.threadId = tid;
       } else if (q.findingId) {
         // 코드 분석에서 나온 질문: 그 코드가 근거로 붙은 경험으로
@@ -169,55 +166,6 @@ window.App = window.App || {};
     },
     streak() { return this.streakDays().length; },
     setQuestionStatus(qid, status) { const q = state.inbox.find((x) => x.id === qid); if (q) { q.status = status; emit(); } },
-    /* ---- 프로젝트 체크인: 트래커와 오늘의 질문이 같은 질문 하나를 함께 쓴다 ----
-       진행 중 프로젝트가 체크인 주기(settings.projectCheckin)를 넘기면 체크인 질문 1개를 인박스에 넣고,
-       트래커의 "오늘의 체크인"도 그 질문을 보여 준다. 어디서 답하든 같은 질문이 답변 완료가 된다. */
-    checkinDays() { return CHECKIN_DAYS[state.settings.projectCheckin] || 2; },
-    // { due, dueDate('YYYY-MM-DD'), last } — 마지막 기록 + 주기 = 다음 체크인 날
-    checkinDue(p) {
-      const last = (p.logs || []).map((l) => l.date).sort().pop() || null;
-      const base = last || (p.createdAt || localDay());
-      const d = parseDay(base); if (last) d.setDate(d.getDate() + this.checkinDays());
-      const dueDate = fmtDay(d);
-      return { due: p.status === 'ongoing' && dueDate <= localDay(), dueDate, last };
-    },
-    // 아직 답하지 않은(대기·나중에) 이 프로젝트의 체크인 질문
-    openCheckin(projectId) { return state.inbox.find((q) => q.checkin && q.targetProjectId === projectId && q.status === 'pending') || null; },
-    syncCheckins() {
-      let added = false;
-      state.projects.forEach((p) => {
-        if (p.status !== 'ongoing') return;
-        const open = this.openCheckin(p.id);
-        const { due, dueDate } = this.checkinDue(p);
-        if (!due) {
-          // 그 사이 트래커에서 기록해 체크인할 때가 아니게 됐으면 대기 중 질문은 정리
-          if (open && open.status === 'pending' && (open.askedAt || '').slice(0, 10) < dueDate) { open.status = 'answered'; open.answer = open.answer || '(트래커에서 직접 기록했어요)'; added = true; }
-          return;
-        }
-        if (open) return;
-        // 최근 한 주기 안에 이미 물어봤으면(미뤄 둔 것 포함) 다시 묻지 않는다
-        const since = parseDay(localDay()); since.setDate(since.getDate() - this.checkinDays() + 1);
-        if (state.inbox.some((q) => q.checkin && q.targetProjectId === p.id && (q.askedAt || '').slice(0, 10) >= fmtDay(since))) return;
-        const bank = window.SEED.projectCheckins; const cnt = {};
-        (p.logs || []).forEach((l) => { cnt[l.type] = (cnt[l.type] || 0) + 1; });
-        let bi = 0; bank.forEach((b, i) => { if ((cnt[b.type] || 0) < (cnt[bank[bi].type] || 0)) bi = i; });
-        state.inbox.unshift(this.checkinQuestion(p, bi, { id: uid('q'), status: 'pending', askedAt: localDay() + ' ' + (state.settings.times && state.settings.times[0] || '12:30') }));
-        added = true;
-      });
-      if (added) emit();
-    },
-    checkinQuestion(p, bankIndex, base = {}) {
-      const b = window.SEED.projectCheckins[bankIndex % window.SEED.projectCheckins.length];
-      return Object.assign(base, {
-        type: 'project', checkin: true, targetProjectId: p.id, targetExpId: null, checkinType: b.type, checkinText: b.text, bankIndex,
-        text: `${projectShort(p.title)} ${b.text}`, hint: '한두 줄이면 충분해요. 타임라인에 기록되고, 관련 경험에 반영돼요.',
-      });
-    },
-    // 트래커에서 "다른 질문"·유형 변경 → 인박스 질문도 같이 바뀐다
-    changeCheckin(qid, bankIndex) {
-      const q = state.inbox.find((x) => x.id === qid); const p = q && this.getProject(q.targetProjectId); if (!p) return;
-      this.checkinQuestion(p, bankIndex, q); emit();
-    },
     pushQuestion(q) { state.inbox.unshift(Object.assign({ id: uid('q'), status: 'pending', askedAt: today() + ' ' + new Date().toTimeString().slice(0, 5) }, q)); emit(); },
 
     // 지원 기업 (기업 + 직무 단위로 역량 맵·자소서·면접 준비를 따로 관리)
@@ -421,21 +369,29 @@ window.App = window.App || {};
       if (!kws.length) kws = (opts.focus && opts.focus.length ? opts.focus.slice(0, 2) : ['문제해결', '협업']);
       kws = kws.slice(0, 3);
       const focus = opts.focus || [];
+      const counts = this.expCounts();
       const recs = state.experiences.map((e) => {
         const hit = e.keywords.filter((k) => kws.includes(k)).length;
         const fhit = e.keywords.filter((k) => focus.includes(k) && !kws.includes(k)).length;
-        const score = Math.min(98, Math.round(hit * 30 + fhit * 6 + e.completeness * 0.35 + (e.status === 'done' ? 6 : 0)));
+        const score = Math.min(98, Math.round(hit * 30 + fhit * 6 + Math.min(5, counts[e.id] || 0) * 7));
         return { exp: e, score, matched: e.keywords.filter((k) => kws.includes(k)) };
       }).filter((r) => r.matched.length).sort((a, b) => b.score - a.score);
       return { keywords: kws, recommendations: recs };
     },
-    // 완성도: STAR 4칸 + 요약 + 키워드 + 결과 내 숫자 + 배운점
-    completeness(e) {
-      let s = 0;
-      ['situation', 'task', 'action', 'result'].forEach((k) => { if (e.star && e.star[k] && e.star[k].trim()) s += 16; });
-      if (e.summary) s += 8; if (e.keywords && e.keywords.length) s += 8;
-      if (e.star && /\d/.test(e.star.result || '')) s += 6; if (e.insights) s += 6;
-      return Math.min(100, s);
+    // 경험 카드마다 담긴 경험(끝낸 대화) 수 { cardId: n }
+    // (한 번 그리는 동안은 캐시 — 저장(emit)되거나 다음 틱이면 다시 센다)
+    _ec: null,
+    expCounts() {
+      if (this._ec) return this._ec;
+      const m = {};
+      if (App.wiki && App.wiki.experienceItems) App.wiki.experienceItems().forEach((it) => (it.cardIds || []).forEach((id) => { m[id] = (m[id] || 0) + 1; }));
+      this._ec = m; Promise.resolve().then(() => { this._ec = null; });
+      return m;
+    },
+    // 대표 카드 순서: 경험을 많이 모은 카드 먼저, 같으면 최근 수정순
+    rankCards(list) {
+      const n = this.expCounts();
+      return list.slice().sort((a, b) => (n[b.id] || 0) - (n[a.id] || 0) || String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
     },
     // 카드에서 비어 있는 부분을 채울 다음 질문
     gapQuestion(e) {
@@ -470,9 +426,10 @@ window.App = window.App || {};
       const exps = state.experiences;
       const comps = (app.competencies || []).map((c) => {
         const pinned = app.pins && app.pins[c.name] ? exps.find((e) => e.id === app.pins[c.name]) : null;
-        const cands = exps.filter((e) => e.keywords.includes(c.name)).sort((a, b) => b.completeness - a.completeness);
+        // 그 역량 키워드가 붙은 경험 카드가 하나라도 있으면 준비됨
+        const cands = this.rankCards(exps.filter((e) => e.keywords.includes(c.name)));
         const exp = pinned || cands[0] || null;
-        return { name: c.name, weight: c.weight, exp, pinned: !!pinned, count: cands.length, ready: !!exp && exp.completeness >= 70 };
+        return { name: c.name, weight: c.weight, exp, pinned: !!pinned, count: cands.length, ready: !!exp };
       });
       const essays = app.essays || []; const iv = app.interview || [];
       const essaysDone = essays.filter((q) => q.expId).length;
@@ -514,11 +471,10 @@ window.App = window.App || {};
     think(ms = 700) { return new Promise((r) => setTimeout(r, ms)); },
   };
 
-  state.experiences.forEach((e) => { e.completeness = App.ai.completeness(e); });
-
   /* ---------------- UI helpers ---------------- */
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const STATUS = { draft: ['작성중', 'tag-draft'], done: ['완성', 'tag-done'], ongoing: ['진행중', 'tag-ongoing'] };
+  // 프로젝트 상태 태그 (진행중 / 완료)
+  const STATUS = { ongoing: ['진행중', 'tag-ongoing'], done: ['완료', 'tag-done'] };
 
   App.ui = {
     esc,
@@ -527,18 +483,18 @@ window.App = window.App || {};
       const x = opts.removable ? `<span class="x" data-remove-kw="${esc(name)}">×</span>` : '';
       return `<span class="${cls}" data-tone="${App.keywords.tone(name)}" data-kw="${esc(name)}">#${esc(name)}${x}</span>`;
     },
-    statusTag(status) { const [t, c] = STATUS[status] || STATUS.draft; return `<span class="tag ${c}">${t}</span>`; },
+    statusTag(status) { const [t, c] = STATUS[status] || STATUS.ongoing; return `<span class="tag ${c}">${t}</span>`; },
     progress(pct) { return `<div class="progress"><span style="width:${pct}%"></span></div>`; },
     period(p) { if (!p || !p.start) return '기간 미입력'; return `${p.start.replace('-', '.')} ~ ${p.end ? p.end.replace('-', '.') : '진행중'}`; },
     // 경험 카드 요약 아이템. 클릭 시 상세로 이동
     expCard(e, opts = {}) {
       return `<div class="card exp-card" data-href="#/card/${e.id}">
-        <div class="exp-card-top">${this.statusTag(e.status)}<span>${esc(e.category)}</span><span>·</span><span>${this.period(e.period)}</span></div>
+        <div class="exp-card-top"><span>${esc(e.category)}</span><span>·</span><span>${this.period(e.period)}</span></div>
         <div class="exp-card-title">${esc(e.title)}</div>
         ${(() => { const p = e.projectId && App.store.getProject(e.projectId); return p ? `<div class="exp-card-from">▤ ${esc(p.title.split(' — ')[0])}에서</div>` : ''; })()}
         ${opts.compact ? '' : `<div class="exp-card-sum">${esc(e.summary || '아직 요약이 없어요. 질문에 답하면 자동으로 채워져요.')}</div>`}
         <div class="exp-card-kws">${e.keywords.map((k) => this.keywordChip(k)).join('')}</div>
-        <div class="exp-card-foot"><span>완성도 ${e.completeness}%</span>${this.progress(e.completeness)}</div>
+        <div class="exp-card-foot"><span>경험 ${App.ai.expCounts()[e.id] || 0}개</span></div>
       </div>`;
     },
     toast(msg) {

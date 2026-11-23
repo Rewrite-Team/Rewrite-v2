@@ -7,7 +7,7 @@
     { href: '#/ask', name: 'ask', ico: '✉', label: '질문함', badge: () => App.store.pending().length, badgeTitle: '아직 답하지 않은 오늘의 질문' },
     { group: '② 경험 위키' },
     { href: '#/graph', name: 'graph', ico: '◉', label: '경험 그래프' },
-    { href: '#/vault', name: 'vault', ico: '▦', label: '경험 위키', badge: () => App.wiki.lint().filter((i) => i.severity >= 3).length, badgeTone: 'soft', badgeTitle: '위키 점검: 꼭 채울 곳' },
+    { href: '#/vault', name: 'vault', ico: '▦', label: '경험 위키' },
     { group: '③ 꺼내 쓰기' },
     { href: '#/resume', name: 'resume', ico: '☰', label: '마스터 이력서' },
     { href: '#/apply', name: 'apply', ico: '◎', label: '지원 기업', apps: true },
@@ -46,8 +46,6 @@
 
   function render() {
     if (cleanup) { try { cleanup(); } catch (e) {} cleanup = null; }
-    App.store.syncCheckins(); // 체크인 주기가 돌아온 프로젝트 → 오늘의 질문함에 체크인 질문
-    App.wiki.autoQueue();     // 위키의 빈 곳(코드 분석·빈 결과) → 하루 한 번 오늘의 질문으로
     const { name, params } = App.matchRoute(location.hash);
     const screen = App.screens[name];
     const root = document.getElementById('app');

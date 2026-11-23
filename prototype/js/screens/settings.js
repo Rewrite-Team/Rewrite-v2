@@ -7,8 +7,6 @@
   const CADENCE = [['daily', '매일'], ['weekdays', '평일만'], ['custom', '직접 고르기']];
   const CHANNELS = [['push', '앱 푸시', '휴대폰 잠금화면으로 바로 받아요'], ['kakao', '카카오톡', '알림톡으로 받아서 바로 답해요'], ['email', '이메일', '하루치 질문을 메일로 모아 받아요']];
   const STYLES = [['light', '가볍게', '한두 줄로 답할 수 있는 질문'], ['deep', '깊게', '조금 더 생각해 볼 만한 질문']];
-  const CHECKIN = [['daily', '매일'], ['every2days', '이틀마다'], ['weekly', '주 1회']];
-  const CHECKIN_LABEL = { daily: '매일', every2days: '이틀마다', weekly: '일주일에 한 번' };
 
   function daysFor(cadence, cur) {
     if (cadence === 'daily') return DAYS.slice();
@@ -29,7 +27,7 @@
     return {
       warn: false,
       text: `${when} ${times.join(', ')}에 ${style} 질문 1개를 ${ch.join('·')}${/톡$/.test(ch[ch.length - 1]) ? '으로' : '로'} 보내드려요.`,
-      sub: (q.start && q.end ? `${q.start}~${q.end}에는 알림을 보내지 않아요. ` : '') + `진행 중 프로젝트는 ${CHECKIN_LABEL[s.projectCheckin] || '이틀마다'} 체크인 질문을 드려요.`,
+      sub: q.start && q.end ? `${q.start}~${q.end}에는 알림을 보내지 않아요.` : '',
     };
   }
 
@@ -114,10 +112,6 @@
           <div class="set-row-ctrl"><div class="set-styles">${STYLES.map(([id, l, desc]) => `
             <button type="button" class="set-style ${s.questionStyle === id ? 'on' : ''}" data-set-style="${id}"><b>${l}</b><span>${desc}</span></button>`).join('')}</div></div>
         </div>
-        <div class="set-row">
-          <div class="set-row-label">프로젝트 체크인</div>
-          <div class="set-row-ctrl">${seg(CHECKIN, s.projectCheckin, 'data-set-checkin')}</div>
-        </div>
         <div class="set-demo">
           <div><b>알림이 어떻게 오는지 궁금하다면</b><p class="subtle">지금 바로 질문 하나를 받아 볼 수 있어요.</p></div>
           <button type="button" class="btn btn-accent" data-set-act="demo">✉ 지금 질문 받아보기 (데모)</button>
@@ -182,7 +176,6 @@
           return saveSettings({ channels }, `${name} 알림을 ${channels[ds.setChannel] ? '켰어요' : '껐어요'}`);
         }
         if (ds.setStyle) return saveSettings({ questionStyle: ds.setStyle }, '질문 스타일을 바꿨어요');
-        if (ds.setCheckin) return saveSettings({ projectCheckin: ds.setCheckin }, '프로젝트 체크인 주기를 바꿨어요');
         if (ds.setAct === 'time-add') {
           const v = root.querySelector('.set-time-add .set-time-input').value;
           if (!v) return;
