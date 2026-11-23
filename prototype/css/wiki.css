@@ -36,7 +36,7 @@
 .wk-issue-actions { display: flex; gap: 6px; flex: none; margin-left: auto; }
 @media (max-width: 640px) { .wk-issue { flex-wrap: wrap; } .wk-issue-actions { width: 100%; justify-content: flex-end; } }
 
-/* 출처 칩 (경험 페이지·이력서) */
+/* 출처 칩 (경험 카드·이력서) */
 .wk-srcchip { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
 
 /* ＋ 기록하기 (하나의 입구) */

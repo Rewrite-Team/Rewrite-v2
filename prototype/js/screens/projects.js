@@ -1,5 +1,5 @@
 /* 프로젝트 페이지 — #/vault/p/:id(?tab=exp|timeline|code)  (옛 주소 #/projects/:id 도 여기로)
-   프로젝트는 경험 위키 안의 묶음 페이지: 이 프로젝트의 경험 문서 + 원본 기록(타임라인) + 코드 근거가 한곳에서 이어진다.
+   프로젝트는 경험 위키 안의 묶음 페이지: 이 프로젝트의 경험 카드 + 원본 기록(타임라인) + 코드 근거가 한곳에서 이어진다.
    목록은 따로 없고 경험 위키(#/vault)의 프로젝트 묶음이 그 역할을 한다. 카드·새 프로젝트 모달은 App.ui 로 내보낸다. */
 (function (App) {
   const esc = (s) => App.ui.esc(s);
@@ -70,7 +70,7 @@
   const short = (t, n) => App.wiki.short(t, n);
   const shortName = (t) => { const m = String(t || '').match(/「[^」]+」/); return m ? m[0] : String(t || '').split(' — ')[0]; };
   const pageHref = (id, tab) => '#/vault/p/' + encodeURIComponent(id) + (tab ? '?tab=' + tab : '');
-  // 프로젝트 상태 태그: 진행중 / 완료 (경험 문서의 '완성'과 구분)
+  // 프로젝트 상태 태그: 진행중 / 완료 (경험 카드의 '완성'과 구분)
   const statusTag = (st) => (st === 'done' ? '<span class="tag tag-done">완료</span>' : App.ui.statusTag(st));
   const ghLink = (e) => (e.links || []).find((l) => /github/i.test(l)) || (e.links || [])[0] || '';
   const prettyLink = (u) => String(u).replace(/^https?:\/\//, '').replace(/\/$/, '');
@@ -102,7 +102,7 @@
       title: '새 프로젝트 시작하기',
       confirmText: '프로젝트 만들기',
       body: `<div class="pj-form">
-        <p class="pj-form-intro">진행하는 동안 체크인 질문을 보내 드릴게요. 답한 기록은 타임라인에 쌓이고, 이야기마다 경험 페이지로 정리돼요.</p>
+        <p class="pj-form-intro">진행하는 동안 체크인 질문을 보내 드릴게요. 답한 대화는 하나하나 경험으로 타임라인에 쌓이고, 경험 카드로 모을 수 있어요.</p>
         <label class="label" for="pj-f-title">프로젝트 이름 <span class="pj-req">*</span></label>
         <input class="input" id="pj-f-title" placeholder="예) 모여봄" maxlength="60" />
         <label class="label" for="pj-f-role">내 역할</label>
@@ -140,7 +140,7 @@
   // 화면 상태 (프로젝트별 질문 인덱스)
   // tab: 프로젝트별 'exp'|'timeline'|'code', gh: 레포 분석 화면 상태
   // report: { pid, id(위키 반영 entry), where:'code' } — 코드 분석을 위키에 반영한 결과를 그 자리에 보여 준다
-  // orgTalk / codeTalk: 타임라인의 보관된 대화·코드 항목 아래에 열어 둔 기록 대화 (threadId / findingId)
+  // orgTalk / codeTalk: 타임라인의 경험(대화)·코드 항목 아래에 열어 둔 기록 대화 (threadId / findingId)
   // autoAnalyze: { pid, url } — 새 프로젝트를 만들며 레포를 넣었으면 상세 화면에 들어가자마자 분석
   const ui = { qIndex: {}, type: {}, typeQ: {}, edit: null, tab: {}, gh: {}, ghView: null, report: null, orgTalk: null, codeTalk: null, autoAnalyze: null };
   const reportAt = (pid, where) => {
@@ -250,15 +250,16 @@
   }
 
   // 타임라인 = 이 프로젝트에 대한 대화 원문(App.wiki.projectTimeline) — 최근 것부터, 주 단위로
+  // 카드에 아직 안 담긴 경험 수 (outcome.kind 'kept' = 경험으로 저장, 카드 없음)
   const keptCount = (pid) => App.wiki.projectTimeline(pid).filter((it) => it.outcome && it.outcome.kind === 'kept').length;
   function outcomeChip(it) {
     const o = it.outcome || {};
     if (o.kind === 'applied') {
       const c = o.expId && App.store.get(o.expId);
-      return c ? `<a class="pj-log-card" href="#/card/${esc(c.id)}" title="${esc(c.title)}">→ 「${esc(short(String(c.title).replace(/[「」]/g, ''), 24))}」에 반영</a>` : '<span class="pj-log-out">경험에 반영됨</span>';
+      return c ? `<a class="pj-log-card" href="#/card/${esc(c.id)}" title="${esc(c.title)}">→ 「${esc(short(String(c.title).replace(/[「」]/g, ''), 24))}」 카드에 담김</a>` : '<span class="pj-log-out">카드에 담김</span>';
     }
     if (!it.thread || ui.orgTalk === it.id) return '';
-    if (o.kind === 'kept') return `<span class="pj-log-out is-kept">📝 경험 후보</span><button type="button" class="btn btn-sm pj-log-org" data-pj-log="organize" data-id="${esc(it.id)}">경험으로 확정</button>`;
+    if (o.kind === 'kept') return `<span class="pj-log-out is-kept">카드에 안 담김</span><button type="button" class="btn btn-sm pj-log-org" data-pj-log="organize" data-id="${esc(it.id)}">카드에 담기</button>`;
     if (o.kind === 'open') return `<span class="pj-log-out">정리 전 대화</span><button type="button" class="btn btn-sm pj-log-org" data-pj-log="organize" data-id="${esc(it.id)}">이어서 정리</button>`;
     return '';
   }
@@ -292,7 +293,7 @@
               <div class="pj-log-text">${esc(it.text)}</div>
               ${kws.length ? `<div class="exp-card-kws">${kws.map((k) => App.ui.keywordChip(k)).join('')}</div>` : ''}
               ${chip ? `<div class="pj-log-wiki">${chip}</div>` : ''}
-              ${ui.orgTalk === it.id ? `<div class="pj-org-cap"><span>경험으로 확정하는 중</span><button type="button" class="pj-org-stop" data-pj-log="org-stop" data-id="${esc(it.id)}">그만두기</button></div><div data-pj-talk="org:${esc(it.id)}"></div>` : ''}
+              ${ui.orgTalk === it.id ? `<div class="pj-org-cap"><span>카드에 담는 중</span><button type="button" class="pj-org-stop" data-pj-log="org-stop" data-id="${esc(it.id)}">그만두기</button></div><div data-pj-talk="org:${esc(it.id)}"></div>` : ''}
             </div></div>`;
         }).join('')}</div>`;
     }).join('')}</div>`;
@@ -324,13 +325,13 @@
     const kept = keptCount(e.id);
     return `<aside class="pj-side">
       <div class="card card-pad pj-cards-box">
-        <div class="section-title">이 프로젝트의 경험 <span class="subtle">${cards.length}</span></div>
+        <div class="section-title">이 프로젝트의 경험 카드 <span class="subtle">${cards.length}</span></div>
         ${cards.length ? `<div class="pj-cards">${cards.slice(0, 4).map((x) => `<a class="pj-cardlink" href="#/card/${esc(x.id)}">
             <div class="pj-cardlink-top">${App.ui.statusTag(x.status)}<span class="pj-cardlink-pct">${x.completeness}%</span></div>
             <div class="pj-cardlink-title">${esc(x.title)}</div></a>`).join('')}</div>
-            ${cards.length > 4 ? `<button class="pj-link" data-pj-tab="exp">경험 ${cards.length}개 모두 보기 →</button>` : ''}`
-          : '<p class="subtle">아직 없어요. 체크인을 남기면 AI가 이야기마다 경험 페이지로 정리해요.</p>'}
-        ${kept ? `<p class="pj-side-hint"><span class="ai-dot">R</span><button class="pj-link" data-pj-tab="timeline">경험 후보 ${kept}개 →</button></p>` : ''}
+            ${cards.length > 4 ? `<button class="pj-link" data-pj-tab="exp">경험 카드 ${cards.length}개 모두 보기 →</button>` : ''}`
+          : '<p class="subtle">아직 없어요. 체크인을 남기면 경험이 쌓이고, 경험을 모아 카드로 만들 수 있어요.</p>'}
+        ${kept ? `<p class="pj-side-hint"><span class="ai-dot">R</span><button class="pj-link" data-pj-tab="timeline">카드에 안 담긴 경험 ${kept}개 →</button></p>` : ''}
       </div>
       ${ghSideBox(e)}
       <div class="card card-pad">
@@ -506,17 +507,17 @@
       <button class="btn btn-sm pj-full" data-pj-tab="code" style="margin-top:12px">⌥ 코드 분석 결과 보기</button></div>`;
   }
 
-  // 경험 탭: 이 프로젝트의 경험 페이지 + 최근 위키 반영
+  // 경험 탭: 이 프로젝트의 경험 카드 + 최근 위키 반영
   function expSection(e) {
     const cards = App.store.cardsOf(e.id);
     const feed = App.wiki.entries({ projectId: e.id }).filter((w) => w.target).slice(0, 5);
     const kept = keptCount(e.id);
     return `<div class="pj-exp">
-      <div class="pj-exp-head"><p class="subtle">체크인·AI와 대화·코드 분석에서 나온 이 프로젝트의 경험 페이지예요. 기록할수록 같은 페이지가 채워져요.</p>
+      <div class="pj-exp-head"><p class="subtle">체크인·AI와 대화·코드 분석에서 나온 이 프로젝트의 경험 카드예요. 경험을 담을수록 같은 카드가 채워져요.</p>
         <button class="btn btn-sm btn-primary" data-capture data-capture-project="${esc(e.id)}">＋ 이 프로젝트 기록하기</button></div>
       ${cards.length ? `<div class="pj-exp-grid">${cards.map((x) => App.ui.expCard(x)).join('')}</div>`
-        : `<div class="card empty"><div class="big">▣</div>아직 이 프로젝트의 경험이 없어요.<div class="subtle" style="margin-top:4px">체크인을 남기거나 코드를 분석하면 경험 페이지가 생겨요.</div></div>`}
-      ${kept ? `<p class="pj-side-hint"><span class="ai-dot">R</span><button class="pj-link" data-pj-tab="timeline">경험 후보 ${kept}개 →</button></p>` : ''}
+        : `<div class="card empty"><div class="big">▣</div>아직 이 프로젝트의 경험 카드가 없어요.<div class="subtle" style="margin-top:4px">체크인을 남기거나 코드를 분석하면 경험 카드가 생겨요.</div></div>`}
+      ${kept ? `<p class="pj-side-hint"><span class="ai-dot">R</span><button class="pj-link" data-pj-tab="timeline">카드에 안 담긴 경험 ${kept}개 →</button></p>` : ''}
       ${feed.length ? `<div class="section-title" style="margin-top:20px">최근 위키 반영</div><div class="card card-pad wk-feed">${feed.map((w) => App.wiki.reportHTML(w, { compact: true })).join('')}</div>` : ''}
     </div>`;
   }
@@ -550,7 +551,7 @@
         <div class="pj-main">
           ${e.status !== 'done' ? checkinCard(e) : ''}
           <div class="pj-tabs" role="tablist">
-            <button type="button" class="pj-tab ${tab === 'exp' ? 'on' : ''}" data-pj-tab="exp" role="tab" aria-selected="${tab === 'exp'}">경험 문서 <span>${App.store.cardsOf(e.id).length}</span></button>
+            <button type="button" class="pj-tab ${tab === 'exp' ? 'on' : ''}" data-pj-tab="exp" role="tab" aria-selected="${tab === 'exp'}">경험 카드 <span>${App.store.cardsOf(e.id).length}</span></button>
             <button type="button" class="pj-tab ${tab === 'timeline' ? 'on' : ''}" data-pj-tab="timeline" role="tab" aria-selected="${tab === 'timeline'}">원본 기록 <span>${App.wiki.projectTimeline(e.id).length}</span></button>
             <button type="button" class="pj-tab ${tab === 'code' ? 'on' : ''}" data-pj-tab="code" role="tab" aria-selected="${tab === 'code'}">⌥ 코드 근거 <span>${e.repo ? liveFindings(e.repo).length : '＋'}</span></button>
           </div>
@@ -598,7 +599,7 @@
         if (key === 'ck') {
           const c = checkinTalkCfg(e);
           return Object.assign(c, {
-            onDone: (entry) => { talks.ck.done = true; App.ui.toast(c.inbox ? '체크인 완료! 오늘의 질문에서도 답변 완료로 바뀌었어요' : entry && entry.target ? '경험에 반영했어요 · 대화는 타임라인에 남아요' : '경험 후보로 보관했어요 · 타임라인에서 볼 수 있어요'); rerenderLocal(); },
+            onDone: (entry) => { talks.ck.done = true; App.ui.toast(c.inbox ? '체크인 완료! 오늘의 질문에서도 답변 완료로 바뀌었어요' : entry && entry.target ? '경험으로 저장하고 카드에 담았어요 · 대화는 타임라인에 남아요' : '경험으로 저장했어요 · 타임라인에서 볼 수 있어요'); rerenderLocal(); },
             next: { label: '다른 체크인 남기기', onClick: () => {
               const Q = window.SEED.projectCheckins;
               if (!App.store.openCheckin(id)) { ui.qIndex[id] = ((ui.qIndex[id] || 0) + 1) % Q.length; ui.type[id] = Q[ui.qIndex[id]].type; }
@@ -607,7 +608,7 @@
           });
         }
         if (key.startsWith('org:')) {
-          // 경험 후보를 이어서 경험으로 확정 — App.talk.organize 가 같은 대화에 이어 쓴다.
+          // 카드에 안 담긴 경험을 이어서 카드에 담기 — App.talk.organize 가 같은 대화에 이어 쓴다.
           // 따로 테두리 친 채팅창을 띄우지 않고 기록 바로 아래로 이어지며, 위에 보이는 내 말은 되풀이하지 않는다
           const tid = key.slice(4); if (!App.wiki.getThread(tid)) return null;
           return { sig: key, organize: tid, inline: true, quietPrefill: true, onDone: () => rerenderLocal(), next: { label: '확인', onClick: closeTalk(key) } };
@@ -794,7 +795,7 @@
         if (logBtn) {
           const a = logBtn.getAttribute('data-pj-log'); const e = App.store.getProject(id); if (!e) return;
           if (a === 'organize') {
-            // 경험 후보 아래에서 AI와 어느 경험에 어떻게 넣을지 정한다
+            // 카드에 안 담긴 경험 아래에서 AI와 어느 카드에 어떻게 넣을지 정한다
             if (ui.orgTalk) dropTalk('org:' + ui.orgTalk);
             ui.orgTalk = logBtn.getAttribute('data-id'); rerenderLocal();
           } else if (a === 'org-stop') {
@@ -815,7 +816,7 @@
             const usedBy = cardsByLog(e)[l.id] || [];
             App.ui.modal({
               title: '이 기록을 삭제할까요?', confirmText: '삭제', danger: true,
-              body: `<p>「${esc(l.text.length > 60 ? l.text.slice(0, 60) + '…' : l.text)}」</p><p style="margin-top:8px">삭제한 기록은 되돌릴 수 없어요.${usedBy.length ? ' 이 기록이 반영된 경험 페이지는 그대로 남아요.' : ''}</p>`,
+              body: `<p>「${esc(l.text.length > 60 ? l.text.slice(0, 60) + '…' : l.text)}」</p><p style="margin-top:8px">삭제한 기록은 되돌릴 수 없어요.${usedBy.length ? ' 이 기록이 담긴 경험 카드는 그대로 남아요.' : ''}</p>`,
               onConfirm() { App.store.removeLog(id, l.id); if (ui.edit && ui.edit.logId === l.id) ui.edit = null; App.ui.toast('기록을 삭제했어요'); rerenderLocal(); return true; },
             });
           }
@@ -863,7 +864,7 @@
         } else if (act === 'finish') {
           App.ui.modal({
             title: '프로젝트를 마무리할까요?', confirmText: '마무리하기',
-            body: `<p>상태가 <b>완성</b>으로 바뀌고 체크인 질문이 멈춰요. ${keptCount(id) ? ` 경험 후보 <b>${keptCount(id)}개</b>를 타임라인에서 경험으로 확정해 두면 면접 준비가 훨씬 쉬워져요.` : ''}</p>`,
+            body: `<p>상태가 <b>완성</b>으로 바뀌고 체크인 질문이 멈춰요. ${keptCount(id) ? ` 카드에 안 담긴 경험 <b>${keptCount(id)}개</b>를 타임라인에서 카드에 담아 두면 면접 준비가 훨씬 쉬워져요.` : ''}</p>`,
             onConfirm() {
               const n = new Date();
               App.store.addLog(id, { type: 'milestone', text: '프로젝트 마무리.' });

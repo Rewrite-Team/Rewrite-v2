@@ -1,6 +1,6 @@
 /* 기록 대화 — 오늘의 질문 · 위키 점검 · ＋기록하기 · 체크인이 모두 같이 쓰는 "AI와 대화하며 적는 곳"
-   흐름: AI 질문 → 사용자 답 → (필요하면 꼬리질문 1번) → AI 제안 "어느 경험의 어느 칸에, 이런 문장으로" → 사용자가 고르거나 말로 고침 → 반영
-   직접 수정(경험 페이지의 ✎ 수정)은 이 대화를 쓰지 않는다 — 사용자가 쓴 그대로 저장.
+   흐름: AI 질문 → 사용자 답 → (필요하면 꼬리질문 1번) → 대화는 언제나 경험 하나로 저장 → AI 제안 "어느 경험 카드의 어느 칸에, 이런 문장으로" → 사용자가 고르거나 말로 고침 → 담기
+   직접 수정(경험 카드의 ✎ 수정)은 이 대화를 쓰지 않는다 — 사용자가 쓴 그대로 저장.
 
    App.talk.mount(el, {
      ask: { text, hint?, label? },      // AI 첫 질문 (prefill 이 있으면 생략 가능)
@@ -13,7 +13,7 @@
      next?: { label, onClick },          // 반영 뒤 보여 줄 다음 행동
      placeholder?, followup?: true
    }) → { destroy() }
-   모든 대화는 App.wiki 의 대화 기록(state.threads)에 원문 그대로 남는다 — 경험으로 확정하지 않고 '경험 후보'로 보관한 것도. */
+   모든 대화는 App.wiki 의 대화 기록(state.threads)에 원문 그대로 남고, 끝낸 대화는 모두 경험이 된다 — 카드에 담지 않은 것도. */
 (function (App) {
   const esc = (s) => App.ui.esc(s);
   const FIELDS = [['situation', '상황'], ['task', '과제'], ['action', '행동'], ['result', '결과'], ['insights', '배운 점']];
@@ -25,7 +25,7 @@
     const st = { phase: cfg.prefill ? 'propose' : 'ask', msgs: [], answer: cfg.prefill || '', plan: null, follows: 0, busy: false, entry: null };
     const W = App.wiki; const S = App.store;
     let alive = true;
-    // ---------- 대화 기록 (원문 보관) ----------
+    // ---------- 대화 기록 (원문 그대로) ----------
     // 같은 질문으로 하다 만 대화가 있으면 새로 시작하지 않고 그 대화를 이어 간다
     const resume = !cfg.threadId && src.questionId ? W.threads().find((t) => t.questionId === src.questionId && t.outcome && t.outcome.kind === 'open' && t.msgs.some((m) => m.who === 'me')) : null;
     let threadId = cfg.threadId || (resume ? resume.id : null);
@@ -59,16 +59,16 @@
     function proposalHTML(p, live) {
       const e = p.expId && S.get(p.expId);
       if (!live) {
-        const where = p.mode === 'update' && e ? `「${esc(W.short(bare(e.title), 26))}」 · ${FL[p.field]}` : p.mode === 'new' ? `새 경험 「${esc(W.short(bare(p.title), 26))}」` : '경험 후보로 보관';
+        const where = p.mode === 'update' && e ? `「${esc(W.short(bare(e.title), 26))}」 · ${FL[p.field]}` : p.mode === 'new' ? `새 경험 카드 「${esc(W.short(bare(p.title), 26))}」` : '카드 없이 경험으로만 저장';
         return `<div class="tk-prop is-past"><span class="subtle">제안</span> ${where}</div>`;
       }
       const opts = [];
       if (e) opts.push([e.id, `「${W.short(bare(e.title), 26)}」`]);
       p.candidates.filter((id) => id !== p.expId).forEach((id) => { const c = S.get(id); if (c) opts.push([id, `「${W.short(bare(c.title), 26)}」`]); });
       const sel = p.mode === 'update' ? p.expId : p.mode === 'new' ? '__new' : '__keep';
-      const head = p.mode === 'update' ? `<b>「${esc(W.short(bare(e && e.title), 28))}」</b>의 <b>${FL[p.field]}</b> 칸에 이렇게 적을게요`
-        : p.mode === 'new' ? '비슷한 경험이 없어서 <b>새 경험</b>으로 만들게요'
-        : '아직 확정하기엔 근황에 가까워요. <b>경험 후보</b>로 보관해 둘게요<div class="tk-keep-note subtle">원문은 그대로 남아 있어서, 나중에 이야기가 이어지면 질문함의 경험 후보에서 바로 경험으로 확정할 수 있어요.</div>';
+      const head = p.mode === 'update' ? `경험으로 저장하고 <b>「${esc(W.short(bare(e && e.title), 28))}」</b> 카드의 <b>${FL[p.field]}</b> 칸에 이렇게 담을게요`
+        : p.mode === 'new' ? '경험으로 저장하고, 비슷한 카드가 없어서 <b>새 경험 카드</b>로 만들게요'
+        : (p.userSet ? '카드에 담지 않고 <b>경험</b>으로만 저장할게요' : '<b>경험</b>으로 저장해 둘게요. 아직 카드에 담기엔 근황에 가까워요') + '<div class="tk-keep-note subtle">원문은 그대로 남아요. 비슷한 경험이 쌓이면 질문함에서 골라 경험 카드로 모을 수 있어요.</div>';
       const editable = p.mode === 'update' || p.mode === 'new';
       return `<div class="tk-prop" data-tk-prop>
         <div class="tk-prop-head">${head}</div>
@@ -79,19 +79,19 @@
           <div class="tk-fields">${FIELDS.map(([k, l]) => `<button type="button" class="tk-chip ${p.field === k ? 'on' : ''}" data-tk-field="${k}">${l}</button>`).join('')}</div>` : ''}
         <div class="tk-prop-row">
           <select class="input tk-target" data-tk-target>
-            ${opts.map(([id, l]) => `<option value="${id}" ${sel === id ? 'selected' : ''}>${esc(l)}에 반영</option>`).join('')}
-            <option value="__new" ${sel === '__new' ? 'selected' : ''}>＋ 새 경험으로 만들기</option>
-            <option value="__keep" ${sel === '__keep' ? 'selected' : ''}>📝 경험 후보로 보관 (아직 확정하지 않음)</option>
+            ${opts.map(([id, l]) => `<option value="${id}" ${sel === id ? 'selected' : ''}>${esc(l)} 카드에 담기</option>`).join('')}
+            <option value="__new" ${sel === '__new' ? 'selected' : ''}>＋ 새 경험 카드 만들기</option>
+            <option value="__keep" ${sel === '__keep' ? 'selected' : ''}>카드 없이 경험으로만 저장</option>
           </select>
-          <button type="button" class="btn btn-primary btn-sm" data-tk-ok>${p.mode === 'keep' ? '경험 후보로 보관' : '이렇게 반영'}</button>
+          <button type="button" class="btn btn-primary btn-sm" data-tk-ok>${p.mode === 'keep' ? '경험으로 저장' : p.mode === 'new' ? '새 카드 만들기' : '이 카드에 담기'}</button>
         </div>
-        <div class="tk-tip subtle">말로 해도 돼요 — "새로 만들어 줘", "결과 칸에", "카페 알바 경험에 넣어 줘", "후보로 보관해 줘"</div>
+        <div class="tk-tip subtle">말로 해도 돼요 — "새 카드로 만들어 줘", "결과 칸에", "카페 알바 카드에 넣어 줘", "카드에는 넣지 마"</div>
       </div>`;
     }
 
     function propText(p) {
       const e = p.expId && S.get(p.expId);
-      return p.mode === 'update' && e ? `제안: 「${bare(e.title)}」의 ${FL[p.field]} 칸에 "${p.text}"` : p.mode === 'new' ? `제안: 새 경험 「${bare(p.title)}」 (${FL[p.field]}: "${p.text}")` : '제안: 경험 후보로 보관';
+      return p.mode === 'update' && e ? `제안: 「${bare(e.title)}」 카드의 ${FL[p.field]} 칸에 "${p.text}"` : p.mode === 'new' ? `제안: 새 경험 카드 「${bare(p.title)}」 (${FL[p.field]}: "${p.text}")` : '제안: 카드 없이 경험으로만 저장';
     }
 
     // ---------- 그리기 ----------
@@ -110,7 +110,7 @@
         <div class="tk-input">
           ${st.phase === 'follow' ? '<div class="tk-quick"><button type="button" class="tk-chip" data-tk-enough>이대로 충분해요</button></div>' : ''}
           <div class="tk-input-row">
-            <textarea class="input" data-tk-in rows="1" placeholder="${esc(st.phase === 'propose' ? '고칠 점을 말하거나, 위에서 고르고 [이렇게 반영]' : (cfg.placeholder || '한두 줄이면 충분해요'))}" ${inputOn ? '' : 'disabled'}></textarea>
+            <textarea class="input" data-tk-in rows="1" placeholder="${esc(st.phase === 'propose' ? '고칠 점을 말하거나, 위에서 고르고 담기를 눌러 주세요' : (cfg.placeholder || '한두 줄이면 충분해요'))}" ${inputOn ? '' : 'disabled'}></textarea>
             <button type="button" class="btn btn-primary tk-send" data-tk-send ${inputOn ? '' : 'disabled'} aria-label="보내기">↑</button>
           </div>
         </div>`}
@@ -192,7 +192,7 @@
       const e = p.expId && S.get(p.expId);
       const lead = p.mode === 'update'
         ? (p.confidence === 'question' ? `이 답은 「${esc(W.short(bare(e.title), 26))}」 이야기죠.` : `「${esc(W.short(bare(e.title), 26))}」와 같은 이야기 같아요.`)
-        : p.mode === 'keep' ? '기록해 둘게요.' : '처음 듣는 이야기예요.';
+        : p.mode === 'keep' ? '경험으로 저장해 둘게요.' : '처음 듣는 이야기예요.';
       ai(`${lead} ${p.mode === 'keep' ? '' : '이렇게 정리해 봤어요. 맞는지 봐 주세요.'}`);
       ai('', { prop: p }); log('ai', propText(p));
       render();
@@ -204,16 +204,16 @@
       const titleM = t.match(/제목[은는을를이가]?\s*["“'「]?(.+?)["”'」]?\s*(?:으로|로)?\s*(?:해\s*줘|해줘|바꿔\s*줘|바꿔줘|할게|해|하자|바꿔)?\.?\s*$/);
       if (/제목/.test(t) && titleM && titleM[1]) {
         // 제목을 말하면 새 경험 이야기로 본다
-        if (p.mode !== 'new') { retarget('__new'); changed.push('새 경험으로'); }
+        if (p.mode !== 'new') { retarget('__new'); changed.push('새 경험 카드로'); }
         p.title = titleM[1].trim(); changed.push(`제목을 「${W.short(p.title, 24)}」로`);
-      } else if (/새로|새 경험|따로|새로운/.test(t)) { retarget('__new'); changed.push('새 경험으로'); }
-      else if (/보관|후보|반영\s*안|하지\s*마|원문만|안\s*넣|넣지\s*마|답변만|나중에|아직/.test(t)) { retarget('__keep'); changed.push('경험 후보로 보관하도록'); }
+      } else if (/새로|새 경험|새 카드|따로|새로운/.test(t)) { retarget('__new'); changed.push('새 경험 카드로'); }
+      else if (/보관|후보|카드\s*없이|경험으로만|저장만|반영\s*안|하지\s*마|원문만|안\s*넣|넣지\s*마|답변만|나중에|아직/.test(t)) { retarget('__keep'); changed.push('카드 없이 경험으로만 저장하도록'); }
       else if (/(에|으로|로|쪽)\s*(넣|반영|붙|추가|합|옮)|경험(이야|이에요|에)|이야기(야|예요|에)/.test(t)) {
         // "카페 알바 경험에 넣어 줘" — 대상 경험을 가리킬 때만 바꾼다 (흔한 단어는 빼고 비교)
         const GENERIC = /^(경험|프로젝트|아르바이트|해결|개선|문제|버그|구현|운영|기록|중복|팀|수업)$/;
         const scoreOf = (e) => bare(e.title).split(/[\s—\-·()]+/).filter((w) => w.length >= 2 && !GENERIC.test(w) && t.includes(w)).length;
         const hit = S.list().map((e) => [e, scoreOf(e)]).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1])[0];
-        if (hit && hit[0].id !== p.expId) { retarget(hit[0].id); changed.push(`「${W.short(bare(hit[0].title), 20)}」에 반영하도록`); }
+        if (hit && hit[0].id !== p.expId) { retarget(hit[0].id); changed.push(`「${W.short(bare(hit[0].title), 20)}」 카드에 담도록`); }
       }
       const fm = [['result', /결과|성과|숫자/], ['action', /행동|한 일|내가 한/], ['situation', /상황|배경|계기/], ['task', /과제|역할|목표|맡은/], ['insights', /배운|느낀|교훈|배움/]].find(([, re]) => re.test(t) && !/제목/.test(t));
       if (fm && fm[0] !== p.field) { p.field = fm[0]; p.current = p.mode === 'update' ? W.currentOf(S.get(p.expId), p.field) : ''; changed.push(`${FL[fm[0]]} 칸에 적도록`); }
@@ -233,14 +233,14 @@
       if ((p.mode === 'update' || p.mode === 'new') && !String(p.text || '').trim()) return;
       const decision = { mode: p.mode, expId: p.mode === 'update' ? p.expId : null, field: p.field, text: p.text, title: p.mode === 'new' ? (p.title || W.short(st.answer, 24)) : undefined, projectId: p.projectId };
       st.phase = 'done';
-      me(p.mode === 'keep' ? '경험 후보로 보관해 주세요' : '이렇게 반영해 주세요');
+      me(p.mode === 'keep' ? '경험으로 저장해 주세요' : p.mode === 'new' ? '새 카드로 만들어 주세요' : '이 카드에 담아 주세요');
       await think(350);
       const entry = W.withThread(threadId, () => (cfg.commit ? cfg.commit(st.answer, decision, threadId) : W.ingest(Object.assign({}, src, { text: st.answer, decision, threadId }))));
       st.entry = entry;
       const tgt = entry && entry.target && S.get(entry.target);
-      if (p.mode === 'keep' || !tgt) { W.closeThread(threadId, { kind: 'kept', entryId: entry && entry.id }); log('ai', '경험 후보로 보관했어요. 나중에 경험으로 확정할 수 있어요.'); }
-      else { W.closeThread(threadId, { kind: 'applied', expId: tgt.id, entryId: entry.id, field: p.field, mode: p.mode }); log('ai', `「${bare(tgt.title)}」에 반영했어요.`); }
-      ai(entry ? W.reportHTML(entry) : '반영했어요.', { report: true });
+      if (p.mode === 'keep' || !tgt) { W.closeThread(threadId, { kind: 'kept', entryId: entry && entry.id }); log('ai', '경험으로 저장했어요. 나중에 비슷한 경험과 모아 카드로 만들 수 있어요.'); }
+      else { W.closeThread(threadId, { kind: 'applied', expId: tgt.id, entryId: entry.id, field: p.field, mode: p.mode }); log('ai', `경험으로 저장하고 「${bare(tgt.title)}」 카드에 담았어요.`); }
+      ai(entry ? W.reportHTML(entry) : '경험으로 저장했어요.', { report: true });
       render();
       if (cfg.onDone) cfg.onDone(entry);
     }
@@ -263,13 +263,13 @@
   }
 
   /* 대화 기록(채팅방) 그리기 — talk 옆 패널과 질문함(#/ask) 대화방이 같이 쓴다
-     opts: { compact, organize (경험 후보에 '경험으로 확정' 버튼), highlight: threadId } */
+     opts: { compact, organize (카드에 안 담긴 경험에 '카드에 담기' 버튼), highlight: threadId } */
   const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
   function dayLabel(d) { const x = App.store.parseDay(d); const today = App.store.localDay(); return d === today ? '오늘' : `${x.getMonth() + 1}월 ${x.getDate()}일 (${WEEK[x.getDay()]})`; }
   function outcomeHTML(t, opts) {
     const o = t.outcome || {}; const S = App.store;
-    if (o.kind === 'applied') { const e = S.get(o.expId); return e ? `<a class="tk-out is-applied" href="#/card/${e.id}">→ 「${esc(App.wiki.short(bare(e.title), 24))}」에 반영</a>` : '<span class="tk-out is-applied">경험에 반영됨</span>'; }
-    if (o.kind === 'kept') return `<span class="tk-out is-kept">📝 경험 후보</span>${opts.organize ? `<button type="button" class="btn btn-sm tk-organize" data-room-organize="${t.id}">경험으로 확정</button>` : ''}`;
+    if (o.kind === 'applied') { const e = S.get(o.expId); return e ? `<a class="tk-out is-applied" href="#/card/${e.id}">→ 「${esc(App.wiki.short(bare(e.title), 24))}」 카드에 담김</a>` : '<span class="tk-out is-applied">카드에 담김</span>'; }
+    if (o.kind === 'kept') return `<span class="tk-out is-kept">경험</span>${opts.organize ? `<button type="button" class="btn btn-sm tk-organize" data-room-organize="${t.id}">카드에 담기</button>` : ''}`;
     return `<span class="tk-out is-open">정리 전 대화</span>${opts.organize ? `<button type="button" class="btn btn-sm tk-organize" data-room-organize="${t.id}">이어서 정리</button>` : ''}`;
   }
   function roomHTML(list, opts = {}) {
@@ -286,7 +286,7 @@
     }).join('');
   }
 
-  // 모달로 띄우기 (위키 점검·홈·경험 페이지 등에서 그 자리에서 답하기)
+  // 모달로 띄우기 (위키 점검·홈·경험 카드 등에서 그 자리에서 답하기)
   function open(cfg) {
     const root = document.getElementById('modal-root');
     root.innerHTML = `<div class="modal-backdrop"><div class="modal tk-modal ${cfg.room === false ? '' : 'has-room'}">
@@ -304,7 +304,7 @@
     return { close };
   }
 
-  // 경험 후보를 나중에 경험으로 확정 — 같은 대화(thread)에 이어서 쓴다
+  // 카드에 안 담긴 경험을 나중에 카드에 담기 — 같은 대화(thread)에 이어서 쓴다
   function organize(el, threadId, cfg = {}) {
     const t = App.wiki.getThread(threadId); if (!t) return null;
     const text = App.wiki.threadText(t);

@@ -160,7 +160,7 @@
       <ol class="ac-steps">${parts.map(([k, v], i) => `<li><span class="ac-step-k">${i + 1}. ${k}</span>
         <span class="ac-step-v">${v ? esc(v) : '<span class="ac-muted">아직 비어 있어요</span>'}</span></li>`).join('')}</ol>
       <div class="ac-tailor"><span class="ac-tailor-k">이 기업에 맞춰 말하기</span><span>${tailor(app, c, e)}</span></div>
-      <div class="ac-answer-foot"><a class="ac-link" href="#/card/${esc(e.id)}">경험 페이지에서 고치기 →</a></div>
+      <div class="ac-answer-foot"><a class="ac-link" href="#/card/${esc(e.id)}">경험 카드에서 고치기 →</a></div>
       ${e.completeness < READY ? `<div class="ac-weak"><span>완성도 ${e.completeness}%예요. 비어 있는 부분을 채우면 답변이 훨씬 단단해져요.</span>
         <a class="ac-link" href="#/ask/new?mode=deep&exp=${encodeURIComponent(e.id)}">AI와 이어서 채우기 →</a></div>` : ''}
     </div>`;

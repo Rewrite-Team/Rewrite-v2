@@ -1,5 +1,6 @@
-/* 경험 페이지 상세·편집 — #/card/:id (id = 'new' 이면 새 경험, ?edit=1 이면 편집 모드로 시작)
-   출처(원문 기록) + 변경 기록(어떤 기록이 무엇을 바꿨는지)을 함께 보여 준다 */
+/* 경험 카드 상세·편집 — #/card/:id (id = 'new' 이면 새 경험 카드, ?edit=1 이면 편집 모드로 시작)
+   경험 카드 = 경험(끝낸 대화) 여러 개를 모아 면접·이력서·자소서에 쓰기 좋게 만든 것.
+   담긴 경험(대화 원문) + 코드 근거 + 변경 기록(어떤 기록이 무엇을 바꿨는지)을 함께 보여 준다 */
 (function (App) {
   const esc = (s) => App.ui.esc(s);
 
@@ -77,7 +78,7 @@
     const missing = STAR.filter((s) => !(e.star[s.key] || '').trim()).map((s) => s.label);
     if (missing.length) return `${missing.join('·')}을(를) 채우면 완성도가 올라가요`;
     if (!/\d/.test(e.star.result || '')) return '결과에 숫자를 넣으면 설득력이 커져요';
-    if (!e.insights) return '배운 점을 적으면 페이지가 완성돼요';
+    if (!e.insights) return '배운 점을 적으면 카드가 완성돼요';
     if (!e.keywords.length) return '역량 키워드를 1개 이상 붙여 주세요';
     return '면접에서 바로 꺼내 쓸 수 있는 경험이에요';
   }
@@ -91,7 +92,7 @@
     return !!gap && App.store.state.inbox.some((q) => q.targetExpId === e.id && q.type === 'deepen' && q.status === 'pending' && (!q.stage || q.stage === gap.stage));
   }
 
-  // 출처 → 그 원문이 나온 대화 (qa 의 threadId, 체크인 로그의 threadId, 아니면 이 페이지로 정리된 대화 중 같은 말을 한 것)
+  // 담긴 경험 → 그 원문이 나온 대화 (qa 의 threadId, 체크인 로그의 threadId, 아니면 이 카드로 정리된 대화 중 같은 말을 한 것)
   function threadOfSource(e, s, mine) {
     const W = App.wiki; if (!W.getThread) return null;
     const ok = (id) => (id && W.getThread(id) ? id : null);
@@ -106,45 +107,61 @@
     return null;
   }
   const chatHref = (id) => '#/ask/' + encodeURIComponent(id);
-  function threadsLine(e) {
-    const list = App.wiki.threadsFor ? App.wiki.threadsFor({ expId: e.id }) : [];
-    if (!list.length) return '';
-    const last = list[list.length - 1];
-    return `<div class="cd-threads-line">💬 이 경험을 만든 대화 <b>${list.length}개</b><a href="${esc(chatHref(last.id))}">질문함에서 보기 →</a></div>`;
-  }
 
-  // 출처: 답변·대화·체크인·코드 분석 — 이 페이지를 만든 원문 기록 그대로
-  function sourcesHTML(e) {
+  // 담긴 경험: 이 카드에 모은 경험(대화) — 같은 대화에서 나온 답은 한 경험으로 묶는다. 코드 분석은 따로 근거로
+  function expGroups(e) {
     const W = App.wiki;
-    const list = W.sourcesOf(e);
     const mine = W.threadsFor ? W.threadsFor({ expId: e.id }) : [];
-    if (!list.length) return '<div class="cd-soft-empty">아직 출처가 없어요. 오늘의 질문에 답하거나 AI와 이어서 채우면 원문이 여기에 그대로 남아요.</div>';
-    return `<ol class="cd-srcs">${list.map((s) => {
+    const groups = []; const byKey = {};
+    W.sourcesOf(e).filter((s) => s.type !== 'code').forEach((s, i) => {
       const tid = s.threadId && W.getThread && W.getThread(s.threadId) ? s.threadId : threadOfSource(e, s, mine);
-      const top = `<div class="cd-src-top"><span class="cd-src-type">${esc(W.SOURCE_LABEL[s.type] || '기록')}</span>
-        ${s.type === 'checkin' && LOG_TYPES[s.logType] ? `<span class="wk-srcchip">${LOG_TYPES[s.logType][1]} ${LOG_TYPES[s.logType][0]}</span>` : ''}
-        <span class="subtle">${esc(fmtDate(s.date))}</span>
-        ${tid ? `<a class="cd-src-link" href="${esc(chatHref(tid))}">대화 원문 →</a>` : ''}
-        ${s.href ? `<a class="cd-src-link" href="${esc(s.href)}">${s.type === 'code' ? '코드 분석 보기' : '프로젝트에서 보기'} →</a>` : ''}</div>`;
-      let body;
-      if (s.type === 'code' && s.finding) {
-        const f = s.finding; const ev = (f.evidence || [])[0];
-        body = `<div class="cd-src-text"><b>${esc(f.title)}</b></div>
-          <div class="cd-src-meta"><span class="wk-srcchip">${esc(f.category || '코드')}</span>
-          ${ev ? `<a class="cd-src-path" href="${esc(ev.url || '#')}" target="_blank" rel="noopener"><code>${esc(ev.path)}:${esc(ev.start)}</code></a>` : ''}</div>`;
-      } else {
-        const q = s.q && s.q !== '(직접 기록)' ? s.q : '';
-        body = `${q ? `<div class="cd-src-q"><span class="ai-dot">R</span><div>${esc(q)}</div></div>` : ''}<div class="cd-src-text">${esc(s.text)}</div>`;
-      }
-      return `<li class="cd-src" data-type="${esc(s.type)}"><span class="wk-src">${W.SOURCE_ICO[s.type] || '•'}</span><div class="cd-src-body">${top}${body}</div></li>`;
+      const key = tid || 'x' + i;
+      if (!byKey[key]) { byKey[key] = { tid, type: s.type, date: s.date, logType: s.logType, href: s.href, pairs: [] }; groups.push(byKey[key]); }
+      byKey[key].pairs.push({ q: s.q && s.q !== '(직접 기록)' ? s.q : '', text: s.text });
+    });
+    return groups;
+  }
+  function expsHTML(e) {
+    const W = App.wiki;
+    const groups = expGroups(e);
+    if (!groups.length) return '<div class="cd-soft-empty">아직 담긴 경험이 없어요. [＋ 경험 더 담기]로 AI와 나눈 대화를 이 카드에 모아 보세요.</div>';
+    return `<ol class="cd-srcs">${groups.map((g) => {
+      const t = g.tid && W.getThread(g.tid);
+      const top = `<div class="cd-src-top"><span class="cd-src-type">${esc((t && t.label) || W.SOURCE_LABEL[g.type] || '경험')}</span>
+        ${g.type === 'checkin' && LOG_TYPES[g.logType] ? `<span class="wk-srcchip">${LOG_TYPES[g.logType][1]} ${LOG_TYPES[g.logType][0]}</span>` : ''}
+        <span class="subtle">${esc(fmtDate(g.date))}</span>
+        ${g.tid ? `<a class="cd-src-link" href="${esc(chatHref(g.tid))}">대화 보기 →</a>` : ''}
+        ${g.href ? `<a class="cd-src-link" href="${esc(g.href)}">프로젝트에서 보기 →</a>` : ''}</div>`;
+      const body = g.pairs.map((x) => `${x.q ? `<div class="cd-src-q"><span class="ai-dot">R</span><div>${esc(x.q)}</div></div>` : ''}<div class="cd-src-text">${esc(x.text)}</div>`).join('');
+      return `<li class="cd-src" data-type="${esc(g.type === 'checkin' ? 'checkin' : 'answer')}"><span class="wk-src">${W.SOURCE_ICO[g.type] || '•'}</span><div class="cd-src-body">${top}${body}</div></li>`;
     }).join('')}</ol>`;
   }
+  // 근거: 코드 분석에서 찾은 것
+  function codeHTML(e) {
+    const W = App.wiki;
+    const list = W.sourcesOf(e).filter((s) => s.type === 'code' && s.finding);
+    if (!list.length) return '';
+    return `<div class="cd-evi-cap">근거 · 코드 분석</div><ol class="cd-srcs">${list.map((s) => {
+      const f = s.finding; const ev = (f.evidence || [])[0];
+      return `<li class="cd-src" data-type="code"><span class="wk-src">${W.SOURCE_ICO.code}</span><div class="cd-src-body">
+        <div class="cd-src-top"><span class="cd-src-type">${esc(W.SOURCE_LABEL.code)}</span><span class="subtle">${esc(fmtDate(s.date))}</span>${s.href ? `<a class="cd-src-link" href="${esc(s.href)}">코드 분석 보기 →</a>` : ''}</div>
+        <div class="cd-src-text"><b>${esc(f.title)}</b></div>
+        <div class="cd-src-meta"><span class="wk-srcchip">${esc(f.category || '코드')}</span>
+        ${ev ? `<a class="cd-src-path" href="${esc(ev.url || '#')}" target="_blank" rel="noopener"><code>${esc(ev.path)}:${esc(ev.start)}</code></a>` : ''}</div></div></li>`;
+    }).join('')}</ol>`;
+  }
+  // 경험 더 담기: 아직 이 카드에 없는 경험 (같은 프로젝트 먼저, 최근 것부터)
+  function pickable(e) {
+    const inCard = new Set(expGroups(e).map((g) => g.tid).filter(Boolean));
+    return App.wiki.experienceItems().filter((it) => !it.cardIds.includes(e.id) && !inCard.has(it.id))
+      .sort((a, b) => ((b.projectId && b.projectId === e.projectId) - (a.projectId && a.projectId === e.projectId)) || String(b.date).localeCompare(String(a.date)));
+  }
 
-  // 변경 기록: 어떤 기록이 이 페이지의 무엇을 바꿨는지
+  // 변경 기록: 어떤 기록이 이 카드의 무엇을 바꿨는지
   function changeText(c) {
     const F = App.wiki.FIELD_LABEL;
     switch (c.kind) {
-      case 'create': return '이 경험 페이지를 만들었어요';
+      case 'create': return '이 경험 카드를 만들었어요';
       case 'fill': return `<b>${esc(F[c.field] || c.field)}</b> 칸을 채웠어요<q>${esc(App.wiki.short(c.after, 70))}</q>`;
       case 'append': return `<b>${esc(F[c.field] || c.field)}</b>에 덧붙였어요<q>${esc(App.wiki.short(c.after, 70))}</q>`;
       case 'keyword': return `역량 ${(c.after || []).map((k) => App.ui.keywordChip(k)).join(' ')} 추가`;
@@ -156,7 +173,7 @@
   function historyHTML(e) {
     const W = App.wiki;
     const list = W.entries({ expId: e.id });
-    if (!list.length) return '<div class="cd-soft-empty">아직 변경 기록이 없어요. 답변이나 대화가 이 페이지에 반영되면 무엇이 바뀌었는지 여기에 남아요.</div>';
+    if (!list.length) return '<div class="cd-soft-empty">아직 변경 기록이 없어요. 경험이 이 카드에 담기면 무엇이 바뀌었는지 여기에 남아요.</div>';
     return `<ol class="cd-hist">${list.slice(0, 12).map((w, i) => {
       const mine = w.changes.filter((c) => c.expId === e.id).map(changeText).filter(Boolean);
       const src = w.source || {};
@@ -185,7 +202,7 @@
     const p = projectOf(e);
     const codeHits = (e.codeRefs || []).map((fid) => App.store.findFinding(fid)).filter(Boolean);
     const codeN = codeHits.length;
-    const srcN = App.wiki.sourcesOf(e).length;
+    const expN = expGroups(e).length;
     const askBtn = gap ? (queued
       ? '<span class="cd-asked">✓ 오늘의 질문에 있어요</span>'
       : '<button class="btn btn-sm" data-act="ask-gap">✉ 오늘의 질문으로 받기</button>') : '';
@@ -194,12 +211,12 @@
     <div class="cd-head card">
       <div class="cd-head-main">
         <div class="cd-meta">${App.ui.statusTag(e.status)}<span class="cd-meta-cat">${esc(e.category)}</span><span class="cd-dot">·</span><span>${App.ui.period(e.period)}</span></div>
-        ${p || codeN ? `<div class="cd-origin">
-          ${p ? `<a class="cd-proj-badge" href="#/vault/p/${encodeURIComponent(p.id)}">▤ ${esc(projShort(p))} 프로젝트의 경험</a>` : ''}
+        ${p || codeN || expN ? `<div class="cd-origin">
+          ${p ? `<a class="cd-proj-badge" href="#/vault/p/${encodeURIComponent(p.id)}">▤ ${esc(projShort(p))} 프로젝트의 경험 카드</a>` : ''}
           ${codeN ? `<a class="wk-srcchip cd-code-chip" href="#/vault/p/${encodeURIComponent(codeHits[0].project.id)}?tab=code">⌥ 코드 근거 ${codeN}</a>` : ''}
-          <span class="wk-srcchip">출처 ${srcN}</span>
+          <span class="wk-srcchip">경험 ${expN}</span>
         </div>` : ''}
-        <h1 class="cd-title">${esc(e.title || '제목 없는 경험')}</h1>
+        <h1 class="cd-title">${esc(e.title || '제목 없는 경험 카드')}</h1>
         ${e.role ? `<div class="cd-role"><span class="cd-role-lb">역할</span>${esc(e.role)}</div>` : ''}
         <p class="cd-summary ${e.summary ? '' : 'is-empty'}">${esc(e.summary || '아직 한 줄 요약이 없어요. 질문에 답하면 AI가 채워요.')}</p>
       </div>
@@ -212,7 +229,7 @@
         ${askBtn}
         <button class="btn btn-sm" data-act="edit">✎ 직접 수정</button>
         ${App.resumeKit ? (App.resumeKit.isCardIn(e.id)
-          ? `<a class="cd-resume-in" href="#/resume" title="마스터 이력서에 이 경험에서 나온 한 줄이 있어요"><span class="cd-resume-check">✓</span>이력서에 담김 · 보기 →</a>`
+          ? `<a class="cd-resume-in" href="#/resume" title="마스터 이력서에 이 카드에서 나온 한 줄이 있어요"><span class="cd-resume-check">✓</span>이력서에 담김 · 보기 →</a>`
           : `<button class="btn btn-sm cd-resume-btn" data-act="resume">☰ 이력서에 한 줄로 담기</button>`) : ''}
         <button class="btn btn-sm btn-ghost cd-del" data-act="delete">삭제</button>
       </div>
@@ -221,7 +238,7 @@
     <div class="cd-layout">
       <div class="cd-main">
         <section class="card card-pad cd-sec">
-          <div class="section-title">STAR 정리 <span class="subtle cd-sec-sub">AI 정리본 · 원문은 아래 출처에 그대로 있어요</span></div>
+          <div class="section-title">STAR 정리 <span class="subtle cd-sec-sub">AI 정리본 · 원문은 아래 담긴 경험에 그대로 있어요</span></div>
           <div class="cd-star">
             ${STAR.map((s) => {
               const v = (e.star[s.key] || '').trim();
@@ -240,13 +257,13 @@
         </section>
 
         <section class="card card-pad cd-sec">
-          <div class="section-title">출처 <span class="subtle cd-sec-sub">이 페이지를 만든 원문 기록 ${srcN}개</span>${p ? `<a class="more" href="#/vault/p/${encodeURIComponent(p.id)}?tab=timeline">프로젝트 원본 기록 →</a>` : ''}</div>
-          ${threadsLine(e)}
-          ${sourcesHTML(e)}
+          <div class="section-title">담긴 경험 <span class="subtle cd-sec-sub">이 카드에 모은 경험 ${expN}개</span><button type="button" class="btn btn-sm cd-add-exp" data-act="add-exp">＋ 경험 더 담기</button></div>
+          ${expsHTML(e)}
+          ${codeHTML(e)}
         </section>
 
         <section class="card card-pad cd-sec" data-cd-hist>
-          <div class="section-title">변경 기록 <span class="subtle cd-sec-sub">어떤 기록이 이 페이지를 바꿨는지</span></div>
+          <div class="section-title">변경 기록 <span class="subtle cd-sec-sub">어떤 기록이 이 카드를 바꿨는지</span></div>
           ${historyHTML(e)}
         </section>
 
@@ -256,7 +273,7 @@
             <a class="cd-kw-item" href="#/vault?kw=${encodeURIComponent(k.name)}" title="${esc(k.desc)}">
               ${App.ui.keywordChip(k.name, { size: 'lg' })}
               <span class="cd-kw-desc">${esc(k.desc)}</span>
-              <span class="cd-kw-count">경험 ${counts[k.name] || 0}개 →</span>
+              <span class="cd-kw-count">카드 ${counts[k.name] || 0}개 →</span>
             </a>`).join('')}</div>`
             : `<div class="cd-soft-empty">아직 키워드가 없어요. <b>✎ 직접 수정</b>에서 붙여 보세요.</div>`}
         </section>
@@ -279,7 +296,7 @@
         ${p ? (() => {
           const siblings = App.store.cardsOf(p.id).filter((x) => x.id !== e.id);
           return siblings.length ? `<section class="card card-pad cd-sec">
-            <div class="section-title">${esc(projShort(p))} 프로젝트의 다른 경험</div>
+            <div class="section-title">${esc(projShort(p))} 프로젝트의 다른 경험 카드</div>
             <div class="cd-siblings">${siblings.map((x) => `<a class="cd-sibling" href="#/card/${encodeURIComponent(x.id)}">${App.ui.statusTag(x.status)}<span>${esc(x.title)}</span></a>`).join('')}</div>
           </section>` : '';
         })() : ''}
@@ -300,7 +317,7 @@
           </div>
 
           <div class="cd-coach-blk">
-            <div class="cd-coach-lb">이 경험으로 답할 수 있는 질문</div>
+            <div class="cd-coach-lb">이 카드로 답할 수 있는 질문</div>
             ${pickQs.length ? `<ul class="cd-qs">${pickQs.map((x) => `<li><a href="#/match?q=${encodeURIComponent(x.q)}">${esc(x.q)}</a>${App.ui.keywordChip(x.k)}</li>`).join('')}</ul>`
               : '<div class="subtle">키워드를 추가하면 어울리는 질문을 찾아 드려요.</div>'}
           </div>
@@ -308,9 +325,9 @@
           ${(() => {
             const fits = App.store.activeApps().map((a) => ({ a, m: (a.competencies || []).filter((c) => e.keywords.includes(c.name)).map((c) => c.name) })).filter((x) => x.m.length);
             return `<div class="cd-coach-blk">
-            <div class="cd-coach-lb">이 경험을 쓸 수 있는 지원 기업</div>
+            <div class="cd-coach-lb">이 카드를 쓸 수 있는 지원 기업</div>
             ${fits.length ? `<ul class="cd-fits">${fits.map(({ a, m }) => `<li><a href="#/apply/${encodeURIComponent(a.id)}/competency"><b>${esc(a.company)}</b><span class="subtle"> · ${esc(a.job)}</span></a><div class="cd-fits-kws">${m.map((k) => App.ui.keywordChip(k)).join('')}</div></li>`).join('')}</ul>`
-              : '<div class="subtle">이 경험의 역량을 요구하는 지원 기업이 아직 없어요.</div>'}
+              : '<div class="subtle">이 카드의 역량을 요구하는 지원 기업이 아직 없어요.</div>'}
           </div>`;
           })()}
 
@@ -338,7 +355,7 @@
     return `
     <form class="cd-form" autocomplete="off" onsubmit="return false">
       <div class="cd-edit-bar">
-        <div><div class="cd-edit-title">${isNew ? '새 경험' : '경험 수정'}</div>
+        <div><div class="cd-edit-title">${isNew ? '새 경험 카드' : '경험 카드 수정'}</div>
           <div class="subtle">빈칸이 있어도 괜찮아요. 적은 그대로 저장돼요.</div></div>
         <div class="row"><button type="button" class="btn" data-act="cancel">취소</button><button type="button" class="btn btn-primary" data-act="save">저장</button></div>
       </div>
@@ -352,7 +369,7 @@
           ${field('시작', `<input class="input" type="month" name="start" value="${esc(d.period.start)}">`)}
           ${field('종료', `<input class="input" type="month" name="end" value="${esc(d.period.end)}"><div class="cd-help">비워 두면 ‘진행중’으로 표시돼요</div>`)}
         </div>
-        ${field('프로젝트', `<select class="select" name="projectId"><option value="">없음 (단독 경험)</option>${App.store.projects().map((p) => `<option value="${esc(p.id)}" ${p.id === d.projectId ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}</select><div class="cd-help">한 프로젝트에 경험 페이지를 여러 개 둘 수 있어요. 진행 중인 일은 경험 위키의 <a class="cd-link" href="#/vault">프로젝트 페이지</a>에서 체크인하세요.</div>`)}
+        ${field('프로젝트', `<select class="select" name="projectId"><option value="">없음 (프로젝트 밖 경험)</option>${App.store.projects().map((p) => `<option value="${esc(p.id)}" ${p.id === d.projectId ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}</select><div class="cd-help">한 프로젝트에 경험 페이지를 여러 개 둘 수 있어요. 진행 중인 일은 경험 위키의 <a class="cd-link" href="#/vault">프로젝트 페이지</a>에서 체크인하세요.</div>`)}
         ${field('역할', `<input class="input" name="role" placeholder="예) 백엔드 담당, 4인 팀" value="${esc(d.role)}">`)}
         ${field('한 줄 요약', `<input class="input" name="summary" placeholder="이 경험을 한 문장으로 소개한다면요?" value="${esc(d.summary)}">`)}
       </section>
@@ -385,14 +402,14 @@
       </section>
 
       <div class="cd-edit-foot">
-        ${isNew ? '' : '<button type="button" class="btn btn-danger" data-act="delete">이 경험 삭제</button>'}
+        ${isNew ? '' : '<button type="button" class="btn btn-danger" data-act="delete">이 카드 삭제</button>'}
         <div class="row cd-edit-foot-r"><button type="button" class="btn" data-act="cancel">취소</button><button type="button" class="btn btn-primary btn-lg" data-act="save">저장하기</button></div>
       </div>
     </form>`;
   }
 
   function notFoundHTML() {
-    return `<div class="card cd-notfound"><div class="big">🗂️</div><h2>경험 페이지를 찾을 수 없어요</h2>
+    return `<div class="card cd-notfound"><div class="big">🗂️</div><h2>경험 카드를 찾을 수 없어요</h2>
       <p class="muted">삭제되었거나 주소가 잘못된 것 같아요.</p>
       <div class="row cd-nf-actions"><a class="btn btn-primary" href="#/vault">경험 위키로 가기</a><button type="button" class="btn" data-capture>＋ 기록하기</button></div></div>`;
   }
@@ -412,8 +429,8 @@
   }
 
   App.screens.card = {
-    title: (p) => (p && p.id === 'new' ? '새 경험' : '경험 페이지'),
-    // 경험 위키 › (프로젝트) › 경험 페이지 — 프로젝트에 속한 경험이면 그 프로젝트를 경로에 넣는다
+    title: (p) => (p && p.id === 'new' ? '새 경험 카드' : '경험 카드'),
+    // 경험 위키 › (프로젝트) › 경험 카드 — 프로젝트에 속한 카드면 그 프로젝트를 경로에 넣는다
     crumb(params) {
       const crumbs = [{ label: '경험 위키', href: '#/vault' }];
       const e = params && params.id && params.id !== 'new' ? App.store.get(params.id) : null;
@@ -447,7 +464,7 @@
           ask: { text: g.text, label: '지금 채우면 좋은 부분' },
           src: { type: 'answer', expId: e.id, stage: g.stage, question: g.text },
           thread: { source: 'coach' },
-          onDone: (entry) => { setTimeout(() => { if (!gapTalk) return; closeGapTalk(); if (entry) App.ui.toast('이 페이지에 반영했어요'); if (App.store.get(st.id)) draw(true); }, 1400); },
+          onDone: (entry) => { setTimeout(() => { if (!gapTalk) return; closeGapTalk(); if (entry) App.ui.toast('이 카드에 반영했어요'); if (App.store.get(st.id)) draw(true); }, 1400); },
         });
       }
 
@@ -514,7 +531,7 @@
         if (!st.id) {
           const created = App.store.create(patch);
           App.wiki.recordEdit('manual', created.id, null); // 변경 기록만 조용히 남긴다
-          App.ui.toast('새 경험을 위키에 추가했어요');
+          App.ui.toast('새 경험 카드를 위키에 추가했어요');
           App.navigate('#/card/' + created.id);
           return;
         }
@@ -527,13 +544,40 @@
         draw();
       }
 
+      // 경험 더 담기 — 아직 이 카드에 없는 경험을 골라 담는다
+      function openPicker() {
+        const e = App.store.get(st.id); if (!e) return;
+        const list = pickable(e);
+        const projOf = (id) => { const p = id && App.store.getProject(id); return p ? App.store.projectName(p) : ''; };
+        App.ui.modal({
+          title: '경험 더 담기',
+          body: list.length ? `<p class="subtle cd-pick-lead">AI와 나눈 대화 하나가 경험 하나예요. 이 카드에 담을 경험을 골라 주세요.${e.projectId ? ' 같은 프로젝트의 경험이 먼저 보여요.' : ''}</p>
+            <ul class="cd-pick">${list.map((it) => `<li><label class="cd-pick-item">
+              <input type="checkbox" value="${esc(it.id)}">
+              <span class="cd-pick-main"><span class="cd-pick-t">${esc(App.wiki.short(it.text, 70))}</span>
+              <span class="cd-pick-meta subtle">${esc(it.label || '대화')} · ${esc(fmtDate(it.date))}${projOf(it.projectId) ? ` · ▤ ${esc(projOf(it.projectId))}` : ''}${it.cardIds.length ? ` · 다른 카드 ${it.cardIds.length}개에 담김` : ''}</span></span>
+            </label></li>`).join('')}</ul>`
+            : '<p>담을 수 있는 경험이 없어요. 질문함에서 AI와 대화를 끝내면 경험이 생겨요.</p>',
+          confirmText: list.length ? '이 카드에 담기' : '확인',
+          onConfirm(mroot) {
+            if (!list.length) return true;
+            const ids = [...mroot.querySelectorAll('.cd-pick input:checked')].map((x) => x.value);
+            if (!ids.length) { App.ui.toast('담을 경험을 골라 주세요'); return false; }
+            ids.forEach((id) => App.wiki.addToCard(id, e.id));
+            App.ui.toast(`경험 ${ids.length}개를 이 카드에 담았어요`);
+            st.draft = clone(App.store.get(st.id)); draw(true);
+            return true;
+          },
+        });
+      }
+
       function confirmDelete() {
         const e = App.store.get(st.id); if (!e) return;
         App.ui.modal({
-          title: '이 경험을 삭제할까요?',
-          body: `<p><b>${esc(e.title)}</b></p><p style="margin-top:6px">STAR 정리와 이 페이지에 모인 답변이 함께 삭제되고 되돌릴 수 없어요.${projectOf(e) ? ' 프로젝트의 체크인 로그는 그대로 남아요.' : ''}</p>`,
+          title: '이 경험 카드를 삭제할까요?',
+          body: `<p><b>${esc(e.title)}</b></p><p style="margin-top:6px">STAR 정리와 카드가 삭제되고 되돌릴 수 없어요. 담긴 경험(대화 원문)은 질문함에 그대로 남아요.${projectOf(e) ? ' 프로젝트의 체크인 로그는 그대로 남아요.' : ''}</p>`,
           confirmText: '삭제하기', danger: true,
-          onConfirm() { App.store.remove(e.id); App.ui.toast('경험을 삭제했어요'); App.navigate('#/vault'); },
+          onConfirm() { App.store.remove(e.id); App.ui.toast('경험 카드를 삭제했어요'); App.navigate('#/vault'); },
         });
       }
 
@@ -559,11 +603,12 @@
         else if (act === 'save') save();
         else if (act === 'delete') confirmDelete();
         else if (act === 'resume') { const e = App.store.get(st.id); if (e && App.resumeKit) App.resumeKit.openCardModal(e, () => draw()); }
+        else if (act === 'add-exp') openPicker();
         else if (act === 'talk-gap') openGapTalk();
         else if (act === 'close-gap-talk') draw(true);
         else if (act === 'ask-gap') {
           const e = App.store.get(st.id); const g = e && App.ai.gapQuestion(e); if (!g) return;
-          App.store.pushQuestion({ type: 'deepen', targetExpId: e.id, stage: g.stage, text: `${App.wiki.short(e.title, 30)} — ${g.text}`, hint: '답하면 이 경험 페이지의 빈 칸이 채워져요.' });
+          App.store.pushQuestion({ type: 'deepen', targetExpId: e.id, stage: g.stage, text: `${App.wiki.short(e.title, 30)} — ${g.text}`, hint: '답하면 이 경험 카드의 빈 칸이 채워져요.' });
           App.ui.toast('오늘의 질문으로 보냈어요');
           draw(true);
         }

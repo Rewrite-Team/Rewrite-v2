@@ -82,7 +82,7 @@
     const st = exp.star || {};
     if (st.result && !/\d/.test(st.result)) lines.push('결과(R)에 숫자를 하나만 더해도 설득력이 확 올라가요.');
     const empty = ['situation', 'task', 'action', 'result'].filter((k) => !st[k]);
-    if (empty.length) lines.push(`${empty.map((k) => PART_LABEL[k]).join('·')} 칸이 비어 있어요. 경험 페이지에서 먼저 채워 두면 좋아요.`);
+    if (empty.length) lines.push(`${empty.map((k) => PART_LABEL[k]).join('·')} 칸이 비어 있어요. 경험 카드에서 먼저 채워 두면 좋아요.`);
     return { part, quote: st[part] || '', lines };
   }
 
@@ -187,7 +187,7 @@
         ${t.quote ? `<blockquote class="ae-quote">${esc(t.quote)}</blockquote>` : ''}
         <ul>${t.lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul></details>
       <div class="ae-rec-actions">
-        <a class="btn btn-sm btn-ghost" href="#/card/${esc(e.id)}">경험 페이지 보기</a>
+        <a class="btn btn-sm btn-ghost" href="#/card/${esc(e.id)}">경험 카드 보기</a>
         ${linked ? '<span class="ae-linked-tag">✓ 이 문항에 연결됨</span>'
           : `<button class="btn btn-sm btn-primary" data-ae-use="${esc(q.id)}" data-exp="${esc(e.id)}">이 경험으로 쓰기</button>`}
       </div>

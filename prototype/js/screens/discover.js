@@ -1,5 +1,5 @@
 /* 경험 하나 끝까지 정리하기 (깊은 대화) — AI가 상황→과제→행동→결과→배운 점 순서로 꼬리질문을 하며 경험을 끌어내고,
-   실시간으로 경험 페이지 초안을 채운다. 질문함의 대화방 안에 붙는다 (따로 된 화면은 없다).
+   실시간으로 경험 카드 초안을 채운다. 긴 대화 하나로 경험 카드 하나를 바로 만드는 모드. 질문함의 대화방 안에 붙는다 (따로 된 화면은 없다).
    대화가 끝나거나(저장·그만하기·나중에) 방을 떠나면 경험 위키에 반영하고, 반영 결과(App.wiki.reportHTML)를 보여 준다.
 
    App.deep.mount(el, {
@@ -227,7 +227,7 @@
             const F = window.SEED.followups;
             g = { stage: src.stage, text: src.stage === 'insight' ? '이 경험 이후 당신이 다르게 하게 된 것이 있나요?' : F[src.stage][0] };
           }
-          intro = `「${esc(e.title)}」 경험 페이지를 이어서 채워 볼게요. 지금 완성도는 <b>${App.ai.completeness(e)}%</b>예요.`;
+          intro = `「${esc(e.title)}」 경험 카드를 이어서 채워 볼게요. 지금 완성도는 <b>${App.ai.completeness(e)}%</b>예요.`;
           if (src.ask && !src.answer) {
             // 질문함의 질문으로 시작 (그 질문이 겨냥한 칸부터)
             const st = src.stage && STAGE[src.stage] ? src.stage : g ? g.stage : 'situation';
@@ -285,7 +285,7 @@
             firstQ = nextQText(firstStage);
           }
           intro = src.type === 'exp'
-            ? `「${esc(S.d.title)}」 경험 페이지를 이어서 채워 볼게요. 방금 한 이야기는 초안의 <b>${STAGE[stage].label}</b> 칸에 넣어 뒀어요.`
+            ? `「${esc(S.d.title)}」 경험 카드를 이어서 채워 볼게요. 방금 한 이야기는 초안의 <b>${STAGE[stage].label}</b> 칸에 넣어 뒀어요.`
             : `방금 한 이야기를 바탕으로 이 경험을 끝까지 정리해 볼게요. 이미 말한 건 초안의 <b>${STAGE[stage].label}</b> 칸에 넣어 뒀어요.
               <blockquote class="dc-cur">${esc(text)}</blockquote>`;
         }
@@ -359,7 +359,7 @@
         const sug = d.suggested.filter((k) => !d.keywords.includes(k));
         el.innerHTML = `
           <div class="dc-draft-head">
-            <span class="ai-badge"><span class="ai-dot">R</span>실시간 경험 페이지</span>
+            <span class="ai-badge"><span class="ai-dot">R</span>실시간 경험 카드</span>
             <span class="dc-live"><i></i>답변할 때마다 채워져요</span>
             <button class="btn btn-ghost btn-sm dc-sheet-close" data-act="sheet" type="button">닫기</button>
           </div>
@@ -400,8 +400,8 @@
             ${sug.length ? '<div class="dc-kw-tip">점선은 AI 추천이에요. 누르면 확정, ×로 뺄 수 있어요.</div>' : ''}
           </div>
           <div class="dc-draft-foot">
-            <button class="btn btn-primary dc-save" data-act="save" type="button">${d.id ? '이 경험에 반영하기' : '위키에 반영하기'}</button>
-            <p class="subtle">질문과 답변 원문은 경험 페이지의 출처에 그대로 남아요.</p>
+            <button class="btn btn-primary dc-save" data-act="save" type="button">${d.id ? '이 카드에 반영하기' : '경험 카드로 저장하기'}</button>
+            <p class="subtle">질문과 답변 원문은 경험 카드의 담긴 경험에 그대로 남아요.</p>
           </div>`;
         el.querySelectorAll('.dc-field-ta').forEach((ta) => autoGrow(ta, 400));
         el.querySelector('#dc-title').addEventListener('input', (ev) => {
@@ -508,10 +508,10 @@
         if (S.src.type === 'exp') {
           // 기존 경험 다듬기 → 반영하거나 다른 칸을 골라 계속
           addAi(`${ack ? `<div class="dc-ack">${ack}</div>` : ''}
-            <div class="dc-q">이 부분은 꽤 단단해졌어요. 지금 위키에 반영할까요?</div>
+            <div class="dc-q">이 부분은 꽤 단단해졌어요. 지금 이 카드에 반영할까요?</div>
             <div class="dc-sub">다른 부분도 다듬고 싶으면 골라 주세요. 그냥 이어서 적으면 가장 얇은 칸에 덧붙일게요.</div>
             <div class="dc-inline-acts">
-              <button class="btn btn-primary btn-sm" data-act="save" type="button">이 경험에 반영하기</button>
+              <button class="btn btn-primary btn-sm" data-act="save" type="button">이 카드에 반영하기</button>
               ${STAGES.map((x) => `<button class="btn btn-sm" data-act="goto" data-stage="${x.key}" type="button">${x.label}</button>`).join('')}
             </div>`);
           renderDraft(); updateMeta(); syncBusy();
@@ -604,7 +604,7 @@
         } else if (stage === 'result' && hasNum(text)) {
           note = '숫자가 들어가니 훨씬 설득력 있어요 👍';
         } else if (!S.crossedHalf && before < 50 && after >= 50) {
-          note = '경험 페이지가 벌써 절반 넘게 채워졌어요. 이 페이스 좋아요!';
+          note = '경험 카드가 벌써 절반 넘게 채워졌어요. 이 페이스 좋아요!';
         }
         if (after >= 50) S.crossedHalf = true;
 
@@ -737,15 +737,15 @@
         if (m.confidence !== 'high' || !m.best) { cb(); return; }
         S.pendingTarget = cb;
         const t = esc(App.wiki.short(m.best.title, 30));
-        addAi(`<div class="dc-q">「${t}」와 같은 이야기 같아요. 거기에 반영할까요?</div>
-          <div class="dc-sub">같은 이야기는 한 페이지에 모아 두어야 이력서·면접에서 근거가 흩어지지 않아요.</div>
+        addAi(`<div class="dc-q">「${t}」 카드와 같은 이야기 같아요. 그 카드에 담을까요?</div>
+          <div class="dc-sub">같은 이야기는 한 카드에 모아 두어야 이력서·면접에서 근거가 흩어지지 않아요.</div>
           <div class="dc-inline-acts" data-merge-acts>
-            <button class="btn btn-primary btn-sm" data-act="merge-yes" data-exp-id="${esc(m.best.id)}" type="button">「${t}」에 반영</button>
-            <button class="btn btn-sm" data-act="merge-no" type="button">새 경험으로</button>
+            <button class="btn btn-primary btn-sm" data-act="merge-yes" data-exp-id="${esc(m.best.id)}" type="button">「${t}」 카드에 담기</button>
+            <button class="btn btn-sm" data-act="merge-no" type="button">새 경험 카드로</button>
           </div>`);
       }
       const joinText = (a, b) => { a = String(a || '').trim(); b = String(b || '').trim(); return !b || a.includes(b) ? a : a ? a + ' ' + b : b; };
-      // 대화 초안을 기존 경험 페이지에 합친다. 이후 대화는 그 페이지를 이어서 채운다
+      // 대화 초안을 기존 경험 카드에 합친다. 이후 대화는 그 카드를 이어서 채운다
       function mergeInto(e) {
         const d = S.d;
         S.baseBefore = clone(e); S.merged = true;
@@ -828,7 +828,7 @@
         if (!t.projectId && S.projectId) t.projectId = S.projectId;
         if (appliedId) {
           const ex = App.store.get(appliedId);
-          t.msgs.push({ who: 'ai', text: `「${String(ex ? ex.title : '').replace(/[「」]/g, '')}」에 반영했어요.`, at, date });
+          t.msgs.push({ who: 'ai', text: `「${String(ex ? ex.title : '').replace(/[「」]/g, '')}」 카드에 담았어요.`, at, date });
         } else App.store.touch();
         return t;
       }
@@ -852,12 +852,12 @@
         const e = id ? App.store.get(id) : null;
         const n = sessionAnswers();
         const undone = !!(entry && entry.undone);
-        const head = !entry ? '경험 페이지는 그대로예요'
+        const head = !entry ? '경험 카드는 그대로예요'
           : undone ? '위키 반영을 되돌렸어요'
-          : entry.decided === 'new' ? '새 경험이 위키에 추가됐어요'
-          : entry.decided === 'user' ? '고른 경험으로 옮겼어요'
-          : S.merged ? '같은 이야기를 하던 경험에 반영했어요'
-          : '경험 페이지가 더 단단해졌어요';
+          : entry.decided === 'new' ? '새 경험 카드가 위키에 추가됐어요'
+          : entry.decided === 'user' ? '고른 경험 카드로 옮겼어요'
+          : S.merged ? '같은 이야기를 하던 경험 카드에 담았어요'
+          : '경험 카드가 더 단단해졌어요';
         const delta = e && entry && entry.decided !== 'new' ? e.completeness - S.startComp : 0;
         const g = e && !undone ? App.ai.gapQuestion(e) : null;
         root.innerHTML = `
@@ -871,7 +871,7 @@
               return `<div class="dc-done-next"><span class="ai-dot">R</span><div style="flex:1"><div class="dc-done-label">다음에 채우면 좋은 질문</div><div>${esc(g.text)}</div></div>
               ${queued ? '<span class="subtle" style="font-size:12.5px;align-self:center">✓ 오늘의 질문에 있어요</span>' : `<button class="btn btn-sm" data-act="queue-gap" data-stage="${esc(g.stage)}" data-text="${esc(g.text)}" data-exp="${esc(e.id)}" type="button">오늘의 질문으로 받기</button>`}</div>`; })() : ''}
             <div class="dc-done-actions">
-              ${!entry && e ? `<a class="btn btn-lg" href="#/card/${esc(e.id)}">경험 페이지 보기</a>` : ''}
+              ${!entry && e ? `<a class="btn btn-lg" href="#/card/${esc(e.id)}">경험 카드 보기</a>` : ''}
               ${opts.onExit ? '<button class="btn btn-primary btn-lg" data-act="exit" type="button">대화방으로 돌아가기</button>' : ''}
               <button class="btn btn-lg" data-act="another" type="button">다른 경험 정리하기</button>
             </div>
@@ -935,8 +935,8 @@
         else if (act === 'merge-yes' || act === 'merge-no') {
           const cb = S.pendingTarget; S.pendingTarget = null;
           const box = actEl.closest('[data-merge-acts]'); if (box) box.remove();
-          if (act === 'merge-yes') { S.mergeInto = actEl.dataset.expId; addUser('네, 거기에 반영할래요', true); }
-          else addUser('새 경험으로 할래요', true);
+          if (act === 'merge-yes') { S.mergeInto = actEl.dataset.expId; addUser('네, 그 카드에 담을래요', true); }
+          else addUser('새 경험 카드로 할래요', true);
           if (cb) cb();
         } else if (act === 'code-yes' || act === 'code-no') {
           const box = actEl.closest('[data-code-acts]'); if (box) box.remove();

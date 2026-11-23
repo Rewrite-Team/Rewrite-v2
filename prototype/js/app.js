@@ -6,12 +6,13 @@
     { href: '#/home', name: 'home', ico: '⌂', label: '홈' },
     { href: '#/ask', name: 'ask', ico: '✉', label: '질문함', badge: () => App.store.pending().length, badgeTitle: '아직 답하지 않은 오늘의 질문' },
     { group: '② 경험 위키' },
+    { href: '#/graph', name: 'graph', ico: '◉', label: '경험 그래프' },
     { href: '#/vault', name: 'vault', ico: '▦', label: '경험 위키', badge: () => App.wiki.lint().filter((i) => i.severity >= 3).length, badgeTone: 'soft', badgeTitle: '위키 점검: 꼭 채울 곳' },
     { group: '③ 꺼내 쓰기' },
     { href: '#/resume', name: 'resume', ico: '☰', label: '마스터 이력서' },
     { href: '#/apply', name: 'apply', ico: '◎', label: '지원 기업', apps: true },
   ];
-  const MOBILE = [['#/home', 'home', '⌂', '홈'], ['#/ask', 'ask', '✉', '질문함'], ['#/vault', 'vault', '▦', '위키'], ['#/resume', 'resume', '☰', '이력서'], ['#/apply', 'apply', '◎', '지원']];
+  const MOBILE = [['#/home', 'home', '⌂', '홈'], ['#/ask', 'ask', '✉', '질문함'], ['#/graph', 'graph', '◉', '그래프'], ['#/vault', 'vault', '▦', '위키'], ['#/resume', 'resume', '☰', '이력서'], ['#/apply', 'apply', '◎', '지원']];
   const APP_STATUS_TONE = { preparing: '#4b4fd6', applied: '#f2994a', passed: '#2f9e6b', failed: '#b9b3a8' };
 
   // 지원 기업 하위 메뉴 (기업마다 하나씩)

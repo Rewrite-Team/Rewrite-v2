@@ -18,7 +18,8 @@
   };
   const SRC_ICO = { capture: '✎', checkin: '📌', code: '⌥', check: '🩺', coach: '✦', chat: '✦', daily: '✉' };
   const STATUS_LABEL = { pending: '대기', answered: '답변함', skipped: '미뤄 둠' };
-  const OUT_LABEL = { applied: '위키 반영', kept: '경험 후보', open: '정리 전' };
+  // 끝낸 대화는 모두 경험이 된다. applied = 경험 카드에 담김, kept = 카드에 안 담긴 경험
+  const OUT_LABEL = { applied: '카드에 담김', kept: '경험', open: '대화 중' };
   const SECTIONS = [['today', '오늘의 질문'], ['missed', '답하지 못한 질문'], ['past', '지난 대화']];
   const DOW = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -38,26 +39,26 @@
     if (q.type === 'code' || q.findingId) {
       const ff = q.findingId && App.store.findFinding(q.findingId);
       const p = q.targetProjectId && App.store.getProject(q.targetProjectId);
-      return { kind: 'code', finding: ff ? ff.finding.title : '', text: '답하면 이 코드가 근거로 붙은 경험에 반영돼요', href: p ? `#/vault/p/${p.id}?tab=code` : '' };
+      return { kind: 'code', finding: ff ? ff.finding.title : '', text: '답하면 경험으로 저장되고, 이 코드가 근거로 붙은 경험 카드에 담겨요', href: p ? `#/vault/p/${p.id}?tab=code` : '' };
     }
     if (q.targetProjectId) {
       const p = App.store.getProject(q.targetProjectId);
-      if (p) return { kind: 'project', text: `「${projName(p)}」 대화로 남고, 관련 경험에 반영돼요`, href: '#/vault/p/' + p.id };
+      if (p) return { kind: 'project', text: `「${projName(p)}」 경험으로 저장되고, 관련 경험 카드에 담을 수 있어요`, href: '#/vault/p/' + p.id };
     }
     if (q.targetExpId) {
       const e = App.store.get(q.targetExpId);
       if (e) {
         const f = App.wiki.inferField('', q.text, q.stage);
         const cur = f === 'insights' ? e.insights : f === 'summary' ? e.summary : e.star[f];
-        return { kind: 'deepen', text: `답하면 「${title(e.title, 28)}」의 ${App.wiki.FIELD_LABEL[f] || f} 칸이 ${String(cur || '').trim() ? '보강돼요' : '채워져요'}`, href: '#/card/' + e.id };
+        return { kind: 'deepen', text: `답하면 「${title(e.title, 28)}」 카드의 ${App.wiki.FIELD_LABEL[f] || f} 칸이 ${String(cur || '').trim() ? '보강돼요' : '채워져요'}`, href: '#/card/' + e.id };
       }
     }
-    return { kind: 'recall', text: '비슷한 경험이 있으면 거기에, 없으면 새 경험으로 반영돼요', href: '' };
+    return { kind: 'recall', text: '답하면 경험으로 저장돼요. 비슷한 경험 카드가 있으면 거기에 담을 수 있어요', href: '' };
   }
   // 이 질문으로 나눈 대화들 (오래된 것부터)
   const qThreads = (qid) => App.wiki.threadsFor().filter((t) => t.questionId === qid);
   function threadOf(q) { const l = q ? qThreads(q.id) : []; return l.length ? l[l.length - 1] : null; }
-  // 답한 뒤: 실제로 어디에 반영됐는지 + 대화방 링크
+  // 답한 뒤: 어느 경험 카드에 담겼는지 + 대화방 링크
   function wentOf(q) {
     const out = [];
     if (!q || q.status !== 'answered') return out;
@@ -65,9 +66,8 @@
     const room = roomHref('q_' + q.id);
     const e = q.compiledTo && App.store.get(q.compiledTo);
     const ee = e || (t && t.outcome && t.outcome.kind === 'applied' && t.outcome.expId && App.store.get(t.outcome.expId)) || (q.targetExpId && App.store.get(q.targetExpId));
-    if (ee) out.push({ kind: 'applied', href: '#/card/' + ee.id, text: `「${title(ee.title, 28)}」에 반영됨` });
-    else if (t && t.outcome && t.outcome.kind === 'kept') out.push({ kind: 'kept', href: room, text: '📝 경험 후보' });
-    if (t && !out.some((w) => w.kind === 'kept')) out.push({ kind: 'chat', href: room, text: '대화 보기' });
+    if (ee) out.push({ kind: 'applied', href: '#/card/' + ee.id, text: `「${title(ee.title, 28)}」 카드에 담김` });
+    if (t) out.push({ kind: 'chat', href: room, text: '대화 보기' });
     return out;
   }
   function destHTML(q) {
@@ -101,8 +101,8 @@
     if (d === ymd(new Date())) return t || '오늘';
     const w = dayWord(d); return w === '어제' ? w : w.split(' ')[0];
   }
-  // 목록 미리보기: 내가 마지막으로 한 말 (반영 버튼 문구는 빼고)
-  const SYS_ME = /^(이렇게 반영해 주세요|경험 후보로 보관해 주세요|대화에만 보관해 주세요|이대로 충분해요)$/;
+  // 목록 미리보기: 내가 마지막으로 한 말 (대화 끝에 자동으로 붙는 문구는 빼고 — 옛 문구 포함)
+  const SYS_ME = /^(이렇게 반영해 주세요|경험 후보로 보관해 주세요|대화에만 보관해 주세요|이대로 충분해요|경험으로 저장해 주세요|이 카드에 담아 주세요|새 카드로 만들어 주세요)$/;
   const lastMine = (t) => { const m = t ? t.msgs.filter((x) => x.who === 'me' && !SYS_ME.test(x.text)).pop() : null; return m ? m.text : ''; };
   const lastAt = (t) => { const m = t.msgs[t.msgs.length - 1]; return `${(m && m.date) || t.date} ${(m && m.at) || t.at || ''}`.trim(); };
 
@@ -145,8 +145,7 @@
   }
 
   // 화면을 다시 그려도 유지되는 목록 상태
-  // kept: 경험 후보(아직 경험으로 확정하지 않은 대화)만 보기 — #/ask?only=kept 로 켜고, 목록의 칩으로 켜고 끈다
-  const UI = { search: '', project: '', kept: false, collapsed: {}, edit: false, sel: new Set(), scroll: 0 };
+  const UI = { search: '', project: '', collapsed: {}, edit: false, sel: new Set(), scroll: 0 };
 
   function resolve(params) {
     let room = params.room || params.thread || '';
@@ -176,7 +175,6 @@
     mount(root, params) {
       const S = App.store; const W = App.wiki;
       const R = resolve(params);
-      if (params.only === 'kept') UI.kept = true;
       let cur = R.room; // 지금 열린 방 id
       let talk = null; let org = null; let mo = null; let deep = null;
       let newProject = null; // 새 대화방이 정해 둔 프로젝트
@@ -203,11 +201,11 @@
       }
       function visibleRooms() {
         const s = UI.search.trim().toLowerCase();
-        return rooms().filter((r) => (!UI.project || r.projectId === UI.project) && (!UI.kept || r.outcome === 'kept') && (!s || r.search.toLowerCase().includes(s)));
+        return rooms().filter((r) => (!UI.project || r.projectId === UI.project) && (!s || r.search.toLowerCase().includes(s)));
       }
       function sectionsHTML() {
         const g = grouped(visibleRooms());
-        const filtering = UI.search.trim() || UI.project || UI.kept;
+        const filtering = UI.search.trim() || UI.project;
         const empty = {
           today: `<li class="ask-empty-li">오늘 질문은 모두 답했어요 · 다음 질문 ⏰ ${esc(nextTime().label)}</li>`,
           missed: '<li class="ask-empty-li">미뤄 둔 질문이 없어요</li>',
@@ -228,12 +226,19 @@
       }
       function editbarHTML() {
         if (!UI.edit) return '';
-        const n = UI.sel.size;
+        const n = UI.sel.size; const xn = selectedExps().length;
         return `<div class="ask-editbar">
           <button type="button" class="btn btn-ghost btn-sm" data-ask-selall>${n && n === visibleRooms().length ? '선택 해제' : '전체 선택'}</button>
           <span class="subtle">${n}개 선택</span>
+          <button type="button" class="btn btn-primary btn-sm" data-ask-compose ${xn ? '' : 'disabled'} title="${xn ? `경험 ${xn}개를 모아 경험 카드 하나로 만들어요` : '끝낸 대화(경험)를 골라 주세요'}">선택한 경험으로 카드 만들기</button>
           <button type="button" class="btn btn-danger btn-sm" data-ask-bulkdel ${n ? '' : 'disabled'}>선택 삭제</button>
         </div>`;
+      }
+      // 선택한 방들 → 그 방의 경험(끝낸 대화) id 들
+      function selectedExps() {
+        const ok = new Set(W.experienceItems().map((it) => it.id));
+        const all = rooms();
+        return [...new Set([...UI.sel].flatMap((id) => { const r = all.find((x) => x.id === id); return r ? r.threads.map((t) => t.id) : []; }))].filter((id) => ok.has(id));
       }
       function renderList() {
         const projects = S.projects();
@@ -255,7 +260,6 @@
                 ${projects.map((p) => `<option value="${esc(p.id)}" ${UI.project === p.id ? 'selected' : ''}>▤ ${esc(projName(p))}</option>`).join('')}
               </select>` : ''}
             </div>
-            ${keptChipHTML()}
           </div>
           <div class="ask-scroll" data-ask-scroll>
             <div data-ask-secs>${sectionsHTML()}</div>
@@ -269,13 +273,6 @@
         inp.addEventListener('input', () => { UI.search = inp.value; refreshSecs(); });
         const sel = listEl.querySelector('[data-ask-project]');
         if (sel) sel.onchange = () => { UI.project = sel.value; refreshSecs(); };
-      }
-      function keptChipHTML() {
-        const n = rooms().filter((r) => r.outcome === 'kept').length;
-        if (!n && !UI.kept) return '';
-        return `<div class="ask-chips">
-          <button type="button" class="ask-chip ${UI.kept ? 'is-on' : ''}" data-ask-kept aria-pressed="${UI.kept}" title="${UI.kept ? '필터 풀기' : '아직 경험으로 확정하지 않은 대화만 보기'}">📝 경험 후보 <b>${n}</b>${UI.kept ? '<span class="ask-chip-x" aria-hidden="true">✕</span>' : ''}</button>
-        </div>`;
       }
       function refreshSecs() {
         const box = listEl.querySelector('[data-ask-secs]'); if (box) box.innerHTML = sectionsHTML();
@@ -299,12 +296,6 @@
         if (it) { ev.preventDefault(); App.navigate(roomHref(it.dataset.roomId)); return; }
         const tg = t.closest('[data-ask-toggle]');
         if (tg) { UI.collapsed[tg.dataset.askToggle] = !UI.collapsed[tg.dataset.askToggle]; refreshSecs(); return; }
-        if (t.closest('[data-ask-kept]')) {
-          UI.kept = !UI.kept;
-          // 링크로 켠 필터를 풀면 주소의 ?only=kept 도 지워서 새로고침해도 다시 걸리지 않게
-          if (!UI.kept && /[?&]only=kept/.test(location.hash)) history.replaceState(null, '', location.hash.replace(/[?&]only=kept/, ''));
-          renderList(); return;
-        }
         if (t.closest('[data-ask-new]')) { App.navigate('#/ask/new'); return; }
         if (t.closest('[data-ask-edit]')) { UI.edit = !UI.edit; UI.sel.clear(); renderList(); return; }
         if (t.closest('[data-ask-selall]')) {
@@ -313,6 +304,14 @@
           refreshSecs(); return;
         }
         if (t.closest('[data-ask-bulkdel]')) { confirmDelete([...UI.sel]); return; }
+        if (t.closest('[data-ask-compose]')) {
+          const ids = selectedExps(); if (!ids.length) return;
+          const e = W.composeCard(ids);
+          if (!e) return;
+          UI.sel.clear(); UI.edit = false;
+          App.ui.toast(`경험 ${ids.length}개를 모아 경험 카드를 만들었어요`);
+          App.navigate('#/card/' + e.id); return;
+        }
         if (t.closest('[data-ask-demo]')) { pushDemo(); }
       });
 
@@ -332,7 +331,7 @@
             ${list.length === 1 ? `<p class="ask-del-name">「${esc(short(list[0].title, 60))}」</p>` : `<ul class="ask-del-list">${list.slice(0, 5).map((r) => `<li>${r.ico} ${esc(short(r.title, 48))}</li>`).join('')}${list.length > 5 ? `<li class="subtle">외 ${list.length - 5}개</li>` : ''}</ul>`}
             <p>${msgs ? `대화 ${msgs}개의 원문이 함께 지워지고, 되돌릴 수 없어요.` : '이 방에는 아직 대화가 없어요.'}</p>
             ${openQ ? `<p>아직 답하지 않은 질문${openQ > 1 ? ` ${openQ}개` : ''}은 다시 묻지 않아요.</p>` : ''}
-            <p class="ask-del-safe">✓ 이미 위키에 반영된 경험 카드와 변경 기록, 프로젝트 타임라인 기록은 그대로 남아요.</p>
+            <p class="ask-del-safe">✓ 이미 만든 경험 카드와 변경 기록, 프로젝트 타임라인 기록은 그대로 남아요.</p>
           </div>`,
           confirmText: '지우기', danger: true,
           onConfirm: () => {
@@ -433,7 +432,7 @@
             ${ths.length ? App.talk.roomHTML(ths, { organize: true, highlight: R.hl })
               : `<div class="tk-thread"><div class="tk-rm ai"><div class="tk-rm-b">${esc(q.text)}</div></div>${q.answer ? `<div class="tk-rm me"><div class="tk-rm-b">${esc(q.answer)}</div></div>` : ''}</div>`}
             ${went.length ? `<div class="ask-went">${went.map((w) => `<a class="ask-target" href="${esc(w.href)}"><span class="ask-target-ico">✓</span><span>${esc(w.text)}</span></a>`).join('')}</div>`
-              : ths.some((t) => t.outcome.kind === 'applied') ? '' : '<div class="ask-went subtle">아직 경험에 반영되지 않은 답이에요. 위의 [경험으로 확정]이나 [다시 답하기]로 반영할 수 있어요.</div>'}
+              : ths.some((t) => t.outcome.kind === 'applied') ? '' : '<div class="ask-went subtle">경험으로 저장했고, 아직 어떤 카드에도 담지 않았어요. 위의 [카드에 담기]로 경험 카드에 넣을 수 있어요.</div>'}
           </div>
           <div class="ask-foot"><span class="subtle">다른 답이 떠올랐다면</span><button type="button" class="btn btn-sm" data-ask-act="reask">다시 답하기</button></div>`;
         scrollToHl();
@@ -459,7 +458,7 @@
         const o = t.outcome || {};
         follow(box);
         talk = App.talk.mount(box, {
-          ask: { text: '이 이야기에 이어서 무엇을 남겨 둘까요?', hint: '새 대화로 이어지고, 위키의 같은 경험에 보탤 수 있어요.' },
+          ask: { text: '이 이야기에 이어서 무엇을 남겨 둘까요?', hint: '새 경험으로 저장되고, 같은 경험 카드에 담을 수 있어요.' },
           src: t.projectId ? { type: 'checkin', projectId: t.projectId, question: '(이어서 기록)', expId: o.expId || null } : { type: 'manual', question: '(이어서 기록)', expId: o.expId || null },
           thread: { source: t.source === 'checkin' ? 'checkin' : 'capture', label: `${t.label || '대화'} · 이어서` },
           onFirstSend: () => adopt(),
@@ -486,9 +485,9 @@
         roomEl.innerHTML = headHTML({ meta, h: project ? `「${esc(projName(project))}」 기록하기` : '무엇이든 기록해 두세요', actions: deepBtn() }) + `
           <div class="ask-room-body" data-ask-body>
             <div class="ask-intro" data-ask-intro>
-              <p>한 줄이면 충분해요. 어느 경험의 어느 칸에 넣을지는 AI가 제안하고, 정하는 건 나예요.</p>
+              <p>한 줄이면 충분해요. 끝낸 대화는 경험으로 저장되고, 어느 경험 카드에 담을지는 AI가 제안해요. 정하는 건 나예요.</p>
               <div class="ask-modes">
-                <div class="ask-deep-hint"><span class="ask-mode-ico">✦</span><div><b>더 깊게 정리하고 싶어지면 언제든</b><span class="subtle">이 방 위의 [경험 하나 끝까지 정리하기]를 누르면, 지금까지 한 이야기를 이어받아 상황→과제→행동→결과→배운 점 순서로 한 경험을 끝까지 정리해요.</span></div></div>
+                <div class="ask-deep-hint"><span class="ask-mode-ico">✦</span><div><b>더 깊게 정리하고 싶어지면 언제든</b><span class="subtle">이 방 위의 [경험 하나 끝까지 정리하기]를 누르면, 지금까지 한 이야기를 이어받아 상황→과제→행동→결과→배운 점 순서로 길게 대화하고, 그 대화로 경험 카드 하나를 바로 만들어요.</span></div></div>
                 <a class="ask-mode" href="${project ? `#/vault/p/${esc(project.id)}?tab=code` : '#/vault'}"><span class="ask-mode-ico">⌥</span><div><b>GitHub 레포 분석</b><span class="subtle">코드에서 찾은 기술 포인트가 근거로 붙고, 빈 이야기는 질문으로 와요</span></div></a>
               </div>
             </div>
@@ -497,7 +496,7 @@
         const box = roomEl.querySelector('[data-ask-talk]');
         follow(box);
         talk = App.talk.mount(box, {
-          ask: { text: project ? `「${projName(project)}」에서 어떤 일이 있었나요?` : '무엇을 기록해 둘까요?', hint: '한 줄이면 충분해요. 어느 경험에 어떻게 넣을지는 같이 정해요.' },
+          ask: { text: project ? `「${projName(project)}」에서 어떤 일이 있었나요?` : '무엇을 기록해 둘까요?', hint: '한 줄이면 충분해요. 어느 경험 카드에 담을지는 같이 정해요.' },
           prefill: preset.text || '',
           src: project ? { type: 'checkin', projectId: project.id, question: '(직접 기록)' } : { type: 'manual', question: '(직접 기록)' },
           thread: project ? undefined : { source: 'capture' },
@@ -627,7 +626,7 @@
         });
       }
 
-      // 경험 후보를 그 자리에서 경험으로 확정 — 따로 박스를 띄우지 않고 이 방의 대화 흐름 맨 아래에 이어 쓴다.
+      // 카드에 안 담긴 경험을 그 자리에서 카드에 담기 — 따로 박스를 띄우지 않고 이 방의 대화 흐름 맨 아래에 이어 쓴다.
       // 맨 아래 '다시 답하기 / 이어서 이야기하기' 바 자리는 이 대화의 입력창이 된다
       function openOrg(threadId) {
         if (org) return;
@@ -637,7 +636,7 @@
         roomEl.querySelectorAll('[data-room-organize]').forEach((b) => { b.disabled = true; });
         const wrap = document.createElement('div');
         wrap.className = 'ask-cont ask-org-wrap';
-        wrap.innerHTML = '<div class="ask-org-cap"><span>경험으로 확정하는 중</span><button type="button" class="ask-org-stop" data-ask-org-close>그만두기</button></div><div class="ask-org-slot"></div>';
+        wrap.innerHTML = '<div class="ask-org-cap"><span>카드에 담는 중</span><button type="button" class="ask-org-stop" data-ask-org-close>그만두기</button></div><div class="ask-org-slot"></div>';
         body.appendChild(wrap);
         const cap = wrap.querySelector('.ask-org-cap'); const slot = wrap.querySelector('.ask-org-slot');
         const close = () => { renderRoom(); refreshAll(); };

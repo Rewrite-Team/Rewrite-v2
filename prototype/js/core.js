@@ -1,7 +1,7 @@
 /* App core: store, router, ui helpers, mock AI. 모든 화면이 이 API만 사용한다. */
 window.App = window.App || {};
 (function (App) {
-  const LS_KEY = 'rewrite-proto-v7'; // v7: 대화 기록(원문 채팅방) + 대화형 이전 체크인 정리, v6: 경험 위키 (모든 기록 → ingest → 경험 페이지, 변경 기록·점검), v5: 깃허브 레포 분석 + 마스터 이력서, v2: 프로젝트와 경험 카드 분리 (1 프로젝트 : N 카드), v3: 완료 프로젝트 예시 추가, v4: 지난 질문 기록 시드 + 연속 기록을 답변 날짜에서 계산
+  const LS_KEY = 'rewrite-proto-v8'; // v8: 경험(대화) → 경험 카드 모델, 경험 후보 삭제, v7: 대화 기록(원문 채팅방) + 대화형 이전 체크인 정리, v6: 경험 위키 (모든 기록 → ingest → 경험 페이지, 변경 기록·점검), v5: 깃허브 레포 분석 + 마스터 이력서, v2: 프로젝트와 경험 카드 분리 (1 프로젝트 : N 카드), v3: 완료 프로젝트 예시 추가, v4: 지난 질문 기록 시드 + 연속 기록을 답변 날짜에서 계산
   const clone = (o) => JSON.parse(JSON.stringify(o));
 
   /* ---------------- Store ---------------- */
@@ -23,12 +23,6 @@ window.App = window.App || {};
   if (!state.resume) state.resume = clone(window.SEED.resume || EMPTY_RESUME());
   // '건너뛰기'와 '나중에'를 '나중에 답하기' 하나로 합침: 예전 '나중에' 질문은 미뤄 둔 질문(skipped)으로
   (state.inbox || []).forEach((q) => { if (q.status === 'later') q.status = 'skipped'; });
-  // 시드 프로젝트 이름을 사용자가 실제로 쓸 법한 짧은 이름으로
-  const SHORT_NAME = { '팀 프로젝트 「모여봄」 — 동네 모임 매칭 서비스': '모여봄', '개인 프로젝트 — 가계부 슬랙봇': '슬랙봇', '캡스톤 디자인 「빈강의실」 — 강의실 예약 웹앱': '빈강의실' };
-  (state.projects || []).forEach((p) => { if (SHORT_NAME[p.title]) p.title = SHORT_NAME[p.title]; });
-  const fixSlack = (t) => String(t || '').replace(/「가계부 슬랙봇」/g, '「슬랙봇」');
-  (state.inbox || []).forEach((q) => { q.text = fixSlack(q.text); });
-  (state.experiences || []).forEach((e) => { e.title = fixSlack(e.title); });
   const listeners = new Set();
   function persist() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ } }
   function emit() { persist(); listeners.forEach((fn) => fn(state)); }
@@ -581,7 +575,7 @@ window.App = window.App || {};
     // 질문함: 질문 하나 = 대화방 하나. 옛 주소(#/daily, #/chat)도 질문함으로 연결
     ['#/ask/:room', 'ask'], ['#/ask', 'ask'], ['#/daily', 'ask'], ['#/chat', 'ask'],
     // 프로젝트는 경험 위키 안의 묶음 페이지 (#/projects/:id 는 옛 주소 호환)
-    ['#/vault/p/:id', 'projects'], ['#/projects/:id', 'projects'], ['#/projects', 'vault'], ['#/vault', 'vault'], ['#/card/:id', 'card'],
+    ['#/vault/p/:id', 'projects'], ['#/projects/:id', 'projects'], ['#/projects', 'vault'], ['#/vault', 'vault'], ['#/graph', 'graph'], ['#/card/:id', 'card'],
     ['#/apply/:id/:tab', 'apply'], ['#/apply/:id', 'apply'], ['#/apply', 'apply'],
     ['#/competency', 'apply'], ['#/match', 'apply'], ['#/settings', 'settings'], ['#/resume', 'resume'],
   ];

@@ -1,5 +1,5 @@
 /* 경험 위키 — #/vault?kw=<키워드>&q=<검색어>
-   기록(답변·체크인·대화·코드) → AI가 정리한 경험 페이지 목록 + 위키 점검 + 최근 변경.
+   경험(끝낸 대화 하나) → 경험을 모은 경험 카드 목록 + 위키 점검 + 최근 변경.
    프로젝트도 위키 안의 묶음이다: 프로젝트 줄(카드) + 프로젝트별 묶음, 각 프로젝트 페이지는 #/vault/p/:id */
 (function (App) {
   const esc = (s) => App.ui.esc(s);
@@ -68,7 +68,7 @@
 
   function listHTML(list, pre = '') {
     return `<div class="card vt-table">
-      <div class="vt-row vt-row-head"><div>경험</div><div>유형</div><div>기간</div><div>역량 키워드</div><div>완성도</div><div></div></div>
+      <div class="vt-row vt-row-head"><div>경험 카드</div><div>유형</div><div>기간</div><div>역량 키워드</div><div>완성도</div><div></div></div>
       ${list.map((e) => `<div class="vt-row" data-href="#/card/${esc(e.id)}">
         <div class="vt-c-title">${App.ui.statusTag(e.status)}<span class="vt-t">${esc(e.title)}</span>${e.projectId && App.store.getProject(e.projectId) ? '<span class="vt-from" title="프로젝트의 경험">▤</span>' : ''}</div>
         <div class="vt-c-cat">${esc(e.category)}</div>
@@ -82,19 +82,19 @@
 
   function emptyHTML(st) {
     if (!App.store.list().length) {
-      return `<div class="card vt-empty"><div class="vt-empty-ico">📭</div><h3>아직 위키에 경험이 없어요</h3>
-        <p class="muted">평범해 보이는 일도 좋은 경험이 될 수 있어요. 한 줄만 기록해도 AI가 경험 페이지로 정리해요.</p>
+      return `<div class="card vt-empty"><div class="vt-empty-ico">📭</div><h3>아직 위키에 경험 카드가 없어요</h3>
+        <p class="muted">평범해 보이는 일도 좋은 경험이 될 수 있어요. AI와 한 줄만 이야기해도 경험이 되고, 경험을 모으면 경험 카드가 돼요.</p>
         <div class="row vt-empty-actions"><button type="button" class="btn btn-primary" data-capture>＋ 기록하기</button></div></div>`;
     }
     if (st.kws.size) {
       const names = Array.from(st.kws);
       return `<div class="card vt-empty"><div class="vt-empty-kws">${names.map((k) => App.ui.keywordChip(k, { size: 'lg' })).join('')}</div>
-        <h3>이 역량의 경험이 아직 없어요</h3>
-        <p class="muted">이 역량이 드러났던 순간을 AI와 대화하며 정리해 볼까요? 답하면 경험 페이지가 만들어져요.</p>
+        <h3>이 역량의 경험 카드가 아직 없어요</h3>
+        <p class="muted">이 역량이 드러났던 순간을 AI와 대화하며 정리해 볼까요? 길게 대화하면 경험 카드가 바로 만들어져요.</p>
         <div class="row vt-empty-actions"><a class="btn btn-primary" href="#/ask/new?mode=deep&kw=${encodeURIComponent(names[0])}">✦ 경험 정리하기</a>
         <button type="button" class="btn" data-act="reset">필터 초기화</button></div></div>`;
     }
-    return `<div class="card vt-empty"><div class="vt-empty-ico">🔍</div><h3>조건에 맞는 경험이 없어요</h3>
+    return `<div class="card vt-empty"><div class="vt-empty-ico">🔍</div><h3>조건에 맞는 경험 카드가 없어요</h3>
       <p class="muted">검색어를 바꾸거나 필터를 풀어 보세요.</p>
       <div class="row vt-empty-actions"><button type="button" class="btn" data-act="reset">필터 초기화</button><button type="button" class="btn btn-primary" data-capture>＋ 기록하기</button></div></div>`;
   }
@@ -139,7 +139,7 @@
   }
 
   function itemsHTML(st, list, pre) { return st.view === 'list' ? listHTML(list, pre) : gridHTML(list, pre); }
-  const srcCount = (list) => list.reduce((n, e) => n + App.wiki.sourcesOf(e).length, 0);
+  const srcCount = (list) => list.reduce((n, e) => n + App.wiki.sourcesOf(e).filter((x) => x.type !== 'code').length, 0);
   const codeCount = (list) => list.reduce((n, e) => n + (e.codeRefs || []).length, 0);
 
   const projHref = (id, tab) => '#/vault/p/' + encodeURIComponent(id) + (tab ? '?tab=' + tab : '');
@@ -175,17 +175,17 @@
       const code = codeCount(items);
       out.push(`<section class="vt-group">
         <div class="vt-group-head"><a class="vt-group-t" href="${projHref(p.id)}">▤ ${esc(projShort(p))}</a>
-          ${App.ui.projectStatusTag ? App.ui.projectStatusTag(p.status) : App.ui.statusTag(p.status)}<span class="vt-group-meta">${App.ui.period(p.period)} · 경험 ${items.length}${code ? ` · <a class="vt-group-code" href="${projHref(p.id, 'code')}">코드 근거 ${code}</a>` : ''}</span>
+          ${App.ui.projectStatusTag ? App.ui.projectStatusTag(p.status) : App.ui.statusTag(p.status)}<span class="vt-group-meta">${App.ui.period(p.period)} · 카드 ${items.length}${code ? ` · <a class="vt-group-code" href="${projHref(p.id, 'code')}">코드 근거 ${code}</a>` : ''}</span>
           ${checkinPill(p)}
           <a class="vt-group-more" href="${projHref(p.id)}">프로젝트 페이지 →</a></div>
         ${items.length ? itemsHTML(st, items, 'p' + p.id + '-')
-          : `<div class="vt-group-empty">아직 이 프로젝트의 경험 문서가 없어요. 체크인을 남기거나 코드를 분석하면 생겨요.
+          : `<div class="vt-group-empty">아직 이 프로젝트의 경험 카드가 없어요. 체크인을 남기거나 코드를 분석하면 생겨요.
             <button type="button" class="btn btn-sm btn-ghost" data-capture data-capture-project="${esc(p.id)}">＋ 이 프로젝트 기록하기</button></div>`}</section>`);
     });
     const loose = list.filter((e) => !e.projectId || !App.store.getProject(e.projectId));
     if (loose.length) {
       out.push(`<section class="vt-group">
-        <div class="vt-group-head"><span class="vt-group-t">프로젝트 밖 경험</span><span class="vt-group-meta">경험 ${loose.length}</span></div>
+        <div class="vt-group-head"><span class="vt-group-t">프로젝트 밖 경험 카드</span><span class="vt-group-meta">카드 ${loose.length}</span></div>
         ${itemsHTML(st, loose, 'loose-')}</section>`);
     }
     return out.join('');
@@ -199,14 +199,14 @@
     const out = keys.map((k) => {
       const items = map.get(k);
       return `<section class="vt-group">
-        <div class="vt-group-head">${App.ui.keywordChip(k, { size: 'lg' })}<span class="vt-group-meta">경험 ${items.length} · 근거 ${srcCount(items)}</span>
+        <div class="vt-group-head">${App.ui.keywordChip(k, { size: 'lg' })}<span class="vt-group-meta">카드 ${items.length} · 경험 ${srcCount(items)}</span>
           <span class="vt-group-desc subtle">${esc(App.keywords.get(k).desc || '')}</span></div>
         ${itemsHTML(st, items, 'k' + k + '-')}</section>`;
     });
     const none = st.kws.size ? [] : list.filter((e) => !e.keywords.length);
     if (none.length) {
       out.push(`<section class="vt-group">
-        <div class="vt-group-head"><span class="vt-group-t">역량이 아직 없는 경험</span><span class="vt-group-meta">경험 ${none.length}</span></div>
+        <div class="vt-group-head"><span class="vt-group-t">역량이 아직 없는 카드</span><span class="vt-group-meta">카드 ${none.length}</span></div>
         ${itemsHTML(st, none, 'none-')}</section>`);
     }
     return out.join('');
@@ -242,7 +242,7 @@
         ? '<span class="vt-asked">✓ 오늘의 질문에 있어요</span>'
         : `<button type="button" class="btn btn-sm btn-ghost vt-later" data-issue-ask="${esc(i.id)}">나중에 질문으로</button>`);
     }
-    if (i.expId) acts.push(`<a class="btn btn-sm btn-ghost" href="#/card/${encodeURIComponent(i.expId)}">페이지 →</a>`);
+    if (i.expId) acts.push(`<a class="btn btn-sm btn-ghost" href="#/card/${encodeURIComponent(i.expId)}">카드 →</a>`);
     else if (i.projectId) acts.push(`<a class="btn btn-sm btn-ghost" href="${projHref(i.projectId, i.findingId ? 'code' : '')}">프로젝트 →</a>`);
     return `<li class="wk-issue ${open ? 'is-talking' : ''}" data-sev="${i.severity}"><span class="wk-issue-dot"></span><span class="wk-issue-text">${esc(i.text)}</span><span class="wk-issue-actions">${acts.join('')}</span>
       ${open ? `<div class="vt-talk-wrap"><button type="button" class="btn btn-ghost btn-sm vt-talk-close" data-act="close-talk" aria-label="닫기">✕</button><div data-vt-talk-slot></div></div>` : ''}</li>`;
@@ -263,8 +263,7 @@
     const issues = App.wiki.lint();
     const shown = st.allIssues ? issues : issues.slice(0, ISSUE_LIMIT);
     const fixed = st.fixed && App.wiki.get(st.fixed);
-    const kept = App.wiki.threadsFor ? App.wiki.threadsFor({ kind: 'kept' }).length : 0;
-    return `<div class="vt-panel-head"><h2>위키 점검</h2><span class="subtle">${issues.length ? `채우면 좋은 곳 ${issues.length}개` : ''}</span>${kept ? `<a class="vt-kept-link" href="#/ask?only=kept">📝 확정 전 경험 후보 ${kept}개 →</a>` : ''}</div>
+    return `<div class="vt-panel-head"><h2>위키 점검</h2><span class="subtle">${issues.length ? `채우면 좋은 곳 ${issues.length}개` : ''}</span></div>
       ${fixed ? `<div class="vt-fixed">${App.wiki.reportHTML(fixed)}<button type="button" class="btn btn-sm btn-ghost vt-fixed-close" data-act="close-fixed">닫기</button></div>` : ''}
       ${issues.length ? `<ul class="wk-issues">${shown.map((i) => issueHTML(i, st)).join('')}</ul>
         ${issues.length > ISSUE_LIMIT ? `<button type="button" class="btn btn-sm btn-ghost vt-more" data-act="more-issues">${st.allIssues ? '접기' : `더 보기 (${issues.length - ISSUE_LIMIT}개)`}</button>` : ''}`
@@ -272,14 +271,15 @@
   }
   function feedHTML() {
     const list = App.wiki.entries().slice(0, 8);
-    return `<div class="vt-panel-head"><h2>최근 변경</h2><span class="subtle">기록이 어느 페이지를 바꿨는지</span></div>
+    return `<div class="vt-panel-head"><h2>최근 변경</h2><span class="subtle">기록이 어느 카드를 바꿨는지</span></div>
       ${list.length ? `<div class="wk-feed">${list.map((e) => App.wiki.reportHTML(e, { compact: true })).join('')}</div>`
         : '<div class="vt-soft">아직 변경 기록이 없어요. 질문함에서 질문에 답하거나 ＋ 기록하기로 시작해 보세요.</div>'}`;
   }
   function statsText() {
     const s = App.wiki.stats();
     const ongoing = App.store.projects().filter((p) => p.status !== 'done').length;
-    return `경험 문서 ${s.pages} · 프로젝트 ${s.projects}${ongoing ? ` (진행 중 ${ongoing})` : ''} · 근거 기록 ${s.sources}`;
+    const exps = App.wiki.experienceItems ? App.wiki.experienceItems().length : 0;
+    return `경험 카드 ${s.pages} · 경험 ${exps} · 프로젝트 ${s.projects}${ongoing ? ` (진행 중 ${ongoing})` : ''}`;
   }
 
   App.screens.vault = {
@@ -289,7 +289,7 @@
       return `<div class="page vt-page">
         <div class="page-head vt-pagehead">
           <div><h1>경험 위키</h1>
-            <p>답변·체크인·AI 대화·코드 분석을 기록하면 AI가 경험 페이지로 정리하고, 프로젝트별로 묶어 둬요. 이력서와 자소서는 여기서 꺼내 써요.</p>
+            <p>AI와 나눈 대화 하나하나가 경험이 되고, 경험을 모은 <b>경험 카드</b>는 면접·이력서·자소서에 바로 꺼내 써요. 프로젝트별로 묶어 둬요.</p>
             <div class="vt-stats" data-vt-stats>${statsText()}</div></div>
           <div class="row vt-head-acts"><button type="button" class="btn btn-primary" data-capture>＋ 기록하기</button></div>
         </div>
@@ -298,7 +298,7 @@
           <section class="card card-pad vt-panel" data-vt-feed>${feedHTML()}</section>
         </div>
         <section class="vt-projects" data-vt-projects>${projectsHTML()}</section>
-        <div class="vt-list-head"><h2>경험 페이지 <span class="subtle" data-vt-total>${App.store.list().length}</span></h2></div>
+        <div class="vt-list-head"><h2>경험 카드 <span class="subtle" data-vt-total>${App.store.list().length}</span></h2></div>
         ${toolbarHTML(st)}
         <div class="vt-results" data-vt-results>${resultsHTML(st)}</div>
       </div>`;
@@ -391,10 +391,10 @@
       function confirmDelete(id) {
         const e = App.store.get(id); if (!e) return;
         App.ui.modal({
-          title: '이 경험을 삭제할까요?',
-          body: `<p><b>${esc(e.title)}</b></p><p style="margin-top:6px">STAR 정리와 이 페이지에 모인 답변이 함께 삭제되고 되돌릴 수 없어요. 프로젝트 체크인 기록은 그대로 남아요.</p>`,
+          title: '이 경험 카드를 삭제할까요?',
+          body: `<p><b>${esc(e.title)}</b></p><p style="margin-top:6px">STAR 정리와 카드가 삭제되고 되돌릴 수 없어요. 담긴 경험(대화 원문)과 프로젝트 체크인 기록은 그대로 남아요.</p>`,
           confirmText: '삭제하기', danger: true,
-          onConfirm() { App.store.remove(id); App.ui.toast('경험을 삭제했어요'); refreshWiki(); },
+          onConfirm() { App.store.remove(id); App.ui.toast('경험 카드를 삭제했어요'); refreshWiki(); },
         });
       }
 
@@ -414,7 +414,7 @@
         const ask = t.closest('[data-issue-ask]');
         if (ask) {
           const issue = findIssue(ask.getAttribute('data-issue-ask'));
-          if (issue && App.wiki.askIssue(issue)) App.ui.toast('오늘의 질문으로 보냈어요. 답하면 이 페이지에 반영돼요.');
+          if (issue && App.wiki.askIssue(issue)) App.ui.toast('오늘의 질문으로 보냈어요. 답하면 이 카드에 반영돼요.');
           refreshWiki(); return;
         }
         const tb = t.closest('[data-issue-talk]');

@@ -132,7 +132,7 @@
   function firstQ(d) {
     const pick = d.seeds[0], txt = d.seedText.trim();
     if (!pick && !txt) return '';
-    if (txt) return `<div class="ob-firstq"><span class="ai-dot">R</span><div><span class="ob-firstq-label">시작하면 이렇게 돼요</span><p>“${esc(txt)}”를 경험 위키에 기록해요. AI가 비슷한 경험에 보태거나 새 경험 페이지를 만들어요.</p></div></div>`;
+    if (txt) return `<div class="ob-firstq"><span class="ai-dot">R</span><div><span class="ob-firstq-label">시작하면 이렇게 돼요</span><p>“${esc(txt)}”를 경험 위키에 기록해요. AI와 나눈 대화는 경험으로 저장되고, 비슷한 경험 카드에 담거나 새 카드를 만들어요.</p></div></div>`;
     return `<div class="ob-firstq"><span class="ai-dot">R</span><div><span class="ob-firstq-label">첫 오늘의 질문</span><p>${esc(seedQuestion(pick))}</p></div></div>`;
   }
 

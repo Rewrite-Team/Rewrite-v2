@@ -78,7 +78,7 @@
 /* 기록 대화 (App.talk) — 체크인 카드 · 타임라인 기록 · 코드 항목 아래 */
 .pj-talk { margin-top: 4px; min-width: 0; }
 .pj-log-body .pj-talk, .pj-gf .pj-talk { margin-top: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); }
-/* 경험 후보 확정: 박스 없이 기록 바로 아래로 이어지는 대화 (안쪽 스크롤도 없음) */
+/* 카드에 담기: 박스 없이 기록 바로 아래로 이어지는 대화 (안쪽 스크롤도 없음) */
 .pj-log-body .pj-talk.is-inline { margin-top: 0; padding: 0; border: 0; background: none; }
 .pj-talk.is-inline .tk-msgs { max-height: none; overflow: visible; }
 .pj-org-cap { display: flex; align-items: center; gap: 10px; margin: 12px 0 10px; font-size: 12px; font-weight: 700; color: var(--primary-ink); }

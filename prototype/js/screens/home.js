@@ -1,5 +1,5 @@
 /* 홈: 지금 할 일만 한 칸에 — 오늘의 질문 · 지원 기업 · 답변 캘린더.
-   위키 점검은 오늘의 질문으로 들어오고(autoQueue) 전체 목록은 경험 위키에서, 변경 기록은 경험 위키·경험 페이지에서 본다 */
+   위키 점검은 오늘의 질문으로 들어오고(autoQueue) 전체 목록은 경험 위키에서, 변경 기록은 경험 위키·경험 카드에서 본다 */
 (function (App) {
   const esc = (s) => App.ui.esc(s);
   const TYPE_LABEL = { project: '프로젝트 체크인', deepen: '경험 깊이 파기', recall: '기억 떠올리기', code: '코드 분석에서 온 질문' };
@@ -27,7 +27,7 @@
       return `<section class="card home-today home-today-done">
         <div class="home-today-head"><span class="home-pill home-pill-done">✓ 오늘 질문 완료</span></div>
         <h2 class="home-today-q">오늘 도착한 질문에 모두 답했어요.</h2>
-        <p class="home-today-hint">떠오른 일이 있으면 질문함의 ＋ 새 대화로 한 줄 남겨 두세요. 위키가 알아서 맞는 경험에 반영해요.</p>
+        <p class="home-today-hint">떠오른 일이 있으면 질문함의 ＋ 새 대화로 한 줄 남겨 두세요. 대화는 경험으로 저장되고, 맞는 경험 카드에 담을 수 있어요.</p>
         <div class="home-today-actions">
           <a class="btn btn-ghost" href="#/ask">질문함 열기</a>
         </div>
