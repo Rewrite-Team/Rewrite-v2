@@ -1,34 +1,50 @@
-/* 깃허브 레포 분석: App.github. 담당: 레포 분석
-   공개 GitHub REST API(비인증)로 레포 메타·언어·파일 트리를 받고, 고른 파일(≤30개)을 raw 로 읽어
-   규칙 기반 분석기(정규식 = 목업 "AI")로 이력서에 쓸 만한 기술 포인트를 찾는다.
-   각 포인트는 어느 파일 몇 번째 줄에서 나왔는지(evidence) 를 함께 돌려준다. */
+/* GitHub: App.github. 담당: 레포 분석
+   ① fetchAccount(주소) — 사용자 주소 하나로 조직·GitHub 프로젝트·레포를 모두 가져온다 (공개 REST API, 비인증)
+   ② analyzeRepo({ owner, name, url }, { login }) — 코드(고른 파일 ≤30개, 규칙 기반 = 목업 "AI")와 커밋·PR 을 읽어
+      STAR 초안 카드로 정리한다. 커밋·PR·코드에서 알 수 있는 사실만 쓰고, 수치·결과는 지어내지 않는다. */
 (function (App) {
   const API = 'https://api.github.com';
   const RAW = 'https://raw.githubusercontent.com';
   const MAX_FILES = 30;
-  const MAX_FINDINGS = 10;
+  const MAX_DRAFTS = 8;
   const MAX_SNIPPET = 18;
+  const MAX_ORGS = 8;
+  const MAX_CONTRIB_OWNERS = 8;   // 조직 멤버십이 비공개일 때 커밋·PR 로 보충하는 owner 수
+  const MAX_CONTRIB_REPOS = 4;    // 그 owner 하나당 레포 수
 
-  const today = () => { const d = new Date(); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
+  const today = () => App.store.localDay();
   const clone = (o) => JSON.parse(JSON.stringify(o));
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const keyOf = (owner, name) => `${owner}/${name}`.toLowerCase();
+  const day = (s) => String(s || '').slice(0, 10);
 
-  /* ---------------- URL ---------------- */
-  // https://github.com/o/r, .git, /tree/branch, 끝 슬래시, github.com/o/r, git@github.com:o/r.git 를 받는다.
-  function parseUrl(url) {
-    let s = String(url || '').trim();
+  /* ---------------- 주소 ---------------- */
+  const LOGIN = /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i;
+  const RESERVED = /^(settings|topics|explore|marketplace|features|pricing|about|login|join|notifications|search|sponsors|issues|pulls|new|apps|collections|trending)$/i;
+  // github.com 주소에서 경로 조각만. github 가 아닌 주소면 null
+  function pathParts(input) {
+    let s = String(input || '').trim();
     if (!s) return null;
-    s = s.replace(/^git@github\.com:/i, 'https://github.com/').replace(/^(?:https?:\/\/)?(?:www\.)?github\.com\//i, '');
-    if (/^[a-z]+:\/\//i.test(s)) return null; // github 가 아닌 주소
-    s = s.split(/[?#]/)[0];
-    const parts = s.split('/').filter(Boolean);
-    if (parts.length < 2) return null;
+    s = s.replace(/^git@github\.com:/i, 'https://github.com/').replace(/^(?:https?:\/\/)?(?:www\.)?github\.com(\/|$)/i, '');
+    if (/^[a-z]+:\/\//i.test(s)) return null;
+    return s.split(/[?#]/)[0].split('/').filter(Boolean);
+  }
+  // 레포 주소: https://github.com/o/r, .git, /tree/branch, git@github.com:o/r.git → { owner, name, branch? }
+  function parseUrl(url) {
+    const parts = pathParts(url);
+    if (!parts || parts.length < 2) return null;
     const owner = parts[0]; const name = parts[1].replace(/\.git$/i, '');
-    if (!/^[A-Za-z0-9-]+$/.test(owner) || !/^[A-Za-z0-9._-]+$/.test(name)) return null;
+    if (!LOGIN.test(owner) || !/^[A-Za-z0-9._-]+$/.test(name)) return null;
     const out = { owner, name };
     if ((parts[2] === 'tree' || parts[2] === 'blob') && parts[3]) out.branch = decodeURIComponent(parts[3]);
     return out;
+  }
+  // 사용자·조직 주소 → login. 레포 주소가 들어오면 그 owner. 'github.com/octocat', 'github.com/orgs/x', '@octocat', 'octocat'
+  function parseAccount(input) {
+    const parts = pathParts(input);
+    if (!parts || !parts.length) return null;
+    const login = (/^(orgs|users)$/i.test(parts[0]) ? parts[1] : parts[0].replace(/^@/, '')) || '';
+    return LOGIN.test(login) && !RESERVED.test(login) && !/^(orgs|users)$/i.test(login) ? login : null;
   }
 
   /* ---------------- 에러 ---------------- */
@@ -37,7 +53,9 @@
     const hhmm = resetAt ? `${String(resetAt.getHours()).padStart(2, '0')}:${String(resetAt.getMinutes()).padStart(2, '0')}` : '';
     const MSG = {
       invalid: 'GitHub 레포 주소 형식이 아니에요. 예) https://github.com/owner/repo',
-      not_found: '레포를 찾을 수 없어요. 주소가 맞는지, 공개(public) 레포인지 확인해 주세요. 비공개 레포는 아직 분석할 수 없어요.',
+      invalid_account: 'GitHub 주소 형식이 아니에요. 예) https://github.com/octocat',
+      not_found: '레포를 찾을 수 없어요. 공개(public) 레포인지 확인해 주세요. 비공개 레포는 아직 분석할 수 없어요.',
+      account_not_found: 'GitHub 계정을 찾을 수 없어요. 주소가 맞는지 확인해 주세요.',
       rate_limit: `GitHub API 호출 한도에 걸렸어요. 로그인 없이 쓰면 1시간에 60회까지만 부를 수 있어요.${hhmm ? ` ${hhmm} 이후에 다시 시도해 주세요.` : ' 잠시 뒤 다시 시도해 주세요.'}`,
       network: '네트워크에 연결할 수 없어요. 인터넷 연결을 확인하고 다시 시도해 주세요.',
       empty: '아직 커밋이 없는 빈 레포예요. 코드를 올린 뒤 다시 분석해 주세요.',
@@ -48,17 +66,18 @@
     return e;
   }
 
-  async function getJson(url) {
+  async function getJson(path, notFound = 'not_found') {
     let res;
-    try { res = await fetch(url, { headers: { Accept: 'application/vnd.github+json' } }); } catch (err) { throw ghError('network'); }
+    try { res = await fetch(API + path, { headers: { Accept: 'application/vnd.github+json' } }); } catch (err) { throw ghError('network'); }
     if (res.ok) return res.json();
     const remaining = res.headers.get('x-ratelimit-remaining');
-    if (res.status === 429 || (res.status === 403 && remaining === '0')) throw ghError('rate_limit', { reset: res.headers.get('x-ratelimit-reset') });
-    if (res.status === 404 || res.status === 451) throw ghError('not_found');
-    if (res.status === 403) throw ghError('not_found'); // 접근 권한 없음 (비공개 등)
+    if (res.status === 429 || (res.status === 403 && (remaining === '0' || res.headers.get('retry-after')))) throw ghError('rate_limit', { reset: res.headers.get('x-ratelimit-reset') });
+    if (res.status === 404 || res.status === 451 || res.status === 403) throw ghError(notFound); // 403: 접근 권한 없음 (비공개 등)
     if (res.status === 409) throw ghError('empty');
     throw ghError('http', { status: res.status });
   }
+  // 없어도 되는 정보: 실패하면 기본값
+  const optional = (path, fallback) => getJson(path).catch(() => fallback);
   async function getRaw(o, r, branch, path) {
     try {
       const res = await fetch(`${RAW}/${o}/${r}/${encodeURIComponent(branch)}/${path.split('/').map(encodeURIComponent).join('/')}`);
@@ -72,11 +91,96 @@
     }));
     return out;
   }
+  const reporter = (opts, steps) => (step, text, done, total) => { if (opts.onProgress) try { opts.onProgress({ step, text: text || steps[step], done, total, steps }); } catch (e) { /* ignore */ } };
+
+  /* ---------------- 계정: 조직 · 프로젝트 · 레포 ---------------- */
+  const ACCOUNT_STEPS = ['계정 확인하는 중', '조직 찾는 중', '레포와 프로젝트 불러오는 중', '기여한 레포 찾는 중'];
+  const PUBLIC_ONLY = '공개 레포만 가져올 수 있어요. 비공개 레포와 비공개 조직은 보이지 않아요.';
+  const byPushed = (a, b) => (a.fork - b.fork) || String(b.pushedAt).localeCompare(String(a.pushedAt));
+  const toRepo = (r) => ({ owner: r.owner.login, name: r.name, url: r.html_url, description: r.description || '', language: r.language || '', pushedAt: day(r.pushed_at), fork: !!r.fork });
+  const toBoards = (list, kind, login) => (Array.isArray(list) ? list : []).filter((p) => p && p.title && !p.is_template && !p.deleted_at)
+    .map((p) => ({ number: p.number, title: p.title, url: `https://github.com/${kind}/${login}/projects/${p.number}` }));
+
+  function sampleAccount() { return Object.assign(clone(window.SEED.github), { fetchedAt: today(), note: PUBLIC_ONLY, warnings: [] }); }
+  const isSampleLogin = (login) => !!window.SEED.github && login.toLowerCase() === window.SEED.github.login.toLowerCase();
+
+  // 커밋·PR 검색으로 "내가 기여한 다른 owner 의 레포" 찾기. 실패하면 빈 배열
+  async function contributedOwners(login, known) {
+    const q = encodeURIComponent(`author:${login}`);
+    const [commits, prs] = await Promise.all([
+      optional(`/search/commits?q=${q}&sort=author-date&per_page=100`, { items: [] }),
+      optional(`/search/issues?q=${encodeURIComponent(`author:${login} type:pr`)}&per_page=100`, { items: [] }),
+    ]);
+    const map = {};
+    const put = (full, info, date, weight) => {
+      const [owner, name] = full.split('/'); if (!owner || !name || known.has(owner.toLowerCase())) return;
+      const k = full.toLowerCase();
+      const r = map[k] = map[k] || { owner, name, url: `https://github.com/${full}`, description: '', language: '', pushedAt: '', fork: false, source: 'contributed', n: 0, type: '' };
+      r.n += weight; if (day(date) > r.pushedAt) r.pushedAt = day(date);
+      if (info) { r.description = info.description || r.description; r.fork = r.fork || !!info.fork; r.type = (info.owner && info.owner.type) || r.type; }
+    };
+    (commits.items || []).forEach((c) => { if (c.repository && !c.repository.private) put(c.repository.full_name, c.repository, c.commit && c.commit.author && c.commit.author.date, 1); });
+    (prs.items || []).forEach((p) => {
+      const full = String(p.repository_url || '').split('/repos/')[1]; if (!full) return;
+      if (p.pull_request && p.pull_request.merged_at) put(full, null, p.pull_request.merged_at, 2); // 병합된 PR 만
+    });
+    const owners = {};
+    Object.values(map).filter((r) => !r.fork).sort((a, b) => b.n - a.n).forEach((r) => { (owners[r.owner] = owners[r.owner] || []).push(r); });
+    return Object.entries(owners).map(([o, repos]) => ({ o, repos: repos.slice(0, MAX_CONTRIB_REPOS), n: repos.reduce((s, r) => s + r.n, 0), type: (repos.find((r) => r.type) || {}).type }))
+      .sort((a, b) => b.n - a.n).slice(0, MAX_CONTRIB_OWNERS)
+      .map((x) => ({ login: x.o, type: x.type === 'User' ? 'user' : 'org', name: x.o, source: 'contributed', projects: [], repos: x.repos.map(({ n, type, ...r }) => r).sort(byPushed) }));
+  }
+
+  // → { login, type, name, url, source:'github'|'sample', fetchedAt, note, warnings:[문장], owners:[{ login, type:'user'|'org', name, source?, projects, repos }] }
+  async function fetchAccount(input, opts = {}) {
+    const report = reporter(opts, ACCOUNT_STEPS);
+    const login = parseAccount(input);
+    if (!login) throw ghError('invalid_account');
+    if (isSampleLogin(login)) {
+      for (let k = 0; k < ACCOUNT_STEPS.length; k++) { report(k); await sleep(220); }
+      return sampleAccount();
+    }
+    report(0);
+    const u = await getJson(`/users/${login}`, 'account_not_found');
+    const isOrg = u.type === 'Organization'; const kind = isOrg ? 'orgs' : 'users';
+    const warnings = [];
+    report(1);
+    const [orgs, mine, boards] = await Promise.all([
+      isOrg ? [] : optional(`/users/${u.login}/orgs?per_page=100`, []),
+      getJson(`/${kind}/${u.login}/repos?per_page=100&sort=pushed`, 'account_not_found'),
+      optional(`/${kind}/${u.login}/projectsV2?per_page=30`, []),
+    ]);
+    if ((u.public_repos || 0) > 100) warnings.push(`${u.login}: 최근에 푸시한 레포 100개만 가져왔어요.`);
+    const owners = [{ login: u.login, type: isOrg ? 'org' : 'user', name: u.name || u.login, projects: toBoards(boards, kind, u.login), repos: mine.map(toRepo).sort(byPushed) }];
+
+    const list = orgs.slice(0, MAX_ORGS); let done = 0;
+    if (orgs.length > MAX_ORGS) warnings.push(`조직은 ${MAX_ORGS}개까지만 가져왔어요.`);
+    report(2, '', 0, list.length);
+    let limited = null;
+    const fetched = await pool(list, 4, async (o) => {
+      const [repos, projects] = await Promise.all([
+        getJson(`/orgs/${o.login}/repos?per_page=100&sort=pushed`).catch((e) => { if (e.code === 'rate_limit') limited = e; else warnings.push(`${o.login}: 레포를 가져오지 못했어요.`); return []; }),
+        optional(`/orgs/${o.login}/projectsV2?per_page=30`, []),
+      ]);
+      done++; report(2, `${ACCOUNT_STEPS[2]} (${done}/${list.length})`, done, list.length);
+      return { login: o.login, type: 'org', name: o.name || o.login, projects: toBoards(projects, 'orgs', o.login), repos: repos.map(toRepo).sort(byPushed) };
+    });
+    owners.push(...fetched);
+
+    if (!isOrg && !limited) {
+      report(3);
+      const extra = await contributedOwners(u.login, new Set(owners.map((o) => o.login.toLowerCase())));
+      await pool(extra.filter((o) => o.type === 'org').slice(0, 4), 4, async (o) => { o.projects = toBoards(await optional(`/orgs/${o.login}/projectsV2?per_page=30`, []), 'orgs', o.login); });
+      owners.push(...extra);
+    }
+    if (limited) warnings.push(limited.message + ' 일부 조직의 레포는 빠져 있어요.');
+    return { login: u.login, type: isOrg ? 'org' : 'user', name: u.name || u.login, url: u.html_url || `https://github.com/${u.login}`, source: 'github', fetchedAt: today(), note: PUBLIC_ONLY, warnings, owners };
+  }
 
   /* ---------------- 파일 고르기 ---------------- */
   const SKIP_DIR = /(^|\/)(node_modules|dist|build|out|target|vendor|\.next|\.nuxt|coverage|\.gradle|\.idea|\.vscode|__pycache__|venv|\.venv|site-packages|migrations|static|public|assets|docs|fixtures|\.mvn|gradle\/wrapper)\//i;
   const SRC_EXT = /\.(java|kt|kts|js|jsx|ts|tsx|mjs|cjs|py)$/i;
-  const PATH_HINT = /(config|security|auth|jwt|token|filter|repositor|repo\b|service|controller|handler|exception|advice|error|cache|redis|lock|middleware|guard|interceptor|router|routes?|views?|models?|serializer|schema|entity|domain|tasks?|worker|consumer|producer|listener|event|client|api|app|main|server|index|settings)/i;
+  const PATH_HINT = /(config|security|auth(?!or)|jwt|token|filter|repositor|repo\b|service|controller|handler|exception|advice|error|cache|redis|lock|middleware|guard|interceptor|router|routes?|views?|models?|serializer|schema|entity|domain|tasks?|worker|consumer|producer|listener|event|client|api|app|main|server|index|settings)/i;
   const isTestPath = (p) => /(^|\/)(src\/test\/|tests?\/|__tests__\/|spec\/)|[._-](test|spec)\.[a-z]+$|(^|\/)test_[^/]+\.py$|Tests?\.(java|kt)$/i.test(p);
 
   function classify(path) {
@@ -134,224 +238,149 @@
     [/mysql/i, 'MySQL'], [/postgres|psycopg|"pg"\s*:/i, 'PostgreSQL'], [/redis/i, 'Redis'], [/\bh2database|com\.h2|:h2:/i, 'H2'],
     [/testcontainers/i, 'Testcontainers'], [/junit|spring-boot-starter-test/i, 'JUnit5'], [/"jest"|"vitest"/i, 'Jest'], [/pytest/i, 'pytest'],
   ];
-  function deriveStack(files, langs, tree) {
+  function deriveStack(files, language, tree) {
     const build = files.filter((f) => f.kind === 'build' || f.kind === 'docker' || f.kind === 'conf').map((f) => f.text || '').join('\n');
     const s = [];
     const add = (x) => { if (x && !s.includes(x)) s.push(x); };
-    Object.keys(langs).filter((l) => ['Java', 'Kotlin', 'TypeScript', 'Python', 'JavaScript', 'Go'].includes(l)).slice(0, 2).forEach(add);
+    add(language);
     STACK_RULES.forEach(([re, name]) => { if (re.test(build)) add(name); });
     if (s.includes('TypeScript') && s.includes('JavaScript')) s.splice(s.indexOf('JavaScript'), 1);
     if (tree.some((t) => /(^|\/)(Dockerfile|docker-compose[^/]*\.ya?ml|compose\.ya?ml)$/i.test(t.path))) add('Docker');
     if (tree.some((t) => /^\.github\/workflows\//.test(t.path))) add('GitHub Actions');
-    return s.slice(0, 14);
+    return s;
   }
 
   /* ---------------- 규칙 ----------------
-     rule = { id, cat, conf, file: 경로 정규식, need: 줄 정규식(필수), also?: [보조 근거 정규식], when?(ctx),
-              title, bullet, detail, tags: 문자열·함수 }   (title/bullet/detail/tags 는 ctx 를 받는 함수일 수 있다) */
+     rule = { id, cat, conf, pri?, file: 경로 정규식, need: 줄 정규식(필수), also?: [보조 근거 정규식], when?(ctx), skipIf?, whole?,
+              title, act: 코드에서 확인되는 일('~함'), log: 커밋·PR 제목에서 같은 작업을 찾는 정규식 }   (title·act 는 ctx 를 받는 함수일 수 있다)
+     pri 1 = 흔한 코드라 커밋·PR 근거가 있을 때만 카드로 만든다 */
   const JVM = /\.(java|kt)$/i, JS = /\.(m?[jt]sx?|cjs)$/i, PY = /\.py$/i, SRCANY = /\.(java|kt|m?[jt]sx?|cjs|py)$/i;
-  const GRADLE = /(build\.gradle(\.kts)?|pom\.xml)$/i;
   const TC_RE = /testcontainers|@Container\b|(MySQL|PostgreSQL|MariaDB|Mongo(DB)?|Generic|Kafka)Container\b/i;
-  const FILL = '수치는 코드만으로 알 수 없어서 ○○로 비워 뒀어요. 직접 측정한 값으로 채워 주세요.';
+  const DEPLOY_RE = /docker\s+(build|push)|deploy|ssh|aws|codedeploy|ecr|ghcr/i;
   const RULES = [
     /* ---- 성능 ---- */
     { id: 'jpa_fetch_join', pri: 3, cat: '성능', conf: 'high', file: JVM, need: /join\s+fetch|JOIN\s+FETCH|@EntityGraph/,
-      title: 'fetch join으로 N+1 쿼리 문제 해결',
-      bullet: '연관 엔티티 조회 시 발생하던 N+1 쿼리를 fetch join(@EntityGraph)으로 묶어 조회 쿼리 수 ○○회→1회로 감소',
-      detail: `연관 관계를 지연 로딩할 때 생기는 N+1을 직접 인지하고 해결한 흔적이에요. 면접에서는 "N+1을 어떻게 발견했는지", "컬렉션 fetch join + 페이징의 한계"를 자주 물어요. ${FILL}`,
-      tags: ['JPA'] },
+      title: 'fetch join으로 연관 데이터 한 번에 조회', act: '연관 엔티티를 fetch join(@EntityGraph)으로 한 번에 조회하게 함.', log: /n\s*\+\s*1|fetch\s*join|entity\s*graph|페치\s*조인/i },
     { id: 'jpa_batch_size', cat: '성능', conf: 'mid', file: /\.(java|kt|ya?ml|properties)$/i, need: /default_batch_fetch_size|@BatchSize/,
-      title: '배치 페치로 지연 로딩 쿼리 수 줄이기',
-      bullet: 'Hibernate batch fetch size 설정으로 지연 로딩 시 IN 절로 묶어 조회해 쿼리 수 감소',
-      detail: 'fetch join을 쓰기 어려운 컬렉션 페이징 상황의 대안으로 자주 쓰여요. fetch join과 무엇이 다른지 설명할 수 있으면 좋아요.', tags: ['JPA'] },
-    { id: 'spring_cache', pri: 3, cat: '성능', conf: 'high', file: JVM, need: /@Cacheable|@EnableCaching|RedisCacheManager|CacheManager\b/,
-      also: [/@CacheEvict|@CachePut/, /RedisCacheConfiguration|RedisTemplate|JCacheManager|Caffeine/],
-      title: (c) => (c.has('Redis') ? 'Redis 캐시로 조회 성능 개선' : 'Spring Cache로 반복 조회 줄이기'),
-      bullet: (c) => (c.has('Redis') ? '자주 조회되는 데이터에 Redis 캐시(@Cacheable)를 적용해 조회 API 응답시간 ○○ms→○○ms로 단축' : '반복 조회되는 데이터에 Spring Cache(@Cacheable)를 적용해 DB 조회 횟수 감소'),
-      detail: `어떤 데이터를 왜 캐시했는지, 데이터가 바뀌면 캐시를 어떻게 무효화(@CacheEvict, TTL)하는지가 단골 질문이에요. ${FILL}`,
-      tags: (c) => (c.has('Redis') ? ['Redis', 'Spring Cache'] : ['Spring Cache']) },
+      title: '배치 페치로 지연 로딩 쿼리 묶기', act: 'batch fetch size를 설정해 지연 로딩 쿼리를 IN 절로 묶어 조회하게 함.', log: /batch\s*(fetch|size)|배치\s*(페치|사이즈|조회)/i },
+    { id: 'spring_cache', pri: 3, cat: '성능', conf: 'high', file: JVM, need: /@Cacheable|@EnableCaching|RedisCacheManager|CacheManager\b/, also: [/@CacheEvict|@CachePut/, /RedisCacheConfiguration|RedisTemplate|JCacheManager|Caffeine/],
+      title: (c) => (c.has('Redis') ? 'Redis 캐시로 반복 조회 줄이기' : 'Spring Cache로 반복 조회 줄이기'), act: (c) => `반복 조회되는 데이터에 ${c.has('Redis') ? 'Redis ' : ''}캐시(@Cacheable)를 적용함.`, log: /cache|캐시|캐싱/i },
     { id: 'jpa_index', pri: 1, cat: '성능', conf: 'mid', file: /\.(java|kt|sql)$/i, need: /@Index\s*\(|CREATE\s+(UNIQUE\s+)?INDEX/i,
-      title: '조회 조건에 인덱스 설계',
-      bullet: '검색 조건 컬럼에 인덱스를 설계해 조회 쿼리 응답시간 ○○% 단축',
-      detail: `어떤 쿼리를 보고 어떤 컬럼에 인덱스를 걸었는지, 복합 인덱스 순서를 어떻게 정했는지 설명할 수 있으면 강해요. ${FILL}`, tags: ['MySQL'] },
+      title: '조회 조건에 인덱스 설계', act: '조회 조건 컬럼에 인덱스를 추가함.', log: /\bindex(es|ing)?\b|인덱스/i },
     { id: 'paging', pri: 1, cat: '성능', conf: 'mid', file: SRCANY, need: /\bPageable\b|\bSlice<|PageRequest\.of|\.paginate\(|PageNumberPagination|CursorPagination/,
-      title: '페이지네이션으로 대량 목록 조회 처리',
-      bullet: '목록 조회 API에 페이지네이션을 적용해 한 번에 불러오는 데이터 양을 제한',
-      detail: '오프셋 방식과 커서(무한 스크롤) 방식의 차이, 데이터가 많아지면 오프셋이 느려지는 이유를 함께 준비해 두면 좋아요.', tags: [] },
+      title: '목록 조회에 페이지네이션 적용', act: '목록 조회에 페이지네이션을 적용함.', log: /pagina|paging|페이징|페이지네이션|무한\s*스크롤/i },
     { id: 'async', cat: '성능', conf: 'mid', file: JVM, need: /@Async\b|@EnableAsync|CompletableFuture\.(supplyAsync|runAsync)/,
-      title: '비동기 처리로 응답 지연 줄이기',
-      bullet: '알림·메일 등 부가 작업을 @Async 비동기로 분리해 핵심 API 응답시간 단축',
-      detail: '스레드 풀을 어떻게 설정했는지, 비동기 작업이 실패하면 어떻게 되는지를 물어볼 수 있어요.', tags: [] },
+      title: '부가 작업을 비동기로 분리', act: '일부 작업을 @Async(CompletableFuture) 비동기로 실행하게 함.', log: /\basync|비동기/i },
     { id: 'django_select_related', pri: 3, cat: '성능', conf: 'high', file: PY, need: /\.(select_related|prefetch_related)\(/,
-      title: 'select_related / prefetch_related로 N+1 해결',
-      bullet: 'Django ORM의 select_related·prefetch_related로 N+1 쿼리를 제거해 목록 API 쿼리 수 ○○회→○회로 감소',
-      detail: `두 메서드가 JOIN과 별도 쿼리 중 어떤 방식으로 동작하는지 차이를 설명할 수 있으면 좋아요. ${FILL}`, tags: ['Django'] },
+      title: 'select_related·prefetch_related로 조회 쿼리 묶기', act: 'select_related·prefetch_related로 연관 데이터를 묶어 조회하게 함.', log: /n\s*\+\s*1|select_related|prefetch|쿼리\s*(최적화|개선)/i },
     { id: 'py_cache', cat: '성능', conf: 'mid', file: PY, need: /@lru_cache|@cache_page|cache\.(get|set)\(|@cached\b|redis\.Redis\(/,
-      title: '캐시로 반복 계산·조회 줄이기', bullet: '반복 조회 결과를 캐시해 응답시간 ○○% 단축',
-      detail: `무엇을 캐시했고 언제 만료되는지(TTL) 설명할 수 있어야 해요. ${FILL}`, tags: (c) => (c.has('Redis') ? ['Redis'] : []) },
-    { id: 'js_cache', cat: '성능', conf: 'mid', file: JS, need: /new\s+Redis\(|createClient\(|redis\.(get|set|setex)\(|\.setEx?\(|cache-manager|CacheModule/,
-      when: (c) => c.has('Redis') || c.hasDep('cache-manager'),
-      title: 'Redis 캐시로 조회 부하 줄이기', bullet: '자주 조회되는 데이터를 Redis에 캐시해 DB 부하를 줄이고 응답시간 ○○ms 단축',
-      detail: `캐시 키 설계와 만료 정책, 캐시와 DB 데이터가 어긋날 때의 처리 방법을 준비해 두세요. ${FILL}`, tags: ['Redis'] },
+      title: '반복 계산·조회에 캐시 적용', act: '반복되는 계산·조회 결과를 캐시하게 함.', log: /cache|캐시|캐싱/i },
+    { id: 'js_cache', cat: '성능', conf: 'mid', file: JS, need: /new\s+Redis\(|createClient\(|redis\.(get|set|setex)\(|\.setEx?\(|cache-manager|CacheModule/, when: (c) => c.has('Redis') || c.hasDep('cache-manager'),
+      title: '자주 조회되는 데이터에 캐시 적용', act: '자주 조회되는 데이터를 캐시에 저장해 다시 쓰게 함.', log: /cache|redis|캐시|캐싱/i },
     { id: 'react_memo', pri: 1, cat: '성능', conf: 'mid', file: /\.(jsx|tsx)$/i, need: /\buseMemo\(|\buseCallback\(|React\.memo\(|\bmemo\(/,
-      title: '메모이제이션으로 불필요한 리렌더링 줄이기', bullet: 'useMemo·useCallback·React.memo로 불필요한 리렌더링을 줄여 화면 반응 속도 개선',
-      detail: '어떤 컴포넌트가 왜 다시 그려졌는지(Profiler 등으로) 확인한 과정이 있으면 훨씬 설득력이 생겨요.', tags: ['React'] },
+      title: '메모이제이션으로 리렌더링 줄이기', act: 'useMemo·useCallback·React.memo로 다시 그려지는 범위를 줄이게 함.', log: /memo|re-?render|리렌더|렌더링/i },
     { id: 'react_lazy', cat: '성능', conf: 'mid', file: /\.(jsx|tsx|js|ts)$/i, need: /React\.lazy\(|\blazy\(\s*\(\)\s*=>\s*import|dynamic\(\s*\(\)\s*=>\s*import/,
-      title: '코드 스플리팅으로 초기 로딩 줄이기', bullet: '라우트 단위 코드 스플리팅(lazy import)으로 초기 번들 크기 ○○% 감소',
-      detail: `번들 크기 전후를 측정해 두면 좋아요. ${FILL}`, tags: ['React'] },
+      title: '코드 스플리팅 적용', act: '화면 단위로 코드를 나눠 필요할 때 불러오게 함.', log: /lazy|code\s*split|번들|스플리팅/i },
 
     /* ---- 인증·보안 ---- */
-    { id: 'jwt_security', pri: 3, cat: '인증·보안', conf: 'high', file: JVM, need: /Jwts\.|JwtTokenProvider|JwtProvider|JWT\.create|JwtDecoder|JwtAuthentication/,
-      also: [/SecurityFilterChain|@EnableWebSecurity|WebSecurityConfigurerAdapter/, /OncePerRequestFilter|addFilterBefore/],
-      title: (c) => (c.has('Spring Security') ? 'JWT + Spring Security 인증 구현' : 'JWT 기반 인증 구현'),
-      bullet: (c) => `${c.has('Spring Security') ? 'Spring Security 필터 체인에 ' : ''}JWT 인증 필터를 구성해 세션 없이 확장 가능한 토큰 기반 인증 구현`,
-      detail: '세션 대신 JWT를 고른 이유, 토큰 탈취·만료 처리(Refresh Token), 필터가 어디서 동작하는지를 꼭 물어봐요.',
-      tags: (c) => ['JWT'].concat(c.has('Spring Security') ? ['Spring Security'] : []) },
-    { id: 'spring_security', cat: '인증·보안', conf: 'mid', file: JVM, need: /SecurityFilterChain|@EnableWebSecurity|WebSecurityConfigurerAdapter/,
-      also: [/PasswordEncoder|BCrypt/], skipIf: ['jwt_security'],
-      title: 'Spring Security로 인증·인가 구성', bullet: 'Spring Security로 URL별 접근 권한과 비밀번호 암호화(BCrypt)를 구성',
-      detail: '인증(Authentication)과 인가(Authorization)의 차이, 필터 체인 흐름을 설명할 수 있으면 좋아요.', tags: ['Spring Security'] },
+    { id: 'jwt_security', pri: 3, cat: '인증·보안', conf: 'high', file: JVM, need: /Jwts\.|JwtTokenProvider|JwtProvider|JWT\.create|JwtDecoder|JwtAuthentication/, also: [/SecurityFilterChain|@EnableWebSecurity|WebSecurityConfigurerAdapter/, /OncePerRequestFilter|addFilterBefore/],
+      title: (c) => (c.has('Spring Security') ? 'JWT + Spring Security 인증 구현' : 'JWT 기반 인증 구현'), act: (c) => `${c.has('Spring Security') ? 'Spring Security에 ' : ''}JWT 기반 인증을 구성함.`, log: /jwt|token|auth(?!or)|security|로그인|인증|인가|토큰/i },
+    { id: 'spring_security', cat: '인증·보안', conf: 'mid', file: JVM, need: /SecurityFilterChain|@EnableWebSecurity|WebSecurityConfigurerAdapter/, also: [/PasswordEncoder|BCrypt/], skipIf: ['jwt_security'],
+      title: 'Spring Security로 인증·인가 구성', act: 'Spring Security로 접근 권한을 구성함.', log: /security|auth(?!or)|로그인|인증|인가|권한/i },
     { id: 'oauth2', cat: '인증·보안', conf: 'high', file: /\.(java|kt|ya?ml|properties|[jt]sx?|py)$/i, need: /oauth2Login|OAuth2User|spring\.security\.oauth2|passport-(google|kakao|naver|github)|NextAuth|social_django|allauth/,
-      title: '소셜 로그인(OAuth 2.0) 연동', bullet: 'OAuth 2.0 기반 소셜 로그인을 연동해 회원가입 절차 간소화',
-      detail: 'Authorization Code 흐름을 그림으로 설명할 수 있게 준비해 두세요. 가입 전환율 같은 수치가 있으면 더 좋아요.', tags: ['OAuth 2.0'] },
-    { id: 'js_jwt', pri: 3, cat: '인증·보안', conf: 'high', file: JS, need: /jwt\.(sign|verify)\(|jsonwebtoken|JwtService|passport\.authenticate|@UseGuards\(/,
-      also: [/bcrypt\.(hash|compare)|argon2/],
-      title: 'JWT 인증 미들웨어 구현', bullet: 'JWT 검증 미들웨어(가드)로 보호 API 접근을 제어하고 비밀번호는 해시로 안전하게 저장',
-      detail: '토큰을 어디에 저장하는지(쿠키 vs 로컬스토리지), 만료·재발급을 어떻게 처리했는지 물어볼 수 있어요.', tags: ['JWT'] },
+      title: '소셜 로그인(OAuth 2.0) 연동', act: 'OAuth 2.0 소셜 로그인을 연동함.', log: /oauth|social|kakao|google|naver|소셜|카카오|구글|네이버/i },
+    { id: 'js_jwt', pri: 3, cat: '인증·보안', conf: 'high', file: JS, need: /jwt\.(sign|verify)\(|jsonwebtoken|JwtService|passport\.authenticate|@UseGuards\(/, also: [/bcrypt\.(hash|compare)|argon2/],
+      title: 'JWT 인증 구현', act: 'JWT를 발급·검증해 보호된 API 접근을 제어하게 함.', log: /jwt|token|auth(?!or)|guard|로그인|인증|토큰/i },
     { id: 'js_security_mw', cat: '인증·보안', conf: 'mid', file: JS, need: /helmet\(|express-rate-limit|rateLimit\(|ThrottlerModule|csurf/,
-      title: '보안 미들웨어·요청 제한 적용', bullet: 'helmet·rate limit 미들웨어로 보안 헤더와 요청 횟수 제한을 적용해 API 남용 방지',
-      detail: '어떤 공격(무차별 대입, XSS 등)을 막으려고 넣었는지 말할 수 있으면 좋아요.', tags: [] },
+      title: '보안 헤더·요청 제한 적용', act: '보안 헤더와 요청 횟수 제한 미들웨어를 적용함.', log: /helmet|rate.?limit|throttl|csrf|보안|요청 제한/i },
     { id: 'py_auth', cat: '인증·보안', conf: 'mid', file: PY, need: /permission_classes|IsAuthenticated|OAuth2PasswordBearer|jwt\.(encode|decode)\(|@login_required|JWTAuthentication/,
-      title: '토큰·권한 기반 API 인증', bullet: '토큰 인증과 권한 클래스로 사용자별 API 접근 권한을 분리',
-      detail: '인증과 인가를 어디서 어떻게 나눴는지 설명할 수 있게 준비해 두세요.', tags: [] },
+      title: '토큰·권한 기반 API 인증', act: '토큰 인증과 권한 검사로 API 접근을 제어하게 함.', log: /jwt|token|auth(?!or)|permission|로그인|인증|권한|토큰/i },
 
     /* ---- 데이터 ---- */
-    { id: 'optimistic_lock', pri: 3, cat: '데이터', conf: 'high', file: JVM, need: /@Version\b/,
-      also: [/OptimisticLock|ObjectOptimisticLockingFailureException|@Retryable/],
-      title: '낙관적 락으로 동시 수정 충돌 제어', bullet: '엔티티 버전 필드(@Version) 기반 낙관적 락으로 동시 요청 시 데이터 정합성 보장',
-      detail: '왜 비관적 락이 아니라 낙관적 락인지, 충돌이 나면 사용자에게 어떻게 안내/재시도하는지가 핵심 질문이에요. 동시성 테스트를 했다면 꼭 함께 적어 주세요.', tags: ['JPA'] },
+    { id: 'optimistic_lock', pri: 3, cat: '데이터', conf: 'high', file: JVM, need: /@Version\b/, also: [/OptimisticLock|ObjectOptimisticLockingFailureException|@Retryable/],
+      title: '낙관적 락으로 동시 수정 충돌 제어', act: '엔티티에 버전 필드(@Version)를 둬 동시에 수정되면 충돌을 감지하게 함.', log: /optimistic|@?version\s*field|concurren|낙관|동시|중복/i },
     { id: 'pessimistic_lock', pri: 3, cat: '데이터', conf: 'high', file: JVM, need: /PESSIMISTIC_(WRITE|READ)|@Lock\s*\(/,
-      title: '비관적 락으로 동시 요청 정합성 보장', bullet: '비관적 락(SELECT … FOR UPDATE)으로 동시 요청 시 재고·정원 초과 문제 방지',
-      detail: '락 범위와 데드락 가능성, 낙관적 락과 비교해 고른 이유를 설명할 수 있어야 해요.', tags: ['JPA'] },
-    { id: 'distributed_lock', pri: 3, cat: '데이터', conf: 'high', file: SRCANY, need: /RedissonClient|RLock|getLock\(|redlock|SETNX|setIfAbsent\(/,
-      title: 'Redis 분산 락으로 동시성 제어', bullet: 'Redisson 분산 락으로 여러 서버에서 동시에 들어오는 요청의 중복 처리 방지',
-      detail: 'DB 락 대신 분산 락을 쓴 이유, 락 타임아웃과 해제 실패 처리 방법이 단골 질문이에요.', tags: ['Redis'] },
+      title: '비관적 락으로 동시 요청 처리', act: '비관적 락으로 조회해 동시 요청을 순서대로 처리하게 함.', log: /pessimistic|\block\b|concurren|비관|동시|(^|[^가-힣])락/i },
+    { id: 'distributed_lock', pri: 3, cat: '데이터', conf: 'high', file: SRCANY, need: /RedissonClient|RLock|redlock|SETNX|setIfAbsent\(/,
+      title: 'Redis 분산 락으로 동시성 제어', act: 'Redis 분산 락으로 같은 작업이 동시에 처리되지 않게 함.', log: /redisson|distributed|\block\b|concurren|분산|동시/i },
     { id: 'py_lock', pri: 3, cat: '데이터', conf: 'high', file: PY, need: /select_for_update\(|transaction\.atomic|with_for_update\(/,
-      title: '트랜잭션·행 잠금으로 데이터 정합성 보장', bullet: 'transaction.atomic과 select_for_update로 동시 요청 시 데이터 정합성 보장',
-      detail: '어떤 상황에서 경쟁 조건이 생기는지 예시를 들어 설명할 수 있으면 좋아요.', tags: [] },
-    { id: 'js_transaction', pri: 3, cat: '데이터', conf: 'high', file: JS, need: /\$transaction\(|startTransaction\(|\.transaction\(\s*(async)?\s*\(|withTransaction\(|@Transaction\(/,
-      title: '트랜잭션으로 여러 쓰기 작업 묶기', bullet: '여러 테이블에 걸친 쓰기 작업을 트랜잭션으로 묶어 중간 실패 시 데이터 불일치 방지',
-      detail: '트랜잭션이 없으면 어떤 문제가 생기는지 실제 시나리오로 설명해 보세요.', tags: [] },
+      title: '트랜잭션·행 잠금으로 데이터 정합성 처리', act: '트랜잭션(행 잠금)으로 여러 쓰기를 함께 처리하게 함.', log: /transaction|atomic|\block\b|concurren|트랜잭션|동시|정합/i },
+    { id: 'js_transaction', pri: 3, cat: '데이터', conf: 'high', file: JS, need: /\$transaction\(|startTransaction\(|\.transaction\(\s*(async)?\s*\(|withTransaction\(|@Transaction\(|query\(\s*['"`]BEGIN/,
+      title: '여러 쓰기 작업을 트랜잭션으로 묶기', act: '여러 쓰기 작업을 한 트랜잭션으로 묶어 처리하게 함.', log: /transaction|rollback|트랜잭션|정합/i },
     { id: 'unique_constraint', pri: 1, cat: '데이터', conf: 'mid', file: /\.(java|kt|sql|prisma|py)$/i, need: /@UniqueConstraint|unique\s*=\s*(true|True)|UNIQUE\s*(KEY|\()|@@unique|UniqueConstraint\(/,
-      title: 'DB 유니크 제약으로 중복 데이터 차단', bullet: 'DB 유니크 제약으로 애플리케이션 검증을 우회한 중복 데이터 저장을 원천 차단',
-      detail: '애플리케이션 검증만으로는 동시 요청을 막을 수 없는 이유를 설명할 수 있으면 좋아요.', tags: [] },
+      title: 'DB 유니크 제약으로 중복 저장 차단', act: 'DB 유니크 제약을 추가해 중복 저장을 막게 함.', log: /unique|duplicat|유니크|중복/i },
     { id: 'readonly_tx', pri: 1, cat: '데이터', conf: 'mid', file: JVM, need: /@Transactional\s*\(\s*readOnly\s*=\s*true/,
-      title: '읽기 전용 트랜잭션 분리', bullet: '조회 로직에 readOnly 트랜잭션을 적용해 불필요한 변경 감지(dirty checking) 비용 절감',
-      detail: 'readOnly가 JPA·DB 레벨에서 각각 어떤 효과가 있는지 물어볼 수 있어요.', tags: ['JPA'] },
+      title: '읽기 전용 트랜잭션 분리', act: '조회 로직에 readOnly 트랜잭션을 적용함.', log: /read-?only|읽기 전용/i },
     { id: 'querydsl', cat: '데이터', conf: 'mid', file: JVM, need: /JPAQueryFactory|BooleanExpression|BooleanBuilder/,
-      title: 'QueryDSL로 동적 검색 쿼리 구현', bullet: 'QueryDSL로 검색 조건 조합에 따라 바뀌는 동적 쿼리를 타입 안전하게 구현',
-      detail: 'JPQL 문자열 대신 QueryDSL을 고른 이유(컴파일 타임 검증, 조건 조합)를 설명해 보세요.', tags: ['QueryDSL'] },
-    { id: 'migration', cat: '데이터', conf: 'mid', file: /(db\/migration\/[^/]+\.sql|build\.gradle(\.kts)?|pom\.xml|package\.json)$/i, need: /flyway|liquibase|prisma\s+migrate|knex\s+migrate|CREATE\s+TABLE/i,
-      title: 'DB 스키마 마이그레이션 관리', bullet: '마이그레이션 도구로 DB 스키마 변경 이력을 코드로 관리해 팀원 간 스키마 불일치 해소',
-      detail: '운영 중 컬럼을 바꿀 때 어떻게 무중단으로 반영하는지 같은 질문으로 이어질 수 있어요.', tags: (c) => (c.has('Flyway') ? ['Flyway'] : []) },
-    { id: 'orm_schema', cat: '데이터', conf: 'mid', file: /\.(prisma|[jt]s)$/i, need: /^model\s+\w+\s*\{|new\s+(mongoose\.)?Schema\(|@Entity\(\)|sequelize\.define\(/,
-      title: 'ORM으로 데이터 모델 설계', bullet: 'ORM 스키마로 도메인 데이터 모델과 연관 관계를 설계하고 타입 안전한 쿼리 구성',
-      detail: '정규화 수준, 관계를 어떻게 정했는지 ERD와 함께 설명할 수 있으면 좋아요.', tags: (c) => ['Prisma', 'TypeORM', 'MongoDB', 'Sequelize'].filter((x) => c.has(x)).slice(0, 1) },
+      title: 'QueryDSL로 동적 검색 쿼리 구현', act: 'QueryDSL로 조건에 따라 바뀌는 검색 쿼리를 구현함.', log: /query\s*dsl|동적\s*쿼리|검색|search|filter/i },
+    { id: 'migration', cat: '데이터', conf: 'mid', file: /(db\/migration\/[^/]+\.sql|build\.gradle(\.kts)?|pom\.xml|package\.json)$/i, need: /flyway|liquibase|prisma\s+migrate|knex\s+migrate/i,
+      title: 'DB 스키마 변경 이력 관리', act: '마이그레이션 도구로 DB 스키마 변경을 코드로 관리하게 함.', log: /flyway|liquibase|migrat|마이그레이션|스키마/i },
+    { id: 'orm_schema', pri: 1, cat: '데이터', conf: 'mid', file: /\.(prisma|[jt]s)$/i, need: /^model\s+\w+\s*\{|new\s+(mongoose\.)?Schema\(|@Entity\(\)|sequelize\.define\(/,
+      title: '데이터 모델 설계', act: 'ORM 스키마로 데이터 모델과 관계를 정의함.', log: /schema|model|entity|erd|스키마|모델|테이블/i },
 
     /* ---- 아키텍처 ---- */
     { id: 'domain_event', pri: 3, cat: '아키텍처', conf: 'high', file: JVM, need: /ApplicationEventPublisher|@TransactionalEventListener|@EventListener|publishEvent\(/,
-      title: '도메인 이벤트로 기능 간 결합도 낮추기', bullet: '스프링 이벤트(@TransactionalEventListener)로 핵심 로직과 알림 등 부가 로직을 분리해 결합도 감소',
-      detail: '트랜잭션 커밋 이후에 이벤트를 처리한 이유, 이벤트 처리가 실패하면 어떻게 되는지가 좋은 질문 거리예요.', tags: [] },
+      title: '이벤트로 기능 간 결합 낮추기', act: '스프링 이벤트를 발행·구독하는 구조로 후속 처리를 분리함.', log: /\bevents?\b|이벤트/i },
     { id: 'mq', pri: 3, cat: '아키텍처', conf: 'high', file: SRCANY, need: /@KafkaListener|KafkaTemplate|RabbitTemplate|@RabbitListener|@Processor\(|new\s+Queue\(|amqplib|kafkajs/,
-      title: '메시지 큐로 비동기 처리', bullet: '메시지 큐로 요청 처리와 후속 작업을 분리해 트래픽 몰림에도 안정적으로 처리',
-      detail: '메시지 유실·중복 처리를 어떻게 다뤘는지(멱등성) 물어볼 가능성이 높아요.', tags: (c) => ['Kafka', 'RabbitMQ'].filter((x) => c.has(x)) },
+      title: '메시지 큐로 작업 분리', act: '메시지 큐로 요청 처리와 후속 작업을 분리함.', log: /kafka|rabbit|queue|consumer|producer|메시지|큐/i },
     { id: 'celery', pri: 3, cat: '아키텍처', conf: 'high', file: PY, need: /@shared_task|@app\.task|@celery_app\.task|Celery\(/,
-      title: 'Celery 비동기 작업 큐', bullet: '오래 걸리는 작업을 Celery 비동기 작업으로 분리해 API 응답시간 단축',
-      detail: '작업 실패 시 재시도 정책과 결과 확인 방법을 준비해 두세요.', tags: ['Celery'] },
+      title: '오래 걸리는 작업을 Celery로 분리', act: '일부 작업을 Celery 비동기 작업으로 분리함.', log: /celery|task|worker|비동기/i },
     { id: 'realtime', pri: 3, cat: '아키텍처', conf: 'high', file: SRCANY, need: /@WebSocketGateway|socket\.io|io\.on\(\s*['"]connection|@MessageMapping|StompEndpointRegistry|WebSocketHandler|websocket\.accept\(|SseEmitter/,
-      title: 'WebSocket 실시간 통신 구현', bullet: 'WebSocket 기반 실시간 통신으로 새로고침 없이 알림·채팅을 전달',
-      detail: '폴링 대신 WebSocket을 고른 이유, 서버가 여러 대일 때 메시지를 어떻게 전달하는지 물어볼 수 있어요.', tags: (c) => (c.has('Socket.IO') ? ['Socket.IO'] : ['WebSocket']) },
-    { id: 'scheduler', pri: 1, cat: '아키텍처', conf: 'mid', file: SRCANY, need: /@Scheduled\s*\(|@EnableScheduling|node-cron|cron\.schedule\(|@Cron\(|crontab\(/,
-      title: '스케줄러로 주기 작업 자동화', bullet: '스케줄러로 정산·알림 등 주기 작업을 자동화',
-      detail: '서버가 여러 대일 때 스케줄러가 중복 실행되지 않게 하는 방법을 함께 준비하면 좋아요.', tags: [] },
-    { id: 'external_api', cat: '아키텍처', conf: 'mid', file: JVM, need: /@FeignClient|WebClient\.(builder|create)|RestTemplate\b|RestClient\.(builder|create)/,
-      also: [/@Retryable|@CircuitBreaker|Resilience4j|timeout/i],
-      title: '외부 API 연동', bullet: '외부 API 연동 시 타임아웃·재시도를 설정해 외부 장애가 서비스 전체로 번지지 않도록 처리',
-      detail: '외부 API가 느리거나 죽었을 때 우리 서비스는 어떻게 되는지가 좋은 질문이에요. 실제로 넣은 장치만 적어 주세요.', tags: [] },
+      title: '실시간 통신 구현', act: 'WebSocket(SSE) 기반 실시간 통신을 구현함.', log: /socket|stomp|sse|real-?time|chat|채팅|실시간/i },
+    { id: 'scheduler', pri: 2, cat: '아키텍처', conf: 'mid', file: SRCANY, need: /@Scheduled\s*\(|@EnableScheduling|node-cron|cron\.schedule\(|@Cron\(|crontab\(/,
+      title: '주기 작업 자동화', act: '스케줄러로 정해진 시간에 작업이 실행되게 함.', log: /schedul|cron|batch|스케줄|배치|정기/i },
+    { id: 'external_api', pri: 1, cat: '아키텍처', conf: 'mid', file: JVM, need: /@FeignClient|WebClient\.(builder|create)|RestTemplate\b|RestClient\.(builder|create)/, also: [/@Retryable|@CircuitBreaker|Resilience4j|timeout/i],
+      title: '외부 API 연동', act: '외부 API를 호출하는 클라이언트를 구현함.', log: /feign|web\s*client|rest\s*template|external|open\s*api|외부|연동/i },
     { id: 'aop', cat: '아키텍처', conf: 'mid', file: JVM, need: /@Aspect\b|@Around\s*\(/,
-      title: 'AOP로 공통 관심사 분리', bullet: 'AOP로 로깅·실행시간 측정 등 공통 관심사를 비즈니스 로직에서 분리',
-      detail: '프록시 기반 AOP가 같은 클래스 내부 호출에는 적용되지 않는 이유를 물어볼 수 있어요.', tags: [] },
-    { id: 'nest_module', cat: '아키텍처', conf: 'mid', file: /\.ts$/i, need: /@Module\(\s*\{/, also: [/@Injectable\(\)/],
-      title: 'NestJS 모듈 구조와 의존성 주입', bullet: 'NestJS 모듈·DI 구조로 도메인별 책임을 분리해 테스트하기 쉬운 구조 설계',
-      detail: '모듈을 어떤 기준으로 나눴는지 설명할 수 있으면 좋아요.', tags: ['NestJS'] },
-    { id: 'py_api', cat: '아키텍처', conf: 'mid', file: PY, need: /class\s+\w+\((viewsets\.\w+|APIView|generics\.\w+)\)|APIRouter\(|Depends\(/,
-      title: (c) => (c.has('FastAPI') ? 'FastAPI 라우터·의존성 주입 구조' : 'DRF ViewSet으로 REST API 구성'),
-      bullet: (c) => (c.has('FastAPI') ? 'FastAPI 라우터와 Depends 의존성 주입으로 인증·DB 세션 등 공통 로직 재사용' : 'DRF ViewSet·Serializer로 REST API를 일관된 구조로 구성'),
-      detail: '공통 로직을 어디에 두었는지, 왜 그 구조를 택했는지 설명할 수 있게 준비해 두세요.', tags: (c) => ['FastAPI', 'DRF'].filter((x) => c.has(x)) },
+      title: 'AOP로 공통 로직 분리', act: 'AOP로 여러 곳에서 쓰는 공통 로직을 분리함.', log: /aop|aspect|공통|로깅|logging/i },
+    { id: 'nest_module', pri: 1, cat: '아키텍처', conf: 'mid', file: /\.ts$/i, need: /@Module\(\s*\{/, also: [/@Injectable\(\)/],
+      title: 'NestJS 모듈 구조 설계', act: 'NestJS 모듈로 기능을 나눠 구성함.', log: /module|nest|모듈|구조/i },
+    { id: 'py_api', pri: 1, cat: '아키텍처', conf: 'mid', file: PY, need: /class\s+\w+\((viewsets\.\w+|APIView|generics\.\w+)\)|APIRouter\(|Depends\(/,
+      title: (c) => (c.has('FastAPI') ? 'FastAPI 라우터 구성' : 'DRF로 REST API 구성'), act: (c) => (c.has('FastAPI') ? 'FastAPI 라우터와 의존성 주입으로 API를 구성함.' : 'DRF 뷰로 REST API를 구성함.'), log: /api|router|view|endpoint|엔드포인트/i },
     { id: 'multi_module', cat: '아키텍처', conf: 'mid', file: /settings\.gradle(\.kts)?$/i, need: /^\s*include\s*[\(\s'"]/,
-      title: '멀티 모듈 프로젝트 구성', bullet: 'Gradle 멀티 모듈로 API·도메인·공통 모듈을 분리해 의존 방향 관리',
-      detail: '모듈을 나눈 기준과 순환 의존을 어떻게 막았는지 물어볼 수 있어요.', tags: ['Gradle'] },
+      title: '멀티 모듈 구조로 분리', act: 'Gradle 멀티 모듈로 프로젝트를 나눠 구성함.', log: /module|모듈/i },
 
     /* ---- 테스트 ---- */
-    { id: 'spring_test', pri: 3, cat: '테스트', conf: 'high', file: JVM, need: /@SpringBootTest|@DataJpaTest|@WebMvcTest|@ExtendWith\(\s*MockitoExtension/,
-      also: [/@Testcontainers|@Container\b|@ServiceConnection|MySQLContainer|PostgreSQLContainer/, /@MockBean|@MockitoBean|Mockito\.|given\(|\bmockMvc\b/i],
-      title: (c) => (c.hasCode(TC_RE) ? 'Testcontainers 통합 테스트 구성' : '계층별 테스트 코드 작성'),
-      bullet: (c) => `${c.testCount ? `테스트 코드 ${c.testCount}개 파일로 ` : ''}${c.hasCode(TC_RE) ? 'Testcontainers 기반 실제 DB 통합 테스트와 ' : ''}슬라이스 테스트(@WebMvcTest·@DataJpaTest)를 구성해 리팩터링 시 회귀 방지`,
-      detail: '단위·슬라이스·통합 테스트를 어떤 기준으로 나눴는지, 테스트 커버리지가 얼마인지 물어볼 수 있어요. 커버리지 수치를 알고 있다면 함께 적어 주세요.',
-      tags: (c) => ['JUnit5'].concat(c.hasCode(TC_RE) ? ['Testcontainers'] : []) },
-    { id: 'js_test', pri: 3, cat: '테스트', conf: 'high', file: /\.(test|spec)\.[jt]sx?$/i, need: /\b(describe|it|test)\(\s*['"`]/,
-      also: [/supertest|request\(app\)|render\(|screen\.|Test\.createTestingModule/],
-      title: '자동화 테스트 코드 작성', bullet: (c) => `${c.testCount ? `테스트 코드 ${c.testCount}개 파일로 ` : ''}핵심 API·컴포넌트 동작을 자동 검증해 배포 전 회귀 방지`,
-      detail: '무엇을 테스트하고 무엇을 목(mock)으로 대체했는지 설명할 수 있으면 좋아요.', tags: (c) => (c.has('Jest') ? ['Jest'] : []) },
+    { id: 'spring_test', pri: 3, cat: '테스트', conf: 'high', file: JVM, need: /@SpringBootTest|@DataJpaTest|@WebMvcTest|@ExtendWith\(\s*MockitoExtension/, also: [/@Testcontainers|@Container\b|@ServiceConnection|MySQLContainer|PostgreSQLContainer/, /@MockBean|@MockitoBean|Mockito\.|given\(|\bmockMvc\b/i],
+      title: (c) => (c.hasCode(TC_RE) ? 'Testcontainers 통합 테스트 구성' : '계층별 테스트 코드 작성'), act: (c) => `${c.hasCode(TC_RE) ? 'Testcontainers로 실제 DB를 띄우는 통합 테스트' : '스프링 테스트 코드'}를 작성함${c.testCount ? ` (테스트 파일 ${c.testCount}개)` : ''}.`, log: /\btests?\b|testcontainers|junit|테스트/i },
+    { id: 'js_test', pri: 3, cat: '테스트', conf: 'high', file: /\.(test|spec)\.[jt]sx?$/i, need: /\b(describe|it|test)\(\s*['"`]/, also: [/supertest|request\(app\)|render\(|screen\.|Test\.createTestingModule/],
+      title: '자동화 테스트 코드 작성', act: (c) => `API·컴포넌트 동작을 검증하는 테스트를 작성함${c.testCount ? ` (테스트 파일 ${c.testCount}개)` : ''}.`, log: /\btests?\b|jest|vitest|테스트/i },
     { id: 'pytest', pri: 3, cat: '테스트', conf: 'high', file: PY, need: /^\s*def\s+test_\w+\(|@pytest\.fixture|class\s+\w+\((TestCase|APITestCase)\)/,
-      title: 'pytest 테스트 코드 작성', bullet: (c) => `${c.testCount ? `테스트 코드 ${c.testCount}개 파일로 ` : ''}API·비즈니스 로직을 자동 검증해 배포 전 회귀 방지`,
-      detail: 'fixture를 어떻게 구성했는지, DB가 필요한 테스트는 어떻게 격리했는지 물어볼 수 있어요.', tags: ['pytest'] },
+      title: '파이썬 테스트 코드 작성', act: (c) => `동작을 검증하는 테스트를 작성함${c.testCount ? ` (테스트 파일 ${c.testCount}개)` : ''}.`, log: /\btests?\b|pytest|테스트/i },
     { id: 'coverage', pri: 1, cat: '테스트', conf: 'mid', file: /(build\.gradle(\.kts)?|pom\.xml|package\.json|jest\.config\.[jt]s|pyproject\.toml|\.ya?ml)$/i, need: /jacoco|coverageThreshold|--cov\b|codecov|"coverage"\s*:/i,
-      title: '테스트 커버리지 측정', bullet: '커버리지 리포트(JaCoCo 등)를 빌드에 연동해 테스트 커버리지 ○○% 유지',
-      detail: `커버리지를 몇 %로 관리했는지는 코드에서 정확히 알 수 없어요. ${FILL}`, tags: [] },
+      title: '테스트 커버리지 측정', act: '빌드에 커버리지 측정을 연결함.', log: /coverage|jacoco|codecov|커버리지/i },
 
     /* ---- 인프라·배포 ---- */
     { id: 'gh_actions', pri: 3, cat: '인프라·배포', conf: 'high', file: /^\.github\/workflows\/.+\.ya?ml$/i, need: /^\s*steps\s*:/,
-      title: (c) => (c.hasCode(/docker\s+(build|push)|deploy|ssh|aws|codedeploy|ecr|ghcr/i, /\.github\/workflows/) ? 'GitHub Actions CI/CD 파이프라인 구축' : 'GitHub Actions CI 구성'),
-      bullet: (c) => (c.hasCode(/docker\s+(build|push)|deploy|ssh|aws|codedeploy|ecr|ghcr/i, /\.github\/workflows/) ? 'GitHub Actions로 빌드·테스트·배포 CI/CD 파이프라인을 구축해 배포 시간 ○○분→○분으로 단축' : 'GitHub Actions로 PR마다 빌드·테스트를 자동 실행하는 CI를 구성해 깨진 코드의 병합 방지'),
-      detail: '어떤 이벤트(push, PR)에 무엇이 실행되는지, 실패하면 어떻게 알 수 있는지 설명해 보세요. 배포 시간 같은 수치는 직접 채워 주세요.', tags: ['GitHub Actions'] },
+      title: (c) => (c.hasCode(DEPLOY_RE, /\.github\/workflows/) ? 'GitHub Actions 배포 자동화' : 'GitHub Actions CI 구성'), act: (c) => (c.hasCode(DEPLOY_RE, /\.github\/workflows/) ? 'GitHub Actions로 빌드와 배포 과정을 자동화함.' : 'GitHub Actions로 빌드·검사가 자동 실행되게 함.'), log: /\bci\b|\bcd\b|ci\/cd|github\s*action|workflow|deploy|배포|자동화/i },
     { id: 'docker_compose', pri: 3, cat: '인프라·배포', conf: 'high', file: /(docker-compose[^/]*|compose)\.ya?ml$/i, need: /^\s*services\s*:/,
-      title: 'Docker Compose로 실행 환경 구성', bullet: 'Docker Compose로 애플리케이션·DB·캐시 실행 환경을 코드로 정의해 명령 한 줄로 동일한 환경 구성',
-      detail: '로컬과 운영 환경 차이를 어떻게 줄였는지, 컨테이너 간 네트워크를 어떻게 연결했는지 물어볼 수 있어요.', tags: ['Docker'] },
+      title: 'Docker Compose로 실행 환경 구성', act: 'Docker Compose로 함께 실행할 서비스를 정의함.', log: /docker|compose|도커|컨테이너/i },
     { id: 'dockerfile', cat: '인프라·배포', conf: 'mid', file: /(^|\/)(Dockerfile(\..+)?|.+\.Dockerfile)$/i, need: /^\s*FROM\s+/i, whole: true, skipIf: ['docker_compose'],
-      title: (c) => (c.multiStage ? '멀티 스테이지 Docker 이미지 빌드' : 'Docker로 애플리케이션 컨테이너화'),
-      bullet: (c) => (c.multiStage ? '멀티 스테이지 Dockerfile로 빌드 도구를 뺀 경량 이미지를 만들어 이미지 크기 ○○MB→○○MB로 감소' : 'Dockerfile로 애플리케이션을 컨테이너화해 어디서나 같은 환경으로 실행'),
-      detail: '이미지 크기를 줄이려고 한 시도, 레이어 캐시를 활용한 방법을 물어볼 수 있어요.', tags: ['Docker'] },
+      title: (c) => (c.multiStage ? '멀티 스테이지 Docker 이미지 빌드' : 'Docker로 애플리케이션 컨테이너화'), act: (c) => (c.multiStage ? '멀티 스테이지 Dockerfile로 빌드와 실행 단계를 나눠 이미지를 만들게 함.' : 'Dockerfile을 작성해 애플리케이션을 컨테이너로 실행하게 함.'), log: /docker|image|도커|컨테이너/i },
     { id: 'k8s', cat: '인프라·배포', conf: 'high', file: /\.ya?ml$/i, need: /^\s*kind\s*:\s*(Deployment|StatefulSet|Ingress)\b/,
-      title: '쿠버네티스 배포 매니페스트 작성', bullet: '쿠버네티스 Deployment·Service 매니페스트로 애플리케이션 배포 구성',
-      detail: '레플리카 수, 헬스 체크(probe)를 어떻게 설정했는지 질문받을 수 있어요.', tags: ['Kubernetes'] },
+      title: '쿠버네티스 배포 구성', act: '쿠버네티스 매니페스트로 배포를 구성함.', log: /k8s|kubernetes|helm|ingress|쿠버네티스/i },
     { id: 'monitoring', pri: 1, cat: '인프라·배포', conf: 'mid', file: /\.(gradle|kts|xml|ya?ml|properties)$/i, need: /actuator|micrometer|prometheus|grafana/i,
-      title: '헬스 체크·모니터링 지표 노출', bullet: 'Actuator·Prometheus로 애플리케이션 상태와 지표를 노출해 장애를 빠르게 감지',
-      detail: '어떤 지표를 보고 있었는지, 실제로 문제를 잡은 경험이 있으면 함께 적어 주세요.', tags: (c) => (c.hasCode(/prometheus/i) ? ['Prometheus'] : []) },
+      title: '상태·지표 모니터링 구성', act: '애플리케이션 상태와 지표를 확인할 수 있게 노출함.', log: /monitor|actuator|prometheus|grafana|metric|모니터링|지표/i },
 
     /* ---- 협업·품질 ---- */
-    { id: 'global_exception', pri: 3, cat: '협업·품질', conf: 'high', file: JVM, need: /@RestControllerAdvice|@ControllerAdvice/,
-      also: [/@ExceptionHandler/, /class\s+\w*(ErrorCode|Exception)\b/],
-      title: '공통 예외 처리로 일관된 에러 응답', bullet: '@RestControllerAdvice 기반 전역 예외 처리로 에러 응답 형식을 통일해 프론트와의 에러 처리 비용 감소',
-      detail: '에러 코드를 어떻게 설계했는지, 예상하지 못한 예외는 어떻게 처리하는지 물어볼 수 있어요.', tags: [] },
+    { id: 'global_exception', pri: 3, cat: '협업·품질', conf: 'high', file: JVM, need: /@RestControllerAdvice|@ControllerAdvice/, also: [/@ExceptionHandler/, /class\s+\w*(ErrorCode|Exception)\b/],
+      title: '공통 예외 처리로 에러 응답 통일', act: '전역 예외 처리(@RestControllerAdvice)로 에러 응답을 한곳에서 만들게 함.', log: /exception|error\s*(code|handl|response)|예외|에러/i },
     { id: 'js_error_mw', pri: 1, cat: '협업·품질', conf: 'mid', file: JS, need: /\(\s*err\s*,\s*req\s*,\s*res\s*,\s*next\s*\)|@Catch\(|ExceptionFilter/,
-      title: '공통 에러 처리 미들웨어', bullet: '전역 에러 처리 미들웨어로 API 에러 응답 형식을 통일',
-      detail: '비동기 에러가 미들웨어까지 전달되게 한 방법을 물어볼 수 있어요.', tags: [] },
+      title: '공통 에러 처리', act: '전역 에러 처리로 에러 응답을 한곳에서 만들게 함.', log: /error\s*(handl|middleware)|exception|예외|에러/i },
     { id: 'api_docs', pri: 3, cat: '협업·품질', conf: 'high', file: /\.(java|kt|gradle|kts|xml|ya?ml|[jt]s|py)$/i, need: /springdoc|@Operation\s*\(|@Tag\s*\(|@ApiOperation|OpenAPIDefinition|SwaggerModule|swagger-ui|swagger-jsdoc|drf_spectacular|restdocs/i,
-      title: (c) => (c.hasCode(/restdocs/i) ? 'Spring REST Docs로 API 문서 자동화' : 'Swagger(OpenAPI) API 문서 자동화'),
-      bullet: (c) => (c.hasCode(/restdocs/i) ? 'Spring REST Docs로 테스트를 통과한 API만 문서화해 문서와 실제 동작 불일치 방지' : 'Swagger(OpenAPI)로 API 명세를 코드에서 자동 생성해 프론트와 명세를 먼저 합의하고 개발'),
-      detail: '명세를 누가 언제 합의했는지, 바뀔 때 어떻게 공유했는지 같은 협업 과정을 함께 이야기하면 좋아요.', tags: (c) => (c.hasCode(/restdocs/i) ? ['Spring REST Docs'] : ['Swagger']) },
-    { id: 'validation', pri: 1, cat: '협업·품질', conf: 'mid', file: /\.(java|kt|[jt]s|py)$/i, need: /@Valid\b|@Validated\b|ValidationPipe|class-validator|z\.object\(|Joi\.object\(|Field\(\s*\.\.\./,
-      also: [/@NotBlank|@NotNull|@Size|@Email|@IsString|@IsNotEmpty/],
-      title: '요청 값 검증 계층 분리', bullet: '요청 DTO 검증(Bean Validation 등)을 컨트롤러 진입 시점에 적용해 잘못된 입력을 일관되게 차단',
-      detail: '검증 로직을 어디(DTO, 도메인)에 두었는지와 그 이유를 물어볼 수 있어요.', tags: [] },
+      title: (c) => (c.hasCode(/restdocs/i) ? 'Spring REST Docs로 API 문서 작성' : 'Swagger(OpenAPI) API 문서 작성'), act: (c) => (c.hasCode(/restdocs/i) ? 'Spring REST Docs로 테스트에서 API 문서를 만들게 함.' : 'Swagger(OpenAPI)로 API 명세를 코드에서 만들게 함.'), log: /swagger|open\s*api|rest\s*docs|api\s*(docs?|문서|명세)|명세/i },
+    { id: 'validation', pri: 1, cat: '협업·품질', conf: 'mid', file: /\.(java|kt|[jt]s|py)$/i, need: /@Valid\b|@Validated\b|ValidationPipe|class-validator|z\.object\(|Joi\.object\(|Field\(\s*\.\.\./, also: [/@NotBlank|@NotNull|@Size|@Email|@IsString|@IsNotEmpty/],
+      title: '요청 값 검증 적용', act: '요청이 들어오는 시점에 값을 검증하게 함.', log: /validat|검증|유효성/i },
     { id: 'lint', pri: 1, cat: '협업·품질', conf: 'mid', file: /(package\.json|\.eslintrc(\.[a-z]+)?|eslint\.config\.[mc]?js|\.prettierrc(\.[a-z]+)?|pyproject\.toml|build\.gradle(\.kts)?)$/i, need: /"husky"|lint-staged|"eslint"|prettier|ruff|black|flake8|spotless|checkstyle|ktlint/i,
-      title: '린트·포맷터로 코드 스타일 통일', bullet: '린터·포맷터와 커밋 훅을 설정해 팀 코드 스타일을 자동으로 통일하고 리뷰 시간 단축',
-      detail: '팀원과 규칙을 어떻게 합의했는지 이야기하면 협업 역량을 함께 보여줄 수 있어요.', tags: [] },
+      title: '린트·포맷터로 코드 스타일 통일', act: '린터와 포맷터를 설정해 코드 스타일을 맞추게 함.', log: /\blint|eslint|prettier|husky|format|린트|컨벤션/i },
     { id: 'ts_strict', pri: 1, cat: '협업·품질', conf: 'mid', file: /tsconfig\.json$/i, need: /"strict"\s*:\s*true/,
-      title: 'TypeScript strict 모드', bullet: 'TypeScript strict 모드로 런타임 이전에 타입 오류를 잡아 버그 감소',
-      detail: 'any를 줄이려고 한 노력, 타입을 어떻게 설계했는지 질문받을 수 있어요.', tags: ['TypeScript'] },
+      title: 'TypeScript strict 모드 적용', act: 'TypeScript strict 모드로 타입을 검사하게 함.', log: /strict|typescript|타입/i },
   ];
+  // 발견 카테고리 → 역량(고정 12개)
+  const CAT_KW = {
+    성능: ['문제 해결력', '분석적 사고'], '인증·보안': ['실행력', '의사결정 능력'], 데이터: ['문제 해결력', '실행력'], 아키텍처: ['의사결정 능력', '실행력'],
+    테스트: ['실행력', '분석적 사고'], '인프라·배포': ['실행력', '추진력'], '협업·품질': ['협업능력', '커뮤니케이션'],
+  };
 
   /* ---------------- 코드 조각 ---------------- */
   const BRACE = /\.(java|kt|kts|[mc]?[jt]sx?|gradle|groovy|go|cs|prisma)$/i;
@@ -426,9 +455,8 @@
     return seg.map((l) => l.slice(Math.min(min, indentOf(l)))).join('\n');
   }
 
-  /* ---------------- 분석 ---------------- */
+  /* ---------------- 코드에서 찾기 ---------------- */
   function makeCtx(files, stack, tree) {
-    const all = files.map((f) => f.text || '').join('\n');
     const build = files.filter((f) => f.kind === 'build').map((f) => f.text || '').join('\n');
     const testCount = tree.filter((t) => t.type === 'blob' && SRC_EXT.test(t.path) && isTestPath(t.path) && !SKIP_DIR.test('/' + t.path)).length;
     const dockerfiles = files.filter((f) => /Dockerfile/i.test(f.path));
@@ -438,7 +466,6 @@
       hasDep: (x) => build.includes(x),
       hasCode: (re, pathRe) => files.some((f) => (!pathRe || pathRe.test(f.path)) && re.test(f.text || '')),
       multiStage: dockerfiles.some((f) => ((f.text || '').match(/^\s*FROM\s+/gim) || []).length > 1),
-      all,
     };
   }
   const val = (v, ctx) => (typeof v === 'function' ? v(ctx) : v);
@@ -484,103 +511,237 @@
       if (ev.length < 2 && byFile[1]) ev.push(toEvidence(byFile[1], r.need, r.whole));
       const pri = r.pri || 2;
       const conf = r.conf === 'mid' && pri >= 2 && (byFile.length >= 3 || ev.length >= 3) ? 'high' : r.conf;
-      found.push({
-        rid: r.id, skipIf: r.skipIf || [], weight: hits.length + ev.length, pri,
-        finding: {
-          id: `gh_${owner}_${name}_${r.id}`.replace(/[^A-Za-z0-9_]/g, '_').toLowerCase(),
-          category: r.cat, title: val(r.title, ctx), bullet: val(r.bullet, ctx), detail: val(r.detail, ctx),
-          tags: (val(r.tags, ctx) || []).filter(Boolean), confidence: conf, evidence: ev, status: 'new',
-        },
-      });
+      found.push({ rule: r, weight: hits.length + ev.length, conf, title: val(r.title, ctx), act: val(r.act, ctx), files: ev });
     });
     // 중복 제거: 상위 규칙이 있으면 하위 규칙(skipIf)은 뺀다 + 같은 근거를 쓰는 항목 정리
-    const ids = new Set(found.map((x) => x.rid));
-    let list = found.filter((x) => !x.skipIf.some((s) => ids.has(s)));
-    const seen = new Set();
-    list = list.filter((x) => { const k = x.finding.evidence[0].path + ':' + x.finding.evidence[0].start + ':' + x.finding.category; if (seen.has(k)) return false; seen.add(k); return true; });
-    const confRank = (x) => (x.finding.confidence === 'high' ? 0 : 1);
-    list.sort((a, b) => confRank(a) - confRank(b) || b.pri - a.pri || b.weight - a.weight);
-    // 카테고리당 최대 3개, 전체 최대 10개
-    const perCat = {}; const out = [];
-    list.forEach((x) => { const c = x.finding.category; perCat[c] = (perCat[c] || 0) + 1; if (perCat[c] <= 3 && out.length < MAX_FINDINGS) out.push(x.finding); });
-    return out;
+    const ids = new Set(found.map((x) => x.rule.id)); const seen = new Set();
+    return found.filter((x) => !(x.rule.skipIf || []).some((s) => ids.has(s)))
+      .filter((x) => { const k = x.files[0].path + ':' + x.files[0].start + ':' + x.rule.cat; if (seen.has(k)) return false; seen.add(k); return true; })
+      .sort((x, y) => (x.conf === 'high' ? 0 : 1) - (y.conf === 'high' ? 0 : 1) || (y.rule.pri || 2) - (x.rule.pri || 2) || y.weight - x.weight);
   }
 
-  /* ---------------- 진입점 ---------------- */
-  const STEPS = ['레포 정보 불러오는 중', '파일 구조 살펴보는 중', '코드 읽는 중', '이력서 문장으로 정리하는 중'];
-  async function analyzeLive(parsed, url, report) {
-    const { owner, name } = parsed;
-    report(0, STEPS[0]);
-    const info = await getJson(`${API}/repos/${owner}/${name}`);
-    const branch = parsed.branch || info.default_branch || 'main';
-    const langBytes = await getJson(`${API}/repos/${owner}/${name}/languages`).catch((e) => { if (e.code === 'rate_limit') throw e; return {}; });
-    const total = Object.values(langBytes).reduce((a, b) => a + b, 0) || 1;
-    const languages = {};
-    Object.entries(langBytes).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => { const pct = Math.round((v / total) * 1000) / 10; if (pct >= 0.5) languages[k] = pct; });
 
-    report(1, STEPS[1]);
-    const treeRes = await getJson(`${API}/repos/${info.owner.login}/${info.name}/git/trees/${encodeURIComponent(branch)}?recursive=1`);
+  /* ---------------- 커밋 · PR ---------------- */
+  const isBot = (u) => !!u && (u.type === 'Bot' || /\[bot\]$|^dependabot|^renovate/i.test(u.login || ''));
+  const toCommit = (c) => {
+    const msg = String((c.commit && c.commit.message) || '');
+    return { sha: c.sha.slice(0, 7), message: msg.split('\n')[0].trim(), body: msg.split('\n').slice(1).join('\n').trim(), date: day(c.commit && ((c.commit.author || {}).date || (c.commit.committer || {}).date)), url: c.html_url };
+  };
+  const goodCommit = (c) => !isBot(c.author) && (c.parents || []).length < 2 && !/^merge\b/i.test((c.commit && c.commit.message) || '');
+  const toPr = (p) => ({ number: p.number, title: p.title.trim(), body: p.body || '', date: day(p.merged_at || p.closed_at || p.created_at), from: day(p.created_at), url: p.html_url, merged: !!p.merged_at, open: p.state === 'open' });
+  const sameLogin = (u, login) => !!u && !!login && u.login.toLowerCase() === login.toLowerCase();
+
+  /* 커밋·PR 읽기. login 의 것이 있으면 그것만, 하나도 없으면 레포 전체 → { commits, prs, byAuthor } */
+  async function readHistory(owner, name, branch, login) {
+    const base = `/repos/${owner}/${name}`; const sha = `&sha=${encodeURIComponent(branch)}`;
+    const soft = (path) => getJson(path).catch((e) => { if (e.code === 'rate_limit') throw e; return []; });
+    const [mine, pulls] = await Promise.all([
+      login ? soft(`${base}/commits?author=${encodeURIComponent(login)}&per_page=100${sha}`) : [],
+      soft(`${base}/pulls?state=all&per_page=100`),
+    ]);
+    const human = pulls.filter((p) => !isBot(p.user) && (p.merged_at || p.state === 'open')); // 병합되지 않고 닫힌 PR 은 뺀다
+    const myPrs = human.filter((p) => sameLogin(p.user, login));
+    if (mine.length || myPrs.length) return { commits: mine.filter(goodCommit).map(toCommit), prs: myPrs.map(toPr), byAuthor: true };
+    const all = await soft(`${base}/commits?per_page=100${sha}`);
+    return { commits: all.filter(goodCommit).map(toCommit), prs: human.map(toPr), byAuthor: false };
+  }
+
+  // 작업 종류. 문서·스타일·버전 올리기처럼 경험 카드가 되기 어려운 것은 ''
+  const KINDS = { perf: 5, fix: 4, refactor: 4, feat: 3, test: 2, ci: 2 };
+  function kindOf(title) {
+    const t = title.trim();
+    const m = t.match(/^\W*(feat|feature|fix|bugfix|hotfix|bug|perf|refactor|refact|test|ci|cd|build|chore|docs?|style|release|merge|revert)\b/i);
+    if (m) {
+      const k = m[1].toLowerCase();
+      return { feature: 'feat', bugfix: 'fix', hotfix: 'fix', bug: 'fix', refact: 'refactor', cd: 'ci' }[k] || (KINDS[k] ? k : '');
+    }
+    if (/^(merge|release|bump|update (readme|dependency|dependencies)|v?\d+\.\d+|revert)\b|readme|오타|typo/i.test(t)) return '';
+    if (/성능|최적화|속도|optimi[sz]|performance|speed ?up/i.test(t)) return 'perf';
+    if (/수정|버그|해결|에러|오류|\bfix(es|ed)?\b|\bresolve/i.test(t)) return 'fix';
+    if (/리팩|구조|분리|refactor|restructure|clean ?up/i.test(t)) return 'refactor';
+    if (/테스트|\btests?\b/i.test(t)) return 'test';
+    if (/배포|\bci\b|deploy|pipeline/i.test(t)) return 'ci';
+    if (/구현|추가|기능|도입|적용|개선|연동|\b(add|implement|support|introduce|create)(s|ed)?\b/i.test(t)) return 'feat';
+    return '';
+  }
+  const KIND_KW = { perf: ['문제 해결력', '분석적 사고'], fix: ['문제 해결력', '실행력'], refactor: ['의사결정 능력', '실행력'], feat: ['실행력'], test: ['실행력', '분석적 사고'], ci: ['실행력', '추진력'] };
+
+  // 'feat(auth): …', '[Feat] …', '#12 …', '… (#34)' 같은 꾸밈을 뗀 제목
+  const cleanTitle = (t) => String(t || '').replace(/^(?:\s|:[a-z_]+:|\p{Extended_Pictographic}|\uFE0F)+/u, '').replace(/^\s*(\[[^\]]*\]\s*)+/, '').replace(/^\W*(feat|feature|fix|bugfix|hotfix|bug|perf|refactor|refact|test|ci|cd|build|chore|docs?|style)(\([^)]*\))?!?\s*[:：\-\/]\s*/i, '')
+    .replace(/^#\d+\s*[:\-]?\s*/, '').replace(/\s*\(?#\d+\)?\s*$/, '').replace(/\s+/g, ' ').trim();
+  const cut = (s, n) => { const t = String(s || '').replace(/\s+/g, ' ').trim(); return t.length <= n ? t : t.slice(0, n - 1).trim() + '…'; };
+
+  // PR 본문의 제목(##)별 내용을 STAR 칸으로 나눈다. 본문에 적힌 글만 쓴다
+  const SECTION = [
+    ['result', /결과|성과|효과|before|after|result|benchmark|impact/i],
+    ['situation', /배경|문제|이유|원인|상황|현상|why|problem|motivation|background|context|cause/i],
+    ['task', /목적|목표|관련 ?이슈|goal|purpose|objective/i],
+    ['action', /변경|작업|구현|내용|해결|방법|요약|개요|what|change|solution|how|summary|description|implementation|fix/i],
+    ['skip', /./],
+  ];
+  function cleanBody(md) {
+    return String(md || '').replace(/<!--[\s\S]*?-->/g, '').replace(/```[\s\S]*?```/g, '').replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/<[^>]+>/g, '')
+      .replace(/^\s*[-*]\s*\[ \].*$/gm, '').replace(/^\s*(close[sd]?|fix(e[sd])?|resolve[sd]?|related to|관련 이슈)?\s*:?\s*#\d+\s*$/gim, '').replace(/https?:\/\/\S+/g, '').replace(/\r/g, '');
+  }
+  function sections(md) {
+    const out = { situation: [], task: [], action: [], result: [] }; let cur = null; let headed = false;
+    cleanBody(md).split('\n').forEach((line) => {
+      const h = line.match(/^\s*#{1,6}\s+(.+)$/) || line.match(/^\s*\*\*([^*]+)\*\*\s*:?\s*$/);
+      if (h) { headed = true; cur = SECTION.find(([, re]) => re.test(h[1]))[0]; return; }
+      const t = line.replace(/^\s*(?:[-*+>]|\d+\.)\s+/, '').replace(/^\[x\]\s*/i, '').replace(/[*_`]{1,3}/g, '').trim();
+      if (!t || /^[-=|:\s]+$/.test(t) || /^\|/.test(t)) return;
+      const k = cur || (headed ? 'skip' : 'action');
+      if (out[k]) out[k].push(/[.!?。]$/.test(t) ? t : t + '.');
+    });
+    const r = {}; Object.keys(out).forEach((k) => { r[k] = cut(out[k].join(' '), 360); });
+    return r;
+  }
+
+  // 같은 작업을 다룬 커밋·PR 찾기 (제목 매칭 + 근거 파일 이름이 언급된 것)
+  function matchHistory(rule, finding, history) {
+    const names = finding.files.map((f) => f.path.split('/').pop().replace(/\.[^.]+$/, '')).filter((n) => n.length >= 8 && !/^(application|settings|docker-compose|package|requirements|Dockerfile)$/i.test(n));
+    const hit = (text) => rule.log.test(text) || names.some((n) => text.includes(n));
+    const bodyHit = (b) => { const t = cleanBody(b); return t.length > 40 && (t.match(new RegExp(rule.log.source, 'gi')) || []).length >= 2; };
+    return {
+      prs: history.prs.map((p) => ({ p, s: (hit(p.title) ? 2 : 0) + (bodyHit(p.body) ? 1 : 0) })).filter((x) => x.s).sort((a, b) => b.s - a.s).slice(0, 3).map((x) => x.p),
+      commits: history.commits.filter((c) => hit(c.message)).slice(0, 5),
+    };
+  }
+  // PR 하나와 이어지는 커밋: 'PR 번호'가 적혀 있거나 제목 낱말이 두 개 이상 겹치는 것
+  function commitsOfPr(pr, commits) {
+    const words = (s) => new Set(cleanTitle(s).toLowerCase().split(/[^a-z0-9가-힣]+/).filter((w) => w.length >= 2));
+    const w = words(pr.title);
+    return commits.filter((c) => new RegExp(`#${pr.number}\\b`).test(c.message) || [...words(c.message)].filter((x) => w.has(x)).length >= 2).slice(0, 5);
+  }
+
+  /* ---------------- STAR 초안 ---------------- */
+  const evCommit = ({ sha, message, date, url }) => ({ sha, message: cut(message, 120), date, url });
+  const evPr = ({ number, title, date, url }) => ({ number, title, date, url });
+  function periodOf(commits, prs) {
+    const ds = commits.map((c) => c.date).concat(prs.map((p) => p.from), prs.map((p) => p.date)).filter(Boolean).sort();
+    return ds.length ? { start: ds[0].slice(0, 7), end: ds[ds.length - 1].slice(0, 7) } : null;
+  }
+  const quoted = (list) => list.map((x) => `「${cut(cleanTitle(x), 70)}」`).join(', ');
+  function makeDraft(meta, id, { title, act, files, commits, prs, keywords, lead }) {
+    const key = `gh:${meta.key}:${id}`; const sec = lead ? sections(lead.body) : {};
+    const own = meta.byAuthor; // 내가 쓴 PR·커밋일 때만 "맡음"
+    const fileNames = [...new Set(files.map((f) => f.path.split('/').pop()))].slice(0, 3);
+    const situation = sec.situation || `${meta.full}${meta.description ? `(${cut(meta.description, 80)})` : ''} 개발 중의 작업.`;
+    const task = sec.task || (lead ? `「${cut(cleanTitle(lead.title), 80)}」(PR #${lead.number}) ${own ? '작업을 맡음' : '작업'}.` : '');
+    const parts = [];
+    if (sec.action) parts.push(sec.action);
+    if (act) parts.push(act + (fileNames.length ? ` (${fileNames.join(', ')})` : ''));
+    if (!parts.length) parts.push(`「${cut(title, 80)}」 작업을 진행함.`);
+    const others = commits.filter((c) => cleanTitle(c.message) !== title).slice(0, 3); // 제목과 같은 커밋은 되풀이하지 않는다
+    if (!sec.action && others.length) parts.push(`관련 커밋은 ${quoted(others.map((c) => c.message))}.`);
+    const d = {
+      key, title: cut(title, 60), summary: cut((act ? act.replace(/함(?=\s*\(|\.$)/, '했다') : '') || App.ai.brief(sec.action || `${meta.full}에서 「${cut(title, 60)}」 작업을 진행했다.`, 90), 110),
+      star: { situation, task, action: parts.join(' '), result: sec.result || '' },
+      keywords: App.keywords.clean(keywords).slice(0, 3),
+      evidence: { repo: meta.full, keys: [key], commits: commits.map(evCommit), prs: prs.map(evPr), files },
+    };
+    const period = periodOf(commits, prs); if (period) d.period = period;
+    return d;
+  }
+
+  async function buildDrafts(found, history, meta) {
+    const has = (x) => x.m.prs.length || x.m.commits.length;
+    found.forEach((x) => { x.m = matchHistory(x.rule, x, history); });
+    // 커밋·PR 제목으로 못 찾은 것은 근거 파일을 고친 커밋으로 확인한다 (호출 수를 아끼려고 앞의 4개만)
+    const author = history.byAuthor ? `&author=${encodeURIComponent(meta.login)}` : '';
+    await pool(found.filter((x) => !has(x) && (x.rule.pri || 2) > 1).slice(0, 4), 4, async (x) => {
+      const list = await optional(`/repos/${meta.full}/commits?path=${encodeURIComponent(x.files[0].path)}&per_page=5&sha=${encodeURIComponent(meta.branch)}${author}`, []);
+      x.m.commits = list.filter(goodCommit).map(toCommit);
+    });
+    // 근거 커밋·PR 이 없으면: 내 레포의 뚜렷한 코드만 남긴다 (팀 레포에서 다른 사람이 쓴 코드가 내 경험이 되지 않게)
+    const rows = found.filter((x) => has(x) || (meta.personal && (x.rule.pri || 2) > 1));
+    const w = (x) => (x.m.prs.length ? 4 : 0) + Math.min(3, x.m.commits.length) + (x.conf === 'high' ? 2 : 0) + (x.rule.pri || 2);
+    rows.sort((a, b) => w(b) - w(a));
+    const perCat = {}; const used = new Set(); const ruleDrafts = [];
+    rows.forEach((x) => {
+      if ((perCat[x.rule.cat] || 0) >= 2) return; perCat[x.rule.cat] = (perCat[x.rule.cat] || 0) + 1;
+      const lead = x.m.prs.find((p) => !used.has(p.number)) || null; if (lead) used.add(lead.number);
+      const prs = lead ? [lead].concat(x.m.prs.filter((p) => p !== lead)) : x.m.prs;
+      ruleDrafts.push({ w: w(x), d: makeDraft(meta, x.rule.id, { title: x.title, act: x.act, files: x.files, commits: x.m.commits, prs, keywords: CAT_KW[x.rule.cat], lead }) });
+    });
+    // 코드 규칙에 걸리지 않은 의미 있는 PR
+    const prW = (p, k) => KINDS[k] + Math.min(3, cleanBody(p.body).trim().length / 150) + (p.merged ? 1 : 0);
+    const prDrafts = history.prs.filter((p) => !used.has(p.number)).map((p) => ({ p, k: kindOf(p.title) })).filter((x) => x.k && cleanTitle(x.p.title).length >= 6)
+      .sort((a, b) => prW(b.p, b.k) - prW(a.p, a.k)).slice(0, MAX_DRAFTS)
+      .map(({ p, k }) => ({ w: prW(p, k), d: makeDraft(meta, `pr-${p.number}`, { title: cleanTitle(p.title), act: '', files: [], commits: commitsOfPr(p, history.commits), prs: [p], keywords: KIND_KW[k], lead: p }) }));
+    // PR 을 쓰지 않는 레포면 커밋에서
+    const inRules = new Set(ruleDrafts.flatMap((x) => x.d.evidence.commits.map((c) => c.sha)));
+    const cDrafts = history.prs.length ? [] : history.commits.filter((c) => !inRules.has(c.sha)).map((c) => ({ c, k: kindOf(c.message) }))
+      .filter((x) => ['perf', 'fix', 'refactor', 'feat'].includes(x.k) && cleanTitle(x.c.message).length >= 10).sort((a, b) => (KINDS[b.k] + (b.c.body ? 2 : 0)) - (KINDS[a.k] + (a.c.body ? 2 : 0))).slice(0, 3)
+      .map(({ c, k }) => ({ w: KINDS[k], d: makeDraft(meta, `commit-${c.sha}`, { title: cleanTitle(c.message), act: '', files: [], commits: [c], prs: [], keywords: KIND_KW[k], lead: null }) }));
+    // 코드 근거가 있는 초안을 앞에 두되, PR 초안 자리를 남겨 둔다
+    const rest = prDrafts.concat(cDrafts); const keep = Math.max(MAX_DRAFTS - rest.length, 5);
+    return ruleDrafts.slice(0, keep).concat(rest).slice(0, MAX_DRAFTS).map((x) => x.d);
+  }
+
+  /* ---------------- 레포 분석 ---------------- */
+  const STEPS = ['레포 정보 불러오는 중', '커밋·PR 읽는 중', '파일 구조 살펴보는 중', '코드 읽는 중', '경험 카드로 정리하는 중'];
+  async function analyzeLive(parsed, login, report) {
+    report(0);
+    const info = await getJson(`/repos/${parsed.owner}/${parsed.name}`);
+    const owner = info.owner.login; const name = info.name; const branch = parsed.branch || info.default_branch || 'main';
+
+    report(1);
+    const history = await readHistory(owner, name, branch, login);
+    report(2);
+    const treeRes = await getJson(`/repos/${owner}/${name}/git/trees/${encodeURIComponent(branch)}?recursive=1`);
     const tree = treeRes.tree || [];
     if (!tree.length) throw ghError('empty');
     const picked = pickFiles(tree);
 
     let done = 0;
-    report(2, `${STEPS[2]} (0/${picked.length})`, 0, picked.length);
+    report(3, `${STEPS[3]} (0/${picked.length})`, 0, picked.length);
     await pool(picked, 6, async (f) => {
-      f.text = await getRaw(info.owner.login, info.name, branch, f.path);
+      f.text = await getRaw(owner, name, branch, f.path);
       f.lines = (f.text || '').split(/\r?\n/);
-      done++; report(2, `${STEPS[2]} (${done}/${picked.length})`, done, picked.length);
+      done++; report(3, `${STEPS[3]} (${done}/${picked.length})`, done, picked.length);
     });
     const files = picked.filter((f) => f.text != null);
 
-    report(3, STEPS[3]);
-    const stack = deriveStack(files, languages, tree);
-    const ctx = makeCtx(files, stack, tree);
-    const meta = { owner: info.owner.login, name: info.name, branch };
-    const findings = runRules(files, meta, ctx);
-    await sleep(350);
+    report(4);
+    const ctx = makeCtx(files, deriveStack(files, info.language, tree), tree);
+    const meta = { owner, name, branch, full: `${owner}/${name}`, key: keyOf(owner, name), description: info.description || '', login, byAuthor: history.byAuthor, personal: !info.fork && (!login || sameLogin(info.owner, login)) };
+    const drafts = await buildDrafts(runRules(files, meta, ctx), history, meta);
     return {
-      url: info.html_url || url, owner: meta.owner, name: meta.name, branch, source: 'github', analyzedAt: today(),
-      meta: { description: info.description || '', stars: info.stargazers_count || 0, languages, topics: info.topics || [] },
-      stack, findings, filesRead: files.length,
+      repo: { owner, name, url: info.html_url, branch, analyzedAt: today(), commits: history.commits.length, prs: history.prs.length },
+      drafts, source: 'github',
+      // login 의 커밋·PR 이 없어 레포 전체 기록으로 정리했으면 알려 준다
+      note: login && !history.byAuthor ? `${login} 계정의 커밋·PR을 찾지 못해 레포 전체 기록으로 정리했어요.` : '',
     };
   }
 
-  // 시드에 있는 예시 레포 (실제로 없는 레포) — 오프라인에서도 다시 분석이 되도록 그대로 돌려준다
-  function sampleRepo(key) {
-    const s = App.github.SAMPLES[key]; if (!s) return null;
-    const r = clone(s); r.source = 'sample'; r.analyzedAt = today();
-    (r.findings || []).forEach((f) => { f.status = 'new'; });
-    return r;
+  // 예시 계정의 레포 (실제로 없는 레포): 네트워크 없이 준비된 초안을 돌려준다
+  function sampleOf(owner, name) {
+    const s = (window.SEED.repoSamples || {})[keyOf(owner, name)]; if (!s) return null;
+    return { repo: Object.assign(clone(s.repo), { analyzedAt: today() }), drafts: clone(s.drafts), source: 'sample', note: '' };
   }
-  async function playSample(key, report) {
-    const r = sampleRepo(key); const n = r.filesRead || 24;
-    report(0, STEPS[0]); await sleep(380);
-    report(1, STEPS[1]); await sleep(380);
-    for (let k = 0; k <= n; k += 4) { report(2, `${STEPS[2]} (${Math.min(k, n)}/${n})`, Math.min(k, n), n); await sleep(90); }
-    report(2, `${STEPS[2]} (${n}/${n})`, n, n);
-    report(3, STEPS[3]); await sleep(420);
-    return r;
+  async function playSample(res, report) {
+    const n = 24;
+    report(0); await sleep(320); report(1); await sleep(420); report(2); await sleep(300);
+    for (let k = 0; k <= n; k += 4) { report(3, `${STEPS[3]} (${k}/${n})`, k, n); await sleep(80); }
+    report(4); await sleep(420);
+    return res;
   }
 
-  async function analyze(url, opts = {}) {
-    const report = (step, text, done, total) => { if (opts.onProgress) try { opts.onProgress({ step, text, done, total, steps: STEPS }); } catch (e) { /* ignore */ } };
-    const parsed = parseUrl(url);
+  // → { repo:{ owner, name, url, branch, analyzedAt, commits, prs }, drafts:[{ key, title, summary, star, keywords, period?, evidence }], source:'github'|'sample', note }
+  async function analyzeRepo(repo, opts = {}) {
+    const report = reporter(opts, STEPS);
+    const parsed = repo && repo.owner && repo.name ? { owner: repo.owner, name: repo.name, branch: repo.branch } : parseUrl(repo && repo.url);
     if (!parsed) throw ghError('invalid');
-    const key = keyOf(parsed.owner, parsed.name);
-    if (App.github.SAMPLES[key] && !opts.live) return playSample(key, report);
+    const sample = sampleOf(parsed.owner, parsed.name);
+    if (sample) return playSample(sample, report);
     try {
-      return await analyzeLive(parsed, url, report);
+      return await analyzeLive(parsed, opts.login || '', report);
     } catch (e) {
-      if (!e.code) { console.warn('[github] analyze failed', e); throw ghError('network'); }
-      if ((e.code === 'rate_limit' || e.code === 'network') && App.github.SAMPLES[key]) e.sample = sampleRepo(key);
+      if (!e.code) { console.warn('[github] analyze failed', e); throw ghError('http'); }
       throw e;
     }
   }
 
-  // 예시 레포: seed-repos.js 가 window.SEED.projects[*].repo 에 넣어 둔 것 ('owner/name' 소문자 키)
-  const SAMPLES = {};
-  ((window.SEED && window.SEED.projects) || []).forEach((p) => { if (p.repo) SAMPLES[keyOf(p.repo.owner, p.repo.name)] = clone(p.repo); });
-
-  App.github = { parseUrl, analyze, SAMPLES, STEPS, keyOf, sampleRepo, RULES, _internals: { blockAround, pickFiles, runRules, deriveStack, makeCtx } };
+  App.github = { parseUrl, parseAccount, fetchAccount, analyzeRepo, sampleAccount, STEPS, ACCOUNT_STEPS, keyOf, _internals: { RULES, buildDrafts, runRules, sections, kindOf, cleanTitle } };
 })(window.App);

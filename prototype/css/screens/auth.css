@@ -1,0 +1,7 @@
+/* 로그인 · 회원가입 (.au-*). 큰 틀은 styles.css 의 .auth */
+.au-input { position: relative; }
+.au-eye { position: absolute; right: 1px; top: 50%; transform: translateY(-50%); }
+.au-input:has(.au-eye) .input { padding-right: 48px; }
+.auth-form :is(.field-hint, .field-error):empty { display: none; }
+.auth-form .au-demo { margin-top: 8px; }
+.au-note { display: block; margin-top: 24px; }

@@ -1,448 +1,293 @@
-/* 지원 기업 상세 — 자소서 탭 (.ae-*)
-   기업(+직무)마다 자소서 문항을 관리하고, 문항별로 숨은 역량 → 경험 추천(기업 요구 역량 가산) → 연결 → 개요까지. */
+/* 지원 기업 — 자소서 탭: 왼쪽 문항 목록, 오른쪽 문항 → 경험 카드 고르기 → AI 초안
+   문항에 저장하는 값: expIds(고른 카드), answer(본문), gen { text, ids }(마지막으로 생성한 글과 그때 고른 카드), prevAnswer·prevGen(되돌리기) */
 (function (App) {
   const esc = (s) => App.ui.esc(s);
+  const I = (n, s) => App.icon(n, s);
+  const U = () => App.applyUtil;
+  const MAX = 3;
+  const num = (n) => Number(n).toLocaleString();
 
-  /* ---------- 문항 해석 가이드 (구 #/match 로직 재사용) ---------- */
-  const KW_GUIDE = {
-    '협업': { want: '혼자가 아니라 팀 안에서 어떤 역할로 기여했는지', part: 'action', tip: '행동(A)에서 팀원과 무엇을 맞췄고, 내가 맡은 몫이 무엇이었는지 나눠서 써 보세요.' },
-    '문제해결': { want: '원인을 어떻게 찾았고 무엇으로 해결했는지', part: 'action', tip: '행동(A)에서 ‘원인 파악 → 해결책’ 순서를 분명히 하고, 결과(R)의 숫자로 마무리하세요.' },
-    '커뮤니케이션': { want: '상대에 맞춰 설명하고 합의를 이끈 방식', part: 'action', tip: '행동(A)에서 누구에게, 어떤 방식으로 전달했는지 구체적으로 보여 주세요.' },
-    '리더십': { want: '방향을 정하고 사람을 움직인 방식', part: 'task', tip: '과제(T)에서 내가 책임진 범위를 먼저 밝히고, 사람을 움직인 행동을 이어 주세요.' },
-    '주도성': { want: '시키지 않았는데 먼저 시작한 순간', part: 'task', tip: '“누가 시키지 않았지만”이라는 출발점을 과제(T)에 분명히 넣어 보세요.' },
-    '책임감': { want: '맡은 일을 끝까지 해낸 과정', part: 'task', tip: '과제(T)의 제약(시간·인원)을 강조하고, 끝까지 마무리한 결과를 보여 주세요.' },
-    '분석력': { want: '데이터나 상황을 쪼개서 판단한 근거', part: 'action', tip: '행동(A)에서 무엇을 세어 보고 비교했는지, 판단 근거를 숫자로 보여 주세요.' },
-    '학습능력': { want: '모르는 것을 얼마나 빠르게, 어떻게 익혔는지', part: 'action', tip: '행동(A)에 학습 방법과 걸린 시간을 넣고, 배운 것을 바로 적용한 결과로 이어 주세요.' },
-    '고객지향': { want: '사용자의 불편을 어떻게 발견하고 반영했는지', part: 'situation', tip: '상황(S)에서 고객이 겪은 불편을 생생하게 묘사하고 시작하세요.' },
-    '꼼꼼함': { want: '실수를 줄이기 위해 챙긴 디테일', part: 'action', tip: '행동(A)에서 확인·검토 과정을 구체적인 절차로 보여 주세요.' },
-    '갈등조정': { want: '의견 차이를 어떻게 듣고 조율했는지', part: 'action', tip: '행동(A)에서 양쪽 입장을 어떻게 확인했고, 어떤 기준으로 합의했는지 강조하세요.' },
-    '의사결정': { want: '선택지를 비교하고 결정한 기준', part: 'action', tip: '행동(A)에서 다른 선택지와 버린 이유까지 쓰면 판단력이 드러나요.' },
-    '끈기': { want: '어려움 앞에서 포기하지 않은 과정', part: 'situation', tip: '상황(S)의 어려움을 충분히 보여 준 뒤, 다시 시도한 행동을 이어 주세요.' },
-    '창의성': { want: '기존과 다르게 시도한 방법', part: 'action', tip: '행동(A)에서 기존 방식과 무엇이 달랐는지 대비해서 써 보세요.' },
-  };
-  const PART_LABEL = { situation: '상황(S)', task: '과제(T)', action: '행동(A)', result: '결과(R)' };
-  const TRIGGERS = { '갈등': '갈등조정', '주도': '주도성', '실패': '끈기', '새로운 기술': '학습능력', '고객': '고객지향', '사용자': '고객지향', '개선': '문제해결', '지원 동기': '주도성', '목표': '주도성' };
+  /* ---------- 화면 상태: 계정 + 기업마다 ---------- */
+  const uiStore = {}; const writing = new Set(); // writing: 지금 AI 가 쓰고 있는 문항
+  const keyOf = (appId) => `${(App.auth.current() || {}).id}|${appId}`;
+  function uiOf(appId) { const k = keyOf(appId); return (uiStore[k] = uiStore[k] || { sel: null, inside: false, q: {} }); }
+  const qui = (ui, q) => (ui.q[q.id] = ui.q[q.id] || { pick: null, others: null, find: '', manual: false });
 
-  function josa(word, a, b) {
-    const ch = String(word).replace(/[’'"」)\s]+$/, '').slice(-1); const code = ch.charCodeAt(0) - 0xac00;
-    if (code < 0 || code > 11171) return word + a;
-    return word + (code % 28 ? a : b);
+  const idsOf = (q) => q.expIds || [];
+  const liveIds = (q) => idsOf(q).filter((id) => App.store.get(id));
+  const written = (q) => !!String(q.answer || '').trim();
+  const edited = (q) => written(q) && q.answer !== ((q.gen && q.gen.text) || '');
+  const cardsChanged = (q) => !!q.gen && q.gen.ids.slice().sort().join() !== liveIds(q).sort().join();
+  // AI 가 비워 둔 곳 [ ] 중 아직 남은 것. 사용자가 쓴 [소제목]은 세지 않는다
+  function slots(q, text) {
+    const t = text == null ? String(q.answer || '') : text;
+    return [...new Set((((q.gen && q.gen.text) || '').match(/\[[^[\]\n]+\]/g)) || [])].filter((s) => t.includes(s));
   }
-  function trigger(text, kw) {
-    const words = [];
-    Object.keys(TRIGGERS).forEach((w) => { if (TRIGGERS[w] === kw && text.includes(w)) words.push(w); });
-    (App.keywords.get(kw).hints || []).forEach((h) => { if (text.includes(h) && !words.includes(h)) words.push(h); });
-    return words[0] || '';
+  function current(app, ui) { const list = app.essays || []; return list.find((q) => q.id === ui.sel) || list[0] || null; }
+
+  /* ---------- 문항 목록 ---------- */
+  function stateText(q) {
+    const n = liveIds(q).length;
+    return writing.has(keyOf(q.id)) ? '쓰는 중' : App.ai.essayDone(q) ? '작성됨' : written(q) ? '다듬는 중' : n ? `카드 ${n}장` : '쓰기 전';
   }
-  function why(text, kw) {
-    const w = trigger(text, kw); const g = KW_GUIDE[kw];
-    const want = g ? g.want : App.keywords.get(kw).desc;
-    return w ? `${josa('‘' + w + '’', '이라는', '라는')} 표현은 ${josa(want, '을', '를')} 보고 싶다는 신호예요.` : `문항 의도상 ${josa(want, '이', '가')} 함께 드러나면 좋아요.`;
-  }
-  function highlight(text, words) {
-    let html = esc(text);
-    words.filter(Boolean).forEach((w) => { const ew = esc(w); html = html.split(ew).join(`<mark class="ae-mark">${ew}</mark>`); });
-    return html;
-  }
-  function kwList(kws) {
-    return kws.map((k, i) => (i < kws.length - 1 ? josa('‘' + k + '’', '과', '와') : '‘' + k + '’')).join(' ');
+  const countText = (q, len) => `${num(len)}${q.limit ? ` / ${num(q.limit)}` : ''}자`;
+  function navHtml(app, ui) {
+    const sel = current(app, ui);
+    return `<ol>${app.essays.map((q, i) => { const len = String(q.answer || '').length; return `<li><button type="button" class="ae-item" data-ae-sel="${esc(q.id)}" ${q === sel ? 'aria-current="true"' : ''}>
+      <span class="ae-item-n">${i + 1}</span><span class="ae-item-main"><span class="ae-item-t">${esc(q.text)}</span>
+      <span class="meta"><span class="${App.ai.essayDone(q) ? 'ae-done' : ''}">${App.ai.essayDone(q) ? I('check', 14) : ''}${stateText(q)}</span><span class="${q.limit && len > q.limit ? 'ae-over' : ''}">${countText(q, len)}</span></span></span></button></li>`; }).join('')}</ol>
+      <button type="button" class="btn btn-sm btn-block" data-ae="add">${I('plus', 16)}문항 추가</button>`;
   }
 
-  /* ---------- 기업 맥락 ---------- */
-  const compNames = (app) => (app.competencies || []).map((c) => c.name);
-  const compOf = (app, name) => (app.competencies || []).find((c) => c.name === name) || null;
-  const expOf = (id) => (id ? App.store.get(id) : null);
-
-  // 저장된 문항 키워드 기준 추천 (core analyzeQuestion 과 같은 점수식, 기업 요구 역량 가산)
-  function recommend(q, app) {
-    const kws = q.keywords || []; const focus = compNames(app);
-    const counts = App.ai.expCounts();
-    return App.store.state.experiences.map((e) => {
-      const hit = e.keywords.filter((k) => kws.includes(k)).length;
-      const fhit = e.keywords.filter((k) => focus.includes(k) && !kws.includes(k)).length;
-      const score = Math.min(98, Math.round(hit * 30 + fhit * 6 + Math.min(5, counts[e.id] || 0) * 7));
-      const companyKws = e.keywords.filter((k) => focus.includes(k));
-      return { exp: e, score, matched: e.keywords.filter((k) => kws.includes(k)), companyKws };
-    }).filter((r) => r.matched.length).sort((a, b) => b.score - a.score);
-  }
-
-  // 같은 경험이 여러 문항에 쓰였는지: { expId: [문항 번호...] }
-  function usage(app) {
-    const m = {};
-    (app.essays || []).forEach((q, i) => { if (q.expId && expOf(q.expId)) (m[q.expId] = m[q.expId] || []).push(i + 1); });
-    return m;
-  }
-
-  function tipFor(exp, matched, q) {
-    const kws = q.keywords || []; const text = q.text;
-    const explicit = (k) => Object.keys(TRIGGERS).some((w) => TRIGGERS[w] === k && text.includes(w));
-    const rank = (k) => (explicit(k) ? -10 : 0) + (kws.indexOf(k) < 0 ? 99 : kws.indexOf(k));
-    const kw = matched.slice().sort((a, b) => rank(a) - rank(b))[0]; const g = KW_GUIDE[kw];
-    const part = g ? g.part : 'action';
-    const lines = [g ? g.tip : '행동(A)에서 내가 직접 한 일을 중심으로 써 보세요.'];
-    const st = exp.star || {};
-    if (st.result && !/\d/.test(st.result)) lines.push('결과(R)에 숫자를 하나만 더해도 설득력이 확 올라가요.');
-    const empty = ['situation', 'task', 'action', 'result'].filter((k) => !st[k]);
-    if (empty.length) lines.push(`${empty.map((k) => PART_LABEL[k]).join('·')} 칸이 비어 있어요. 경험 카드에서 먼저 채워 두면 좋아요.`);
-    return { part, quote: st[part] || '', lines };
-  }
-
-  // 개요: 도입 / 상황 / 행동 / 결과 / 직무 연결 (기업·직무·요구 역량 이유 반영)
-  function outline(exp, q, app) {
-    const b = App.ai.starBrief(exp);
-    const qk = q.keywords || [];
-    const used = qk.filter((k) => exp.keywords.includes(k));
-    const kws = used.length ? used : qk.length ? qk : exp.keywords.slice(0, 2);
-    const kwTxt = kws.length ? kwList(kws) : '제 강점';
-    // 기업이 원하는 역량 중 이 문항·경험과 닿는 것 (가중치 순)
-    const comps = (app.competencies || []).filter((c) => kws.includes(c.name) || exp.keywords.includes(c.name))
-      .sort((x, y) => y.weight - x.weight).slice(0, 2);
-    const job = (app.job || App.store.state.user.targetJob || '지원 직무').replace(/\s*\(.*?\)\s*/g, '').trim() || '지원 직무';
-    let link;
-    if (comps.length) {
-      const reasons = comps.filter((c) => c.reason).map((c) => `‘${c.reason}’`);
-      const names = kwList(comps.map((c) => c.name));
-      link = reasons.length
-        ? `${app.company} ${job} 직무에는 ${josa(reasons.join(', '), '이', '가')} 중요하다고 생각합니다. 이 경험에서 키운 ${josa(names, '을', '를')} 바탕으로 ${app.company}에서도 같은 방식으로 기여하겠습니다.`
-        : `이 경험에서 키운 ${josa(names, '을', '를')} ${app.company} ${josa(job, '으로서', '로서')} 살리겠습니다.`;
-    } else {
-      link = `이 경험에서 키운 ${josa(kwTxt, '을', '를')} ${app.company} ${josa(job, '으로서', '로서')} 팀의 문제를 해결하는 데 살리겠습니다.`;
-    }
-    return [
-      ['도입', `저는 「${exp.title}」 경험을 통해 ${kwTxt} 역량을 키웠습니다.`],
-      ['상황', b.situation || '(경험의 상황·과제를 채워 주세요)'],
-      ['행동', b.action || '(내가 한 행동을 채워 주세요)'],
-      ['결과', b.result || '(결과를 채워 주세요. 숫자가 있으면 더 좋아요)'],
-      ['직무 연결', (b.insight ? b.insight + ' ' : '') + link],
-    ];
-  }
-
-  /* ---------- 모듈 상태 (탭 전환·refresh 사이에 유지) ---------- */
-  const ui = { appId: null, open: {}, adding: false, draft: '', draftLimit: '800', editing: null, busy: false, fresh: null };
-  function syncApp(app) {
-    if (ui.appId !== app.id) Object.assign(ui, { appId: app.id, open: {}, adding: false, draft: '', draftLimit: '800', editing: null, busy: false, fresh: null });
-  }
-
-  function scoreTone(n) { return n >= 75 ? 'high' : n >= 50 ? 'mid' : 'low'; }
-
-  function kwChips(q, app) {
-    const req = compNames(app);
-    if (!(q.keywords || []).length) return '<span class="subtle">키워드 분석 전이에요</span>';
-    return q.keywords.map((k) => req.includes(k)
-      ? `<span class="ae-kw-req" title="${esc(app.company)}의 요구 역량">${App.ui.keywordChip(k)}<i aria-label="요구 역량">★</i></span>`
-      : App.ui.keywordChip(k)).join('');
-  }
-
-  function linkedRow(q, use) {
-    const e = expOf(q.expId);
-    if (!e) {
-      return `<div class="ae-link ae-link-empty"><span class="ae-link-ico">＋</span><span>경험을 연결하세요</span>
-        <span class="subtle ae-link-hint">${ui.open[q.id] ? '아래 추천에서 골라 주세요' : 'AI 추천을 열어 골라 보세요'}</span></div>`;
-    }
-    const others = (use[e.id] || []).length > 1;
-    return `<div class="ae-link ${others ? 'is-dup' : ''}">
-      <span class="ae-link-ico ok">✓</span>
-      <div class="ae-link-body">
-        <a class="ae-link-title" href="#/card/${esc(e.id)}">${esc(e.title)}</a>
-        <div class="ae-link-meta"><span>${esc(e.category)} · 경험 ${App.ai.expCounts()[e.id] || 0}개</span></div>
-      </div>
-      <button class="btn btn-sm btn-ghost" data-ae-unlink="${esc(q.id)}">연결 해제</button>
-    </div>`;
-  }
-
-  function hiddenPanel(q, app) {
+  /* ---------- 문항 머리 ---------- */
+  function headHtml(q, i) {
     const kws = q.keywords || [];
-    if (!kws.length) return '';
-    return `<div class="ae-sec">
-      <div class="ae-sec-h"><span class="ai-dot">R</span><b>이 문항에 숨은 역량</b></div>
-      <div class="ae-why-list">${kws.map((k) => {
-        const c = compOf(app, k);
-        return `<div class="ae-why">${App.ui.keywordChip(k, { size: 'lg' })}<div>
-          <span>${esc(why(q.text, k))}</span>
-          ${c ? `<span class="ae-why-co">★ ${esc(app.company)}도 원하는 역량이에요${c.reason ? ` — ‘${esc(c.reason)}’` : ''}</span>` : ''}
-        </div></div>`;
-      }).join('')}</div>
-      <div class="ae-echo">“${highlight(q.text, kws.map((k) => trigger(q.text, k)))}”</div>
-    </div>`;
+    return `<button type="button" class="btn btn-ghost btn-sm ae-back" data-ae="back">${I('chevron-left', 16)}문항 목록</button>
+      <header class="ae-q"><div class="ae-q-top"><h2>${i + 1}번 문항</h2>
+        <div class="menu"><button type="button" class="icon-btn" aria-haspopup="menu" aria-expanded="false" aria-label="문항 더 보기">${I('more')}</button>
+          <div class="menu-list"><button type="button" data-ae="edit">${I('edit', 16)}문항과 역량 고치기</button><hr><button type="button" class="is-danger" data-ae="del">${I('trash', 16)}문항 지우기</button></div></div></div>
+        <p class="ae-q-text">${esc(q.text)}</p>
+        <dl class="ae-facts"><div><dt>글자 수</dt><dd>${q.limit ? `${num(q.limit)}자 이내` : '제한 없음'}</dd></div>
+          <div><dt>핵심 역량</dt><dd class="row row-wrap">${kws.length ? kws.map((k) => App.ui.keywordChip(k, true)).join('') : '<span class="subtle">특정 역량을 묻지 않아요</span>'}<button type="button" class="icon-btn ae-kw-edit" data-ae="edit" aria-label="핵심 역량 고치기">${I('edit', 15)}</button></dd></div></dl></header>`;
   }
 
-  function recCard(r, i, q, app, use) {
-    const e = r.exp; const linked = q.expId === e.id; const t = tipFor(e, r.matched, q);
-    const others = e.keywords.filter((k) => !r.matched.includes(k));
-    const coKw = r.companyKws.filter((k) => !r.matched.includes(k));
-    const coAll = r.companyKws;
-    const usedIn = (use[e.id] || []).filter((n) => app.essays[n - 1] && app.essays[n - 1].id !== q.id);
-    return `<div class="ae-rec ${linked ? 'is-linked' : ''}" data-score="${scoreTone(r.score)}">
-      <div class="ae-rec-top">
-        <span class="ae-rank">${i + 1}</span>
-        <div class="ae-rec-head">
-          <div class="ae-rec-meta"><span>${esc(e.category)}</span>${usedIn.length ? `<span class="ae-used">${usedIn.join('·')}번 문항에 사용 중</span>` : ''}</div>
-          <div class="ae-rec-title">${esc(e.title)}</div>
-        </div>
-        <div class="ae-score"><b>${r.score}<small>%</small></b><span>적합도</span></div>
-      </div>
-      <div class="ae-scorebar"><span style="width:${r.score}%"></span></div>
-      <div class="ae-rec-kws">${r.matched.map((k) => App.ui.keywordChip(k)).join('')}${others.map((k) => `<span class="ae-kw-dim">${App.ui.keywordChip(k)}</span>`).join('')}</div>
-      ${coAll.length ? `<div class="ae-co-note">★ ${coKw.length ? `이 기업이 원하는 ${esc(josa(coKw.map((k) => '#' + k).join(' '), '과도', '와도'))} 맞아요` : `이 기업이 원하는 ${coAll.map((k) => '#' + esc(k)).join(' ')} 역량이 담겨 있어요`}</div>` : ''}
-      <details class="ae-tip"><summary><span>이렇게 연결해 보세요</span><span class="ae-part">${PART_LABEL[t.part]} 강조</span></summary>
-        ${t.quote ? `<blockquote class="ae-quote">${esc(t.quote)}</blockquote>` : ''}
-        <ul>${t.lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul></details>
-      <div class="ae-rec-actions">
-        <a class="btn btn-sm btn-ghost" href="#/card/${esc(e.id)}">경험 카드 보기</a>
-        ${linked ? '<span class="ae-linked-tag">✓ 이 문항에 연결됨</span>'
-          : `<button class="btn btn-sm btn-primary" data-ae-use="${esc(q.id)}" data-exp="${esc(e.id)}">이 경험으로 쓰기</button>`}
-      </div>
-    </div>`;
+  /* ---------- 경험 카드 고르기 ---------- */
+  // 같은 기업의 다른 문항에서 쓴 곳
+  const usedIn = (app, q, id) => app.essays.map((x, i) => (x.id !== q.id && idsOf(x).includes(id) ? i + 1 : 0)).filter(Boolean);
+  function choice(app, q, e, matched) {
+    const used = usedIn(app, q, e.id);
+    return `<label class="choice ae-choice"><input type="checkbox" data-ae-card="${esc(e.id)}" ${idsOf(q).includes(e.id) ? 'checked' : ''}>
+      <span class="choice-main"><span class="ae-choice-top">${App.ui.projChip(e.projectId)}${used.length ? `<span class="ae-used">${used.join(', ')}번 문항에서 사용</span>` : ''}</span>
+        <span class="choice-title">${esc(e.title)}</span><span class="choice-sub">${esc(e.resumeLine || e.summary)}</span>
+        <span class="ae-kws">${e.keywords.map((k) => App.ui.keywordChip(k, matched.includes(k))).join('')}</span></span>
+      <a class="icon-btn" href="#/card/${esc(e.id)}" target="_blank" rel="noopener" title="카드 열기" aria-label="「${esc(e.title)}」 카드 새 창에서 열기">${I('external', 16)}</a></label>`;
+  }
+  // 핵심 역량이 겹치지 않는 카드 (프로젝트끼리 모아서)
+  function otherCards(q) {
+    const hit = new Set(App.ai.cardsFor(q.keywords).map((r) => r.exp.id));
+    return App.store.projects().map((p) => App.ai.rankCards(App.store.cardsOf(p.id).filter((e) => !hit.has(e.id)))).filter((l) => l.length);
+  }
+  function otherList(app, q, find) {
+    const t = find.trim().toLowerCase();
+    const groups = otherCards(q).map((l) => l.filter((e) => !t || [e.title, e.summary, e.resumeLine, (App.store.getProject(e.projectId) || {}).title, ...e.keywords].join(' ').toLowerCase().includes(t))).filter((l) => l.length);
+    return groups.length ? groups.map((l) => `<div class="ae-group">${l.map((e) => choice(app, q, e, [])).join('')}</div>`).join('') : '<p class="subtle ae-none">찾는 카드가 없어요.</p>';
+  }
+  function cardsHtml(app, q, st) {
+    if (!App.store.list().length) return `<section class="ae-sec"><h3 class="section-title">경험 카드 고르기</h3><div class="panel ae-nocard"><p>아직 경험 카드가 없어요. 카드가 있으면 AI가 자소서를 써 드려요.</p>
+      ${written(q) ? '' : '<button type="button" class="btn btn-ghost" data-ae="manual">직접 쓰기</button>'}<button type="button" class="btn" data-chat data-chat-kw="${esc((q.keywords || [])[0] || '')}">${I('chat', 16)}AI 채팅 시작하기</button></div></section>`;
+    const hits = App.ai.cardsFor(q.keywords); const kws = q.keywords || []; const rest = otherCards(q).reduce((n, l) => n + l.length, 0);
+    const pick = st.pick == null ? !written(q) : st.pick;
+    const others = !kws.length || (st.others == null ? !hits.length || U().isOpen(q.text) : st.others);
+    const find = `<div class="input-icon ae-find">${I('search', 16)}<input class="input" type="search" data-ae-find value="${esc(st.find)}" placeholder="카드 검색" aria-label="카드 검색"></div>`;
+    const title = (n) => `<h3 class="section-title">경험 카드 고르기${n ? ` <span class="count">${n}</span>` : ''}<span class="subtle ae-cap">${MAX}장까지</span>${written(q) && !writing.has(keyOf(q.id)) ? `<button type="button" class="more link" data-ae="pick" aria-expanded="${pick}">${pick ? '접기' : '카드 바꾸기'}</button>` : ''}</h3>`;
+    if (!pick) return `<section class="ae-sec">${title(0)}<div data-ae-picked>${pickedHtml(q)}</div></section>`;
+    return `<section class="ae-sec">${title(kws.length ? hits.length : rest)}
+      ${kws.length ? (hits.length ? `<div>${hits.map((r) => choice(app, q, r.exp, r.matched)).join('')}</div>`
+        : `<div class="panel ae-nocard"><p>${kws.length > 1 ? '이 역량들' : `‘${esc(kws[0])}’ 역량`}과 맞는 경험 카드가 없어요.</p><button type="button" class="btn" data-chat data-chat-kw="${esc(kws[0])}">${I('chat', 16)}AI 채팅으로 찾기</button></div>`) : find}
+      ${!kws.length ? `<div data-ae-others>${otherList(app, q, st.find)}</div>` : rest ? `<button type="button" class="btn btn-sm ae-more" data-ae="others" aria-expanded="${others}">${I('chevron-down', 16)}다른 카드 보기 <span class="count">${rest}</span></button>
+        ${others ? `${find}<div data-ae-others>${otherList(app, q, st.find)}</div>` : ''}` : ''}
+      <div data-ae-picked class="is-sticky">${pickedHtml(q)}</div></section>`;
+  }
+  // 고른 카드: 어느 프로젝트의 어떤 카드인지 + 생성 버튼
+  function pickedHtml(q) {
+    const ids = idsOf(q); const n = liveIds(q).length; const busy = writing.has(keyOf(q.id)); const redo = written(q);
+    const hint = !n ? '경험 카드를 하나 이상 골라 주세요' : n > 2 ? '1~2장을 고르면 한 경험을 더 자세히 쓸 수 있어요' : redo && cardsChanged(q) ? '다시 생성하면 바꾼 카드로 새로 써요' : '';
+    return `<div class="ae-picked"><div class="ae-picked-main"><div class="label">고른 경험 카드 ${n ? `<span class="count">${n}</span>` : ''}</div>
+        ${ids.length ? `<ul>${ids.map((id) => `<li class="ae-chip">${U().cardRef(id)}<button type="button" class="chip-x" data-ae-unpick="${esc(id)}" aria-label="${esc((App.store.get(id) || { title: '휴지통에 있는 카드' }).title)} 빼기">${I('close', 14)}</button></li>`).join('')}</ul>` : ''}
+        ${hint ? `<p class="subtle">${hint}</p>` : ''}</div>
+      <div class="ae-picked-go">${!redo && !busy ? '<button type="button" class="btn btn-ghost" data-ae="manual">직접 쓰기</button>' : ''}<button type="button" class="btn ${!redo || cardsChanged(q) ? 'btn-primary' : ''}" data-ae="write" ${!n || busy ? 'disabled' : ''}>${busy ? '<span class="spinner"></span>쓰는 중' : redo ? `${I('refresh', 16)}다시 생성` : `${I('sparkle', 16)}AI로 자소서 생성`}</button></div></div>`;
   }
 
-  function recsPanel(q, app, use) {
-    const all = recommend(q, app);
-    let recs = all.slice(0, 3);
-    const li = all.findIndex((r) => r.exp.id === q.expId);
-    if (li >= 3) recs = recs.concat(all[li]);
-    const best = all.length ? all[0].score : 0;
-    const kw = (q.keywords || [])[0] || compNames(app)[0] || '';
-    const nudge = best < 50 ? `<div class="ae-nudge"><span class="ae-nudge-ico">✦</span><div class="ae-nudge-body">
-        <b>${all.length ? '딱 맞는 경험이 아직 부족해요' : '이 역량을 보여 줄 경험이 아직 없어요'}</b>
-        <span>${all.length ? '적합도 50% 이상인 경험이 없어요. ' : ''}${kw ? `#${esc(kw)} 경험을 ` : '경험을 '}질문 몇 개로 같이 찾아봐요.</span></div>
-        <a class="btn btn-sm btn-primary" href="#/ask/new?mode=deep${kw ? '&kw=' + encodeURIComponent(kw) : ''}">✦ 경험 정리하기</a></div>` : '';
-    return `<div class="ae-sec">
-      <div class="ae-sec-h"><b>추천 경험</b><span class="subtle">${all.length ? `${recs.length}개 · 적합도 순 · ${esc(app.company)} 요구 역량 반영` : ''}</span></div>
-      ${recs.length ? `<div class="ae-recs">${recs.map((r, i) => recCard(r, all.indexOf(r), q, app, use)).join('')}</div>` : ''}
-      ${nudge}
-    </div>`;
+  /* ---------- 초안 ---------- */
+  const mirror = (q, text) => {
+    let h = esc(text); slots(q, text).forEach((s) => { h = h.split(esc(s)).join(`<span class="ae-slot">${esc(s)}</span>`); });
+    return h + '\n';
+  };
+  function countHtml(q, text) {
+    const n = text.length; const over = q.limit ? n - q.limit : 0;
+    return `<span class="${over > 0 ? 'ae-over' : ''}">${num(n)}${q.limit ? ` / ${num(q.limit)}` : ''}자${over > 0 ? `, ${num(over)}자 넘었어요` : ''}</span> <span class="subtle">공백 포함</span>`;
+  }
+  function slotBanner(q, text) {
+    const n = slots(q, text).length;
+    return n ? `<div class="banner banner-warn">${I('warning')}<span>채워야 할 곳 ${n}군데</span><button type="button" class="btn btn-sm" data-ae="slot">찾아가기</button></div>` : '';
+  }
+  function draftHtml(q, st) {
+    if (writing.has(keyOf(q.id))) return `<section class="ae-sec"><h3 class="section-title">자소서</h3><div class="ae-wait" role="status"><span class="sr-only">고른 카드로 자소서를 쓰고 있어요</span>${[96, 100, 88, 94, 60].map((w) => `<span class="skeleton" style="width:${w}%"></span>`).join('')}</div></section>`;
+    if (!written(q) && !st.manual) return '';
+    const text = String(q.answer || '');
+    return `<section class="ae-sec"><h3 class="section-title"><label for="ae-text">자소서</label><span class="count" data-ae-saved role="status"></span></h3>
+      <div data-ae-slots>${slotBanner(q, text)}</div>
+      <div class="ae-editor"><div class="ae-mirror" aria-hidden="true" data-ae-mirror>${mirror(q, text)}</div><textarea id="ae-text" data-q="${esc(q.id)}" class="textarea" spellcheck="false" aria-describedby="ae-count" placeholder="자소서를 써 주세요.">${esc(text)}</textarea></div>
+      <div class="ae-draft-foot"><span id="ae-count" data-ae-count>${countHtml(q, text)}</span>
+        <span class="row spacer">${q.prevAnswer ? `<button type="button" class="btn btn-sm btn-ghost" data-ae="undo">${I('restore', 16)}이전 글로 되돌리기</button>` : ''}<button type="button" class="btn btn-sm" data-ae="copy">${I('copy', 16)}복사</button></span></div></section>
+      ${q.note ? `<section class="ae-sec"><h3 class="section-title"><label for="ae-note">메모</label></h3><textarea id="ae-note" data-q="${esc(q.id)}" class="textarea ae-note" rows="2">${esc(q.note)}</textarea></section>` : ''}`;
   }
 
-  function outlinePanel(q, app) {
-    const e = expOf(q.expId); if (!e) return '';
-    const rows = outline(e, q, app);
-    const len = rows.reduce((n, r) => n + r[1].length, 0);
-    return `<div class="ae-sec ae-outline">
-      <div class="ae-sec-h"><b>자소서 개요</b><span class="subtle">${esc(e.title.split(' — ')[0])} · 경험의 STAR로 조립했어요</span>
-        <button class="btn btn-sm" data-ae-copy="${esc(q.id)}">⧉ 복사</button></div>
-      <ol>${rows.map(([k, v]) => `<li><span class="ae-ol-k">${k}</span><span class="ae-ol-v">${esc(v)}</span></li>`).join('')}</ol>
-      ${q.limit ? `<div class="ae-len subtle">개요 약 ${len}자 · 제한 ${q.limit}자 — 행동과 결과에 살을 붙여 ${Math.round(q.limit * 0.9)}자 안팎으로 맞춰 보세요. 표현은 내 말로 다듬어 주세요.</div>` : ''}
-    </div>`;
+  function detailHtml(app, ui) {
+    const q = current(app, ui); if (!q) return ''; const st = qui(ui, q);
+    return `${headHtml(q, app.essays.indexOf(q))}<div class="ae-work"><div data-ae-cards>${cardsHtml(app, q, st)}</div><div class="ae-draft" data-ae-draft>${draftHtml(q, st)}</div></div>`;
   }
-
-  function editForm(q) {
-    return `<div class="ae-form" data-ae-form="edit">
-      <label class="label" for="ae-edit-text">문항</label>
-      <textarea class="textarea" id="ae-edit-text" maxlength="500">${esc(q.text)}</textarea>
-      <div class="ae-form-row">
-        <label class="ae-limit"><span class="label">글자 수 제한</span><input class="input" id="ae-edit-limit" type="number" min="0" step="50" inputmode="numeric" value="${esc(q.limit || '')}" placeholder="없음"></label>
-        <div class="ae-form-btns"><button class="btn btn-sm" data-ae="edit-cancel">취소</button><button class="btn btn-sm btn-primary" data-ae-save="${esc(q.id)}">저장</button></div>
-      </div>
-    </div>`;
-  }
-
-  function qCard(q, i, app, use) {
-    const open = !!ui.open[q.id]; const editing = ui.editing === q.id;
-    const dup = q.expId && (use[q.expId] || []).length > 1;
-    const fresh = ui.fresh === q.id;
-    return `<article class="card ae-q ${open ? 'is-open' : ''} ${q.expId && expOf(q.expId) ? 'is-done' : ''} ${fresh ? 'ae-fresh' : ''}" data-q="${esc(q.id)}">
-      <div class="ae-q-top">
-        <span class="ae-num">${i + 1}</span>
-        <div class="ae-q-main">
-          ${editing ? editForm(q) : `<div class="ae-q-text">${esc(q.text)}</div>
-          <div class="ae-q-meta"><span class="ae-limit-tag">${q.limit ? `${Number(q.limit).toLocaleString()}자 이내` : '글자 수 제한 없음'}</span>${kwChips(q, app)}</div>`}
-        </div>
-        ${editing ? '' : `<div class="ae-q-tools">
-          <button class="ae-icon-btn" data-ae-edit="${esc(q.id)}" title="문항 수정" aria-label="문항 수정">✎</button>
-          <button class="ae-icon-btn" data-ae-del="${esc(q.id)}" title="문항 삭제" aria-label="문항 삭제">🗑</button>
-        </div>`}
-      </div>
-      ${linkedRow(q, use)}
-      ${dup ? `<div class="ae-dup">${use[q.expId].join('·')}번 문항에 같은 경험을 연결했어요</div>` : ''}
-      <button class="ae-toggle" data-ae-toggle="${esc(q.id)}" aria-expanded="${open}">
-        <span class="ai-dot">R</span>${open ? 'AI 분석 접기' : (q.expId && expOf(q.expId) ? 'AI 분석 · 개요 보기' : 'AI 추천 경험 보기')}<span class="ae-chev">${open ? '▴' : '▾'}</span></button>
-      ${open ? `<div class="ae-panel">
-        ${hiddenPanel(q, app)}
-        ${recsPanel(q, app, use)}
-        ${outlinePanel(q, app)}
-        <div class="ae-sec ae-memo">
-          <label class="ae-sec-h" for="ae-note-${esc(q.id)}"><b>메모</b><span class="subtle ae-saved" data-ae-saved="${esc(q.id)}"></span></label>
-          <textarea class="textarea" id="ae-note-${esc(q.id)}" data-ae-note="${esc(q.id)}" placeholder="강조할 수치, 넣고 싶은 표현 등을 적어 두세요">${esc(q.note || '')}</textarea>
-        </div>
-      </div>` : ''}
-    </article>`;
-  }
-
-  function sampleChips(mode) {
-    return (window.SEED.sampleQuestions || []).map((s, i) => `<button class="ae-sample" data-ae-sample="${i}" data-mode="${mode}" title="${esc(s)}">＋ ${esc(s)}</button>`).join('');
-  }
-
-  function addForm() {
-    if (!ui.adding) return '';
-    return `<div class="card ae-form ae-add" data-ae-form="add">
-      <label class="label" for="ae-add-text">새 문항</label>
-      <textarea class="textarea" id="ae-add-text" maxlength="500" placeholder="예) 팀 프로젝트에서 갈등을 해결한 경험을 작성해 주세요.">${esc(ui.draft)}</textarea>
-      <div class="ae-samples"><span class="subtle">예시</span>${sampleChips('fill')}</div>
-      <div class="ae-form-row">
-        <label class="ae-limit"><span class="label">글자 수 제한</span><input class="input" id="ae-add-limit" type="number" min="0" step="50" inputmode="numeric" value="${esc(ui.draftLimit)}" placeholder="없음"></label>
-        <div class="ae-form-btns"><button class="btn btn-sm" data-ae="add-cancel">취소</button>
-          <button class="btn btn-sm btn-primary" data-ae="add-save" ${ui.busy ? 'disabled' : ''}>${ui.busy ? '숨은 역량 찾는 중…' : '✦ 추가하고 분석하기'}</button></div>
-      </div>
-    </div>`;
-  }
-
   function render(app) {
-    app = App.store.getApp(app.id) || app; syncApp(app);
-    const qs = app.essays || []; const use = usage(app);
-    const done = qs.filter((q) => q.expId && expOf(q.expId)).length;
-    const pct = qs.length ? Math.round(done / qs.length * 100) : 0;
-    const dups = Object.keys(use).filter((id) => use[id].length > 1);
-    const head = `<div class="ae-head">
-      <div class="ae-head-txt">
-        <h2>${esc(app.company)} 자소서 <span>문항 ${qs.length}개 · 경험 연결 ${done}/${qs.length}</span></h2>
-        ${qs.length ? `<div class="ae-head-prog">${App.ui.progress(pct)}</div>` : ''}
-      </div>
-      ${ui.adding ? '' : '<button class="btn btn-primary btn-sm" data-ae="add-open">＋ 문항 추가</button>'}
-    </div>`;
-    const warn = dups.length ? `<div class="ae-warn"><span>!</span><div>${dups.map((id) => {
-      const e = expOf(id); return `<div><b>${esc(e.title.split(' — ')[0])}</b> 경험이 ${use[id].join('·')}번 문항에 함께 쓰였어요.</div>`;
-    }).join('')}<div class="subtle">같은 경험이 두 문항에 쓰였어요. 다른 경험도 고려해 보세요.</div></div></div>` : '';
-    const body = qs.length
-      ? `<div class="ae-list">${qs.map((q, i) => qCard(q, i, app, use)).join('')}</div>`
-      : (ui.adding ? '' : `<div class="card ae-empty">
-          <div class="ae-empty-ico">✎</div>
-          <b>${esc(app.company)} 자소서 문항을 넣어 주세요</b>
-          <p class="subtle">문항마다 숨은 역량을 찾고, ${esc(josa(app.company, '이', '가'))} 원하는 역량까지 고려해서<br>쌓아 둔 경험 중 가장 잘 맞는 것을 골라 드려요.</p>
-          <div class="ae-samples ae-samples-wrap">${sampleChips('add')}</div>
-          <button class="btn btn-primary" data-ae="add-open">＋ 직접 입력하기</button>
-        </div>`);
-    return `<div class="ae">${head}${addForm()}${warn}${body}</div>`;
+    const ui = uiOf(app.id);
+    if (!(app.essays || []).length) return `<div class="empty"><div class="empty-title">자소서 문항이 없어요</div><p>문항을 넣으면 어울리는 경험 카드를 찾아 드려요.</p><button type="button" class="btn btn-primary" data-ae="add">${I('plus', 16)}문항 추가</button></div>`;
+    return `<div class="ae ${ui.inside ? 'is-inside' : ''}"><nav class="ae-nav" aria-label="자소서 문항">${navHtml(app, ui)}</nav><div class="ae-detail">${detailHtml(app, ui)}</div></div>`;
   }
 
   App.applyTabs = App.applyTabs || {};
   App.applyTabs.essay = {
-    label: '자소서',
-    render,
-    mount(el, app, ctx) {
-      const appId = app.id; let alive = true;
+    label: '자소서', render,
+    mount(el, app0, ctx) {
+      const appId = app0.id; const ui = uiOf(appId); let alive = true; let timer = null; let dirty = false;
       const cur = () => App.store.getApp(appId);
-      const redraw = () => { const a = cur(); if (a) el.innerHTML = render(a); };
-      const refresh = () => { if (ctx && typeof ctx.refresh === 'function') ctx.refresh(); else redraw(); };
-      const focusTop = (sel) => { const t = el.querySelector(sel); if (t) { t.focus(); } };
+      const now = () => { const a = cur(); return a && current(a, ui); };
+      const byId = (id) => { const a = cur(); return a && a.essays.find((x) => x.id === id); };
+      const $ = (s) => el.querySelector(s);
+      const put = (id, patch) => App.store.updateAppItem(appId, 'essays', id, patch);
+      const drawNav = () => { const a = cur(); if (a && $('.ae-nav')) $('.ae-nav').innerHTML = navHtml(a, ui); };
+      const drawDetail = () => { const a = cur(); if (a && $('.ae-detail')) $('.ae-detail').innerHTML = detailHtml(a, ui); };
+      const drawCards = () => { const q = now(); if (q) $('[data-ae-cards]').innerHTML = cardsHtml(cur(), q, qui(ui, q)); };
+      const drawDraft = () => { const q = now(); if (q) $('[data-ae-draft]').innerHTML = draftHtml(q, qui(ui, q)); };
+      const drawPicked = () => { const q = now(); const box = $('[data-ae-picked]'); if (q && box) box.innerHTML = pickedHtml(q); };
 
-      async function addQuestion(text, limit) {
-        const a = cur(); if (!a || ui.busy) return;
-        text = String(text || '').trim();
-        if (!text) { App.ui.toast('문항을 입력해 주세요'); focusTop('#ae-add-text'); return; }
-        ui.busy = true; if (ui.adding) redraw();
-        await App.ai.think(650);
-        if (!alive) { ui.busy = false; return; }
-        const res = App.ai.analyzeQuestion(text, { focus: compNames(a) });
-        const lim = parseInt(limit, 10);
-        const it = App.store.addAppItem(appId, 'essays', { text, limit: lim > 0 ? lim : null, keywords: res.keywords, expId: null, note: '' });
-        Object.assign(ui, { busy: false, adding: false, draft: '', draftLimit: '800', fresh: it ? it.id : null });
-        if (it) ui.open[it.id] = true;
-        App.ui.toast(`숨은 역량을 찾았어요: ${res.keywords.map((k) => '#' + k).join(' ')}`);
-        refresh();
-        setTimeout(() => {
-          ui.fresh = null;
-          const card = it && el.querySelector(`[data-q="${it.id}"]`);
-          if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }, 30);
+      /* 본문 저장: 쉬면 저장 */
+      function flush() {
+        clearTimeout(timer); timer = null; const ta = $('#ae-text'); const q = ta && byId(ta.dataset.q); if (!dirty) return; dirty = false;
+        if (!q || (q.answer || '') === ta.value) return;
+        const had = written(q); put(q.id, { answer: ta.value }); $('[data-ae-saved]').textContent = '저장됨';
+        drawNav(); if (had !== written(q)) ctx.refreshHead();
+      }
+      function leave() {
+        flush(); const note = $('#ae-note'); const q = note && byId(note.dataset.q);
+        if (q && note.value !== (q.note || '')) put(q.id, { note: note.value });
+      }
+      function select(id, inside) {
+        leave(); ui.sel = id; ui.inside = inside; const a = cur(); if (!$('.ae')) return;
+        $('.ae').classList.toggle('is-inside', inside); drawNav(); drawDetail();
+        if (!a.essays.length) ctx.refresh();
       }
 
-      function saveNote(id, value) {
-        const a = cur(); const q = a && a.essays.find((x) => x.id === id); if (!q) return;
-        if ((q.note || '') === value) return;
-        App.store.updateAppItem(appId, 'essays', id, { note: value });
-        const s = el.querySelector(`[data-ae-saved="${id}"]`); if (s) { s.textContent = '저장했어요'; setTimeout(() => { if (s.isConnected) s.textContent = ''; }, 1800); }
+      /* 카드 고르기 */
+      function setCard(id, on) {
+        const q = now(); if (!q) return false;
+        if (on && liveIds(q).length >= MAX) { App.ui.toast(`카드는 ${MAX}장까지 고를 수 있어요`); return false; }
+        put(q.id, { expIds: idsOf(q).filter((x) => x !== id).concat(on ? id : []) });
+        drawPicked(); drawNav(); return true;
       }
 
-      const onClick = async (ev) => {
-        const t = ev.target;
-        const act = t.closest('[data-ae]'); const a = cur(); if (!a) return;
-        if (act) {
-          const k = act.getAttribute('data-ae');
-          if (k === 'add-open') { ui.adding = true; redraw(); focusTop('#ae-add-text'); return; }
-          if (k === 'add-cancel') { Object.assign(ui, { adding: false, draft: '', draftLimit: '800' }); redraw(); return; }
-          if (k === 'add-save') { addQuestion(el.querySelector('#ae-add-text').value, el.querySelector('#ae-add-limit').value); return; }
-          if (k === 'edit-cancel') { ui.editing = null; redraw(); return; }
+      /* AI 로 쓰기 */
+      function askWrite() {
+        flush(); const q = now(); if (!q || !liveIds(q).length) return;
+        if (edited(q)) App.ui.modal({ title: '다시 생성할까요?', confirmText: '다시 생성', body: '<p>지금 글을 AI가 새로 쓴 글로 바꿔요. 바꾼 뒤에 이전 글로 되돌릴 수 있어요.</p>', onConfirm: () => { write(q); } });
+        else write(q);
+      }
+      async function write(q) {
+        const a = cur(); const acct = (App.auth.current() || {}).id; const key = keyOf(q.id); if (writing.has(key)) return;
+        const ids = liveIds(q);
+        const cards = ids.map((id) => { const e = App.store.get(id); return { title: e.title, projectTitle: App.store.projectName(App.store.getProject(e.projectId)), role: e.role, summary: e.summary, star: e.star, keywords: e.keywords }; });
+        const ask = { question: q.text, keywords: q.keywords || [], limit: q.limit || 0, cards, company: a.company, job: a.job };
+        writing.add(key); qui(ui, q).pick = false; drawCards(); drawDraft(); drawNav(); // 목록을 접어 고른 카드와 초안이 한눈에 보이게
+        const box = $('[data-ae-cards]'); if (box && box.getBoundingClientRect().top < 56) box.scrollIntoView({ block: 'start' });
+        let text = '';
+        try { await App.ai.think(900); text = App.essay.writeEssay(ask); } catch (e) { console.error(e); } finally { writing.delete(key); }
+        if ((App.auth.current() || {}).id !== acct) return; // 그사이 로그아웃했거나 다른 계정
+        const fresh = byId(q.id); if (!fresh) return;
+        const before = fresh.answer || '';
+        if (text && text === before) App.ui.toast('카드가 같아서 글도 같아요. 다른 카드를 골라 보세요.');
+        else if (text) put(q.id, { answer: text, gen: { text, ids }, prevAnswer: before.trim() ? before : fresh.prevAnswer || '', prevGen: before.trim() ? fresh.gen || null : fresh.prevGen || null });
+        else App.ui.toast('글을 만들지 못했어요. 다시 시도해 주세요.');
+        if (text && text === before && cardsChanged(fresh)) put(q.id, { gen: { text, ids } });
+        qui(uiOf(appId), q).pick = null;
+        if (!alive) return;
+        ctx.refreshHead(); drawNav();
+        if (now() && now().id === q.id) { drawCards(); drawDraft(); }
+      }
+      function undo() {
+        flush(); const q = now(); if (!q || !q.prevAnswer) return;
+        put(q.id, { answer: q.prevAnswer, gen: q.prevGen || null, prevAnswer: q.answer, prevGen: q.gen || null });
+        App.ui.toast('이전 글로 되돌렸어요'); drawDraft(); drawPicked(); drawNav(); ctx.refreshHead();
+      }
+      async function copy() {
+        flush(); const q = now(); const ta = $('#ae-text'); if (!q || !ta) return; let ok = true;
+        try { await navigator.clipboard.writeText(ta.value); } catch (e) { const s = ta.selectionStart; ta.focus(); ta.select(); ok = document.execCommand('copy'); ta.setSelectionRange(s, s); }
+        const n = slots(q).length; App.ui.toast(!ok ? '복사하지 못했어요' : n ? `복사했어요. 채워야 할 곳이 ${n}군데 남아 있어요.` : '복사했어요');
+      }
+      function goSlot() {
+        const ta = $('#ae-text'); const q = now(); if (!ta || !q) return; const from = ta.selectionEnd === ta.value.length ? 0 : ta.selectionEnd;
+        const list = slots(q, ta.value).map((s) => [ta.value.indexOf(s), s.length]).sort((x, y) => x[0] - y[0]); const hit = list.find(([i]) => i >= from) || list[0]; if (!hit) return;
+        ta.focus({ preventScroll: true }); ta.setSelectionRange(hit[0], hit[0] + hit[1]);
+        const mark = $('[data-ae-mirror]').querySelectorAll('.ae-slot')[list.indexOf(hit)]; if (mark) mark.scrollIntoView({ block: 'center' });
+      }
+
+      /* 문항 추가·고치기 */
+      function openQuestion(q) {
+        const samples = window.SEED.sampleQuestions || []; let touched = !!q;
+        App.ui.modal({
+          title: q ? '문항 고치기' : '문항 추가', confirmText: q ? '저장' : '추가',
+          body: `<div class="field"><label class="label" for="ae-f-text">문항</label><textarea class="textarea" id="ae-f-text" rows="4" maxlength="500">${esc(q ? q.text : '')}</textarea>
+              <p class="field-error" data-err role="alert" hidden>${I('warning', 15)}문항을 적어 주세요.</p></div>
+            ${q ? '' : `<select class="select ae-sample" aria-label="예시 문항"><option value="">예시 문항에서 고르기</option>${samples.map((s) => `<option>${esc(s)}</option>`).join('')}</select>`}
+            <div class="field"><label class="label" for="ae-f-limit">글자 수 제한 <span class="subtle">비워 두면 제한 없음</span></label><input class="input" id="ae-f-limit" type="number" min="0" step="50" inputmode="numeric" value="${esc(q ? q.limit || '' : 800)}"></div>
+            <div class="field"><div class="label" id="ae-f-kw">핵심 역량 <span class="subtle">3개까지</span></div><div role="group" aria-labelledby="ae-f-kw" data-kwbox>${U().kwPicker(q ? q.keywords : [])}</div></div>`,
+          onOpen(root) {
+            const ta = root.querySelector('#ae-f-text'); const box = root.querySelector('[data-kwbox]');
+            const detect = () => { if (!touched) box.innerHTML = U().kwPicker(U().detectKw(ta.value)); };
+            ta.addEventListener('input', detect); box.addEventListener('kwpick', () => { touched = true; });
+            const sm = root.querySelector('.ae-sample'); if (sm) sm.onchange = () => { if (sm.value) { ta.value = sm.value; detect(); } };
+          },
+          onConfirm(root) {
+            const ta = root.querySelector('#ae-f-text'); const text = ta.value.trim(); const lim = parseInt(root.querySelector('#ae-f-limit').value, 10);
+            root.querySelector('[data-err]').hidden = !!text; ta.setAttribute('aria-invalid', String(!text)); if (!text) { ta.focus(); return false; }
+            const data = { text, limit: lim > 0 ? lim : null, keywords: U().kwPicked(root) };
+            if (q) { leave(); put(q.id, data); ui.q[q.id] = null; drawNav(); drawDetail(); return true; }
+            leave(); const it = App.store.addAppItem(appId, 'essays', Object.assign(data, { expIds: [], answer: '', note: '' })); if (!it) return true;
+            ui.sel = it.id; ui.inside = true; ctx.refresh(); return true;
+          },
+        });
+      }
+      function removeQuestion() {
+        leave(); const a = cur(); const q = now(); if (!q) return; const at = a.essays.indexOf(q); const keep = JSON.parse(JSON.stringify(q)); const acct = (App.auth.current() || {}).id;
+        App.store.removeAppItem(appId, 'essays', q.id); ui.sel = null; ui.inside = false; ctx.refresh();
+        App.ui.toast('문항을 지웠어요', { action: '되돌리기', onAction: () => {
+          const b = cur(); if (!b || (App.auth.current() || {}).id !== acct) return; const list = b.essays.slice(); list.splice(at, 0, keep); App.store.updateApp(appId, { essays: list }); ui.sel = keep.id; if (alive) ctx.refresh();
+        } });
+      }
+
+      const onClick = (ev) => {
+        const sel = ev.target.closest('[data-ae-sel]'); if (sel) { select(sel.dataset.aeSel, true); const box = $('.ae'); if (box.getBoundingClientRect().top < 56 || !$('.ae-nav').offsetParent) box.scrollIntoView({ block: 'start' }); return; }
+        const un = ev.target.closest('[data-ae-unpick]');
+        if (un) {
+          const id = un.dataset.aeUnpick; setCard(id, false); const c = el.querySelector(`[data-ae-card="${CSS.escape(id)}"]`); if (c) c.checked = false;
+          const next = $('[data-ae-unpick]') || $('[data-ae-card]'); if (next) next.focus({ preventScroll: true }); return;
         }
-        const s = t.closest('[data-ae-sample]');
-        if (s) {
-          const text = window.SEED.sampleQuestions[+s.getAttribute('data-ae-sample')];
-          if (s.getAttribute('data-mode') === 'fill') {
-            const ta = el.querySelector('#ae-add-text'); if (ta) { ta.value = text; ui.draft = text; ta.focus(); }
-          } else addQuestion(text, 800);
-          return;
-        }
-        const tg = t.closest('[data-ae-toggle]');
-        if (tg) { const id = tg.getAttribute('data-ae-toggle'); ui.open[id] = !ui.open[id]; redraw(); return; }
-        const use = t.closest('[data-ae-use]');
-        if (use) {
-          const qid = use.getAttribute('data-ae-use'); const eid = use.getAttribute('data-exp');
-          App.store.updateAppItem(appId, 'essays', qid, { expId: eid });
-          const n = usage(cur())[eid] || [];
-          App.ui.toast(n.length > 1 ? '연결했어요. 다른 문항에도 쓰인 경험이에요' : '이 경험으로 연결했어요. 아래 개요를 확인해 보세요');
-          refresh();
-          setTimeout(() => { const o = el.querySelector(`[data-q="${qid}"] .ae-outline`); if (o) o.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 30);
-          return;
-        }
-        const un = t.closest('[data-ae-unlink]');
-        if (un) { App.store.updateAppItem(appId, 'essays', un.getAttribute('data-ae-unlink'), { expId: null }); App.ui.toast('연결을 해제했어요'); refresh(); return; }
-        const ed = t.closest('[data-ae-edit]');
-        if (ed) { ui.editing = ed.getAttribute('data-ae-edit'); redraw(); focusTop('#ae-edit-text'); return; }
-        const sv = t.closest('[data-ae-save]');
-        if (sv) {
-          const id = sv.getAttribute('data-ae-save'); const q = a.essays.find((x) => x.id === id); if (!q) return;
-          const text = el.querySelector('#ae-edit-text').value.trim(); const lim = parseInt(el.querySelector('#ae-edit-limit').value, 10);
-          if (!text) { App.ui.toast('문항을 입력해 주세요'); return; }
-          const patch = { text, limit: lim > 0 ? lim : null };
-          if (text !== q.text) patch.keywords = App.ai.analyzeQuestion(text, { focus: compNames(a) }).keywords;
-          App.store.updateAppItem(appId, 'essays', id, patch); ui.editing = null;
-          App.ui.toast(patch.keywords ? '문항을 수정하고 숨은 역량을 다시 찾았어요' : '문항을 수정했어요');
-          redraw(); return;
-        }
-        const del = t.closest('[data-ae-del]');
-        if (del) {
-          const id = del.getAttribute('data-ae-del'); const idx = a.essays.findIndex((x) => x.id === id); if (idx < 0) return;
-          App.ui.modal({
-            title: `${idx + 1}번 문항을 삭제할까요?`,
-            body: `<p class="ae-modal-q">${esc(a.essays[idx].text)}</p><p class="subtle">연결한 경험과 메모도 함께 지워져요. 경험 자체는 경험 위키에 그대로 남아요.</p>`,
-            confirmText: '삭제', danger: true,
-            onConfirm: () => { App.store.removeAppItem(appId, 'essays', id); delete ui.open[id]; App.ui.toast('문항을 삭제했어요'); refresh(); },
-          });
-          return;
-        }
-        const cp = t.closest('[data-ae-copy]');
-        if (cp) {
-          const q = a.essays.find((x) => x.id === cp.getAttribute('data-ae-copy')); const e = q && expOf(q.expId); if (!e) return;
-          const rows = outline(e, q, a);
-          const txt = `[${a.company} · ${q.text}${q.limit ? ` (${q.limit}자)` : ''}]\n\n` + rows.map(([k, v]) => `■ ${k}\n${v}`).join('\n\n');
-          try { await navigator.clipboard.writeText(txt); App.ui.toast('개요를 복사했어요'); }
-          catch (err) { App.ui.toast('복사하지 못했어요. 직접 선택해서 복사해 주세요'); }
+        const b = ev.target.closest('[data-ae]'); if (!b) return; const q = now(); const st = q && qui(ui, q);
+        switch (b.dataset.ae) {
+          case 'add': openQuestion(null); break;
+          case 'edit': if (q) openQuestion(q); break;
+          case 'del': removeQuestion(); break;
+          case 'back': select(q && q.id, false); break;
+          case 'pick': st.pick = b.getAttribute('aria-expanded') !== 'true'; drawCards(); { const t = $('[data-ae=pick]'); if (t) t.focus({ preventScroll: true }); } break;
+          case 'others': st.others = b.getAttribute('aria-expanded') !== 'true'; drawCards(); { const t = $('[data-ae=others]'); if (t) t.focus({ preventScroll: true }); } break;
+          case 'write': askWrite(); break;
+          case 'manual': st.manual = true; drawDraft(); $('#ae-text').focus(); break;
+          case 'undo': undo(); break;
+          case 'copy': copy(); break;
+          case 'slot': goSlot(); break;
+          default: break;
         }
       };
+      const onChange = (ev) => { const id = ev.target.dataset && ev.target.dataset.aeCard; if (id && !setCard(id, ev.target.checked)) ev.target.checked = !ev.target.checked; };
       const onInput = (ev) => {
-        if (ev.target.id === 'ae-add-text') ui.draft = ev.target.value;
-        else if (ev.target.id === 'ae-add-limit') ui.draftLimit = ev.target.value;
+        const q = now(); if (!q) return; const t = ev.target;
+        if (t.matches('[data-ae-find]')) { qui(ui, q).find = t.value; $('[data-ae-others]').innerHTML = otherList(cur(), q, t.value); return; }
+        if (t.id !== 'ae-text') return;
+        $('[data-ae-mirror]').innerHTML = mirror(q, t.value); $('[data-ae-count]').innerHTML = countHtml(q, t.value); $('[data-ae-saved]').textContent = '';
+        const n = slots(q, t.value).length; const bn = $('[data-ae-slots]'); if (bn.dataset.n !== String(n)) { bn.dataset.n = n; bn.innerHTML = slotBanner(q, t.value); }
+        dirty = true; clearTimeout(timer); timer = setTimeout(flush, 500);
       };
-      const onBlur = (ev) => { const n = ev.target.getAttribute && ev.target.getAttribute('data-ae-note'); if (n) saveNote(n, ev.target.value); };
-      const onKey = (ev) => {
-        if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter') {
-          if (ev.target.id === 'ae-add-text' || ev.target.id === 'ae-add-limit') { ev.preventDefault(); addQuestion(el.querySelector('#ae-add-text').value, el.querySelector('#ae-add-limit').value); }
-          else if (ev.target.id === 'ae-edit-text' || ev.target.id === 'ae-edit-limit') { const b = el.querySelector('[data-ae-save]'); if (b) b.click(); }
-        } else if (ev.key === 'Escape') {
-          if (ui.editing && ev.target.closest('[data-ae-form="edit"]')) { ui.editing = null; redraw(); }
-          else if (ui.adding && ev.target.closest('[data-ae-form="add"]')) { ui.adding = false; redraw(); }
-        }
-      };
-      el.addEventListener('click', onClick);
-      el.addEventListener('input', onInput);
-      el.addEventListener('focusout', onBlur);
-      el.addEventListener('keydown', onKey);
-      return () => {
-        alive = false; ui.busy = false;
-        // 떠나기 전 작성 중이던 메모 저장
-        el.querySelectorAll('[data-ae-note]').forEach((ta) => saveNote(ta.getAttribute('data-ae-note'), ta.value));
-        el.removeEventListener('click', onClick); el.removeEventListener('input', onInput);
-        el.removeEventListener('focusout', onBlur); el.removeEventListener('keydown', onKey);
-      };
+      const onBlur = (ev) => { if (ev.target.id === 'ae-text') flush(); else if (ev.target.id === 'ae-note') leave(); };
+      el.addEventListener('click', onClick); el.addEventListener('change', onChange); el.addEventListener('input', onInput); el.addEventListener('focusout', onBlur);
+      window.addEventListener('beforeunload', leave);
+      return () => { leave(); alive = false; window.removeEventListener('beforeunload', leave); };
     },
   };
 })(window.App);

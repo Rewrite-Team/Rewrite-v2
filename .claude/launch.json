@@ -4,8 +4,8 @@
     {
       "name": "prototype",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["tools/serve.py", "5173"],
-      "port": 5173
+      "runtimeArgs": ["tools/serve.py", "5183"],
+      "port": 5183
     }
   ]
 }

@@ -1,234 +1,103 @@
-/* 설정: 프로필 · 질문 알림 리듬 · 데이터. 변경 즉시 저장 */
+/* 설정: 프로필 · GitHub 계정 · 계정. 프로필은 바꾸는 즉시 저장 */
 (function (App) {
-  const esc = (s) => App.ui.esc(s);
-  const DAYS = ['월', '화', '수', '목', '금', '토', '일'];
-  const TYPES = [['newgrad', '신입 취업 준비'], ['switcher', '직무 전환 준비'], ['junior', '주니어 이직 준비']];
+  const esc = (s) => App.ui.esc(s); const S = App.store; const I = App.icon;
   const JOBS = ['백엔드 개발자', '프론트엔드 개발자', '서비스 기획자', 'PM/PO', '데이터 분석가', 'UX/UI 디자이너', '마케터'];
-  const CADENCE = [['daily', '매일'], ['weekdays', '평일만'], ['custom', '직접 고르기']];
-  const CHANNELS = [['push', '앱 푸시', '휴대폰 잠금화면으로 바로 받아요'], ['kakao', '카카오톡', '알림톡으로 받아서 바로 답해요'], ['email', '이메일', '하루치 질문을 메일로 모아 받아요']];
-  const STYLES = [['light', '가볍게', '한두 줄로 답할 수 있는 질문'], ['deep', '깊게', '조금 더 생각해 볼 만한 질문']];
+  const meId = () => (App.auth.current() || {}).id;
+  const row = (label, body, forId) => `<div class="set-row">${forId ? `<label class="set-label" for="${forId}">${label}</label>` : `<div class="set-label">${label}</div>`}<div class="set-ctrl">${body}</div></div>`;
 
-  function daysFor(cadence, cur) {
-    if (cadence === 'daily') return DAYS.slice();
-    if (cadence === 'weekdays') return DAYS.slice(0, 5);
-    return cur && cur.length ? cur.slice() : DAYS.slice(0, 5);
+  function githubHTML() {
+    const gh = S.github();
+    if (!gh) return row('GitHub 주소', '<span class="set-value subtle">연결하지 않았어요</span><button type="button" class="btn btn-sm" data-act="gh-on">GitHub 연결</button>');
+    const url = gh.url || `https://github.com/${gh.login}`;
+    return row('GitHub 주소', `<span class="set-value">${esc(url.replace(/^https?:\/\//, ''))}${gh.source === 'sample' ? ' <span class="tag">예시</span>' : ''}</span>
+      <button type="button" class="btn btn-sm" data-act="gh-on">바꾸기</button><button type="button" class="btn btn-sm btn-ghost btn-danger" data-act="gh-off">연결 해제</button>`);
   }
-
-  function preview(s) {
-    const times = (s.times || []).slice().sort();
-    const ch = CHANNELS.filter(([id]) => s.channels && s.channels[id]).map(([, l]) => l);
-    const days = DAYS.filter((d) => (s.days || []).includes(d));
-    if (!times.length) return { warn: true, text: '질문 받을 시간이 없어요. 시간을 하나 이상 추가해 주세요.' };
-    if (!ch.length) return { warn: true, text: '켜져 있는 채널이 없어서 질문을 보낼 수 없어요.' };
-    if (!days.length) return { warn: true, text: '질문 받을 요일을 하나 이상 골라 주세요.' };
-    const when = days.length === 7 ? '매일' : (days.join('') === '월화수목금' ? '평일마다' : (days.join('') === '토일' ? '주말마다' : days.join('·') + '요일'));
-    const style = s.questionStyle === 'deep' ? '조금 깊이 생각해 볼' : '가볍게 답할 수 있는';
-    const q = s.quietHours || {};
-    return {
-      warn: false,
-      text: `${when} ${times.join(', ')}에 ${style} 질문 1개를 ${ch.join('·')}${/톡$/.test(ch[ch.length - 1]) ? '으로' : '로'} 보내드려요.`,
-      sub: q.start && q.end ? `${q.start}~${q.end}에는 알림을 보내지 않아요.` : '',
-    };
-  }
-
-  function toggle(on, attrs) {
-    return `<button type="button" class="set-switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" ${attrs}><span></span></button>`;
-  }
-
-  function seg(list, cur, attr) {
-    return `<div class="set-seg">${list.map(([id, l]) => `<button type="button" class="${cur === id ? 'on' : ''}" ${attr}="${id}">${l}</button>`).join('')}</div>`;
-  }
-
   function view() {
-    const u = App.store.state.user, s = App.store.state.settings;
-    const p = preview(s);
-    const times = (s.times || []).slice().sort();
-    const ch = s.channels || {};
-    const q = s.quietHours || { start: '', end: '' };
-    return `<div class="page page-narrow set">
-      <div class="page-head"><h1>설정</h1><p>바꾸는 즉시 저장돼요. 질문이 부담스럽다면 리듬부터 줄여 보세요.</p></div>
-
-      <section class="card set-sec">
-        <div class="set-sec-head"><h2>프로필</h2><p>목표 직무에 맞춰 역량 키워드와 질문 방향을 정해요.</p></div>
-        <div class="set-row">
-          <div class="set-row-label">이름</div>
-          <div class="set-row-ctrl"><input class="input set-input" data-set-user="name" maxlength="20" value="${esc(u.name)}" /></div>
-        </div>
-        <div class="set-row">
-          <div class="set-row-label">사용자 유형</div>
-          <div class="set-row-ctrl">${seg(TYPES, u.userType, 'data-set-type')}</div>
-        </div>
-        <div class="set-row set-row-top">
-          <div class="set-row-label">목표 직무</div>
-          <div class="set-row-ctrl">
-            <input class="input set-input" data-set-user="targetJob" maxlength="30" placeholder="예: 백엔드 개발자" value="${esc(u.targetJob)}" />
-            <div class="set-chips">${JOBS.map((j) => `<button type="button" class="set-chip ${u.targetJob === j ? 'on' : ''}" data-set-job="${esc(j)}">${esc(j)}</button>`).join('')}</div>
-          </div>
-        </div>
-      </section>
-
-      <section class="card set-sec">
-        <div class="set-sec-head"><h2>질문 알림 리듬</h2><p>서비스가 먼저 말을 거는 시간이에요. 질문은 한 번에 하나만 보내요.</p></div>
-        <div class="set-preview ${p.warn ? 'warn' : ''}">
-          <span class="ai-dot">${p.warn ? '!' : 'R'}</span>
-          <div><div class="set-preview-text">${esc(p.text)}</div>${p.sub ? `<div class="set-preview-sub">${esc(p.sub)}</div>` : ''}</div>
-        </div>
-
-        <div class="set-row">
-          <div class="set-row-label">주기</div>
-          <div class="set-row-ctrl">${seg(CADENCE, s.cadence, 'data-set-cadence')}</div>
-        </div>
-        <div class="set-row">
-          <div class="set-row-label">요일</div>
-          <div class="set-row-ctrl"><div class="set-days">${DAYS.map((d) => `<button type="button" class="set-day ${(s.days || []).includes(d) ? 'on' : ''} ${d === '토' || d === '일' ? 'wkend' : ''}" data-set-day="${d}">${d}</button>`).join('')}</div>
-            <div class="subtle set-hint">요일을 직접 바꾸면 ‘직접 고르기’로 바뀌어요.</div></div>
-        </div>
-        <div class="set-row set-row-top">
-          <div class="set-row-label">시간</div>
-          <div class="set-row-ctrl">
-            <div class="set-times">
-              ${times.map((t) => `<span class="set-time">${esc(t)}<button type="button" class="set-time-x" data-set-time-rm="${esc(t)}" aria-label="${esc(t)} 삭제">×</button></span>`).join('')}
-              <span class="set-time-add"><input type="time" class="input set-time-input" value="18:00" step="300" /><button type="button" class="btn btn-sm" data-set-act="time-add">＋ 추가</button></span>
-            </div>
-          </div>
-        </div>
-        <div class="set-row set-row-top">
-          <div class="set-row-label">받을 곳</div>
-          <div class="set-row-ctrl set-channels">${CHANNELS.map(([id, l, desc]) => `
-            <div class="set-channel"><div><b>${l}</b><span>${desc}</span></div>${toggle(!!ch[id], `data-set-channel="${id}"`)}</div>`).join('')}
-          </div>
-        </div>
-        <div class="set-row">
-          <div class="set-row-label">방해 금지 시간</div>
-          <div class="set-row-ctrl set-quiet">
-            <input type="time" class="input set-time-input" data-set-quiet="start" value="${esc(q.start)}" />
-            <span class="subtle">부터</span>
-            <input type="time" class="input set-time-input" data-set-quiet="end" value="${esc(q.end)}" />
-            <span class="subtle">까지는 조용히</span>
-          </div>
-        </div>
-        <div class="set-row set-row-top">
-          <div class="set-row-label">질문 스타일</div>
-          <div class="set-row-ctrl"><div class="set-styles">${STYLES.map(([id, l, desc]) => `
-            <button type="button" class="set-style ${s.questionStyle === id ? 'on' : ''}" data-set-style="${id}"><b>${l}</b><span>${desc}</span></button>`).join('')}</div></div>
-        </div>
-        <div class="set-demo">
-          <div><b>알림이 어떻게 오는지 궁금하다면</b><p class="subtle">지금 바로 질문 하나를 받아 볼 수 있어요.</p></div>
-          <button type="button" class="btn btn-accent" data-set-act="demo">✉ 지금 질문 받아보기 (데모)</button>
-        </div>
-      </section>
-
-      <section class="card set-sec">
-        <div class="set-sec-head"><h2>데이터</h2><p>이 프로토타입의 데이터는 브라우저에만 저장돼요.</p></div>
-        <div class="set-row">
-          <div class="set-row-label">온보딩</div>
-          <div class="set-row-ctrl"><a class="btn btn-sm" href="#/onboarding">다시 온보딩 보기</a></div>
-        </div>
-        <div class="set-row">
-          <div class="set-row-label">초기화</div>
-          <div class="set-row-ctrl set-danger-row"><span class="subtle">경험·답변·설정을 처음 상태로 되돌려요.</span>
-            <button type="button" class="btn btn-sm btn-danger" data-set-act="reset">프로토타입 데이터 초기화</button></div>
-        </div>
-      </section>
-    </div>`;
+    const u = S.state.user; const me = App.auth.current() || {};
+    return `<div class="page page-narrow set"><header class="page-head"><h1>설정</h1></header>
+      <section class="section"><h2 class="section-title">프로필</h2><div class="set-rows">
+        ${row('이름', `<div class="set-field" data-field="name"><input class="input" id="set-name" data-user="name" maxlength="20" autocomplete="name" value="${esc(u.name)}" /></div>`, 'set-name')}
+        ${row('목표 직무', `<div class="set-field"><input class="input" id="set-job" data-user="targetJob" list="set-jobs" maxlength="30" placeholder="예: 백엔드 개발자" value="${esc(u.targetJob)}" /><datalist id="set-jobs">${JOBS.map((j) => `<option value="${esc(j)}"></option>`).join('')}</datalist></div>`, 'set-job')}
+      </div></section>
+      <section class="section"><h2 class="section-title">GitHub 계정</h2><div class="set-rows" data-github>${githubHTML()}</div></section>
+      <section class="section"><h2 class="section-title">계정</h2><div class="set-rows">
+        ${row('이메일', `<span class="set-value">${esc(me.email)}</span><button type="button" class="btn btn-sm" data-logout>로그아웃</button>`)}
+        ${row('회원 탈퇴', '<span class="set-value subtle">계정과 모든 데이터를 지워요</span><button type="button" class="btn btn-sm btn-ghost btn-danger" data-act="leave">회원 탈퇴</button>')}
+      </div></section></div>`;
   }
 
   App.screens.settings = {
     title: '설정',
     render: view,
     mount(root) {
-      const st = () => App.store.state.settings;
-      let toastTimer = null;
-      const saved = (msg) => {
-        clearTimeout(toastTimer);
-        toastTimer = setTimeout(() => App.ui.toast(msg || '저장했어요'), 120);
-      };
-      const repaint = () => {
-        const y = window.scrollY;
-        root.innerHTML = view();
-        window.scrollTo(0, y);
-      };
-      const saveSettings = (patch, msg) => { App.store.updateSettings(patch); repaint(); saved(msg); };
-      // 사이드바(이름·직무)까지 갱신해야 하는 경우
-      const saveUser = (patch, msg) => {
-        App.store.updateUser(patch);
-        const y = window.scrollY; App.rerender(); window.scrollTo(0, y);
-        saved(msg);
-      };
+      const drawGithub = () => { const el = root.querySelector('[data-github]'); if (el) el.innerHTML = githubHTML(); };
+      // 모달 안의 입력칸 아래 오류. msg 가 비면 지운다
+      function fieldError(field, msg) {
+        const i = field.querySelector('input'); const old = field.querySelector('.field-error'); if (old) old.remove();
+        if (!msg) { i.removeAttribute('aria-invalid'); i.removeAttribute('aria-describedby'); return; }
+        field.insertAdjacentHTML('beforeend', `<p class="field-error" id="${i.id}-e" role="alert">${I('warning', 15)}${esc(msg)}</p>`);
+        i.setAttribute('aria-invalid', 'true'); i.setAttribute('aria-describedby', `${i.id}-e`);
+      }
+
+      function connectGithub() {
+        const changing = !!S.github(); const me = meId();
+        App.ui.modal({
+          title: changing ? 'GitHub 계정 바꾸기' : 'GitHub 연결', confirmText: '불러오기',
+          body: '<div class="field"><label class="label" for="set-gh">GitHub 주소</label><input class="input" id="set-gh" placeholder="github.com/내아이디" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" maxlength="200" /></div><p class="set-busy" role="status" data-busy></p>',
+          onOpen(m) { const i = m.querySelector('#set-gh'); i.oninput = () => fieldError(i.closest('.field'), ''); i.focus(); },
+          async onConfirm(m) {
+            const i = m.querySelector('#set-gh'); const field = i.closest('.field'); const busy = m.querySelector('[data-busy]'); const v = i.value.trim();
+            if (!v) { fieldError(field, 'GitHub 주소를 적어 주세요.'); i.focus(); return false; }
+            fieldError(field, ''); i.disabled = true;
+            const show = (t) => { busy.innerHTML = t ? `<span class="spinner"></span><span>${esc(t)}</span>` : ''; };
+            show('계정 확인하는 중');
+            try {
+              const account = await App.github.fetchAccount(v, { onProgress: (p) => show(typeof p === 'string' ? p : (p && p.text) || '') });
+              if (!i.isConnected || meId() !== me) return false; // 닫았거나 다른 계정으로 바뀌었다
+              S.setGithub(account); drawGithub(); App.ui.toast(`${account.login} 계정을 연결했어요`); return true;
+            } catch (e) { if (i.isConnected) { i.disabled = false; show(''); fieldError(field, e.message); i.focus(); } return false; }
+          },
+        });
+      }
+      function leave() {
+        const me = App.auth.current(); if (!me) return;
+        App.ui.modal({
+          title: '회원 탈퇴', confirmText: '탈퇴하기', danger: true,
+          body: me.demo ? '<p>예시 계정이라 계정은 남고, 데이터만 처음 상태로 돌아가요. 되돌릴 수 없어요.</p>'
+            : '<p class="set-leave">프로젝트, AI 채팅, 경험 카드, 지원 기업, 이력서가 모두 지워지고 되돌릴 수 없어요.</p><div class="field"><label class="label" for="set-pw">비밀번호 확인</label><input class="input" id="set-pw" type="password" autocomplete="current-password" /></div>',
+          onOpen(m) { const i = m.querySelector('#set-pw'); if (i) i.oninput = () => fieldError(i.closest('.field'), ''); },
+          async onConfirm(m) {
+            const i = m.querySelector('#set-pw');
+            if (i && !i.value) { fieldError(i.closest('.field'), '비밀번호를 적어 주세요.'); i.focus(); return false; }
+            try { await App.auth.remove(i ? i.value : ''); } catch (e) {
+              if (i && i.isConnected) { fieldError(i.closest('.field'), e.field ? e.message : '문제가 생겼어요. 다시 시도해 주세요.'); i.select(); }
+              return false;
+            }
+            App.ui.closeModal(); App.navigate('#/login'); App.ui.toast(me.demo ? '예시 데이터를 처음 상태로 되돌렸어요' : '탈퇴했어요');
+            return true;
+          },
+        });
+      }
 
       function onClick(ev) {
-        const b = ev.target.closest('button');
-        if (!b || !root.contains(b)) return;
-        const ds = b.dataset;
-        const s = st();
-        if (ds.setType) return saveUser({ userType: ds.setType }, '사용자 유형을 바꿨어요');
-        if (ds.setJob) return saveUser({ targetJob: ds.setJob }, `목표 직무를 ‘${ds.setJob}’(으)로 바꿨어요`);
-        if (ds.setCadence) return saveSettings({ cadence: ds.setCadence, days: daysFor(ds.setCadence, s.days) }, '질문 주기를 바꿨어요');
-        if (ds.setDay) {
-          const days = s.days.includes(ds.setDay) ? s.days.filter((d) => d !== ds.setDay) : DAYS.filter((d) => s.days.includes(d) || d === ds.setDay);
-          const cadence = days.length === 7 ? 'daily' : days.join('') === '월화수목금' ? 'weekdays' : 'custom';
-          return saveSettings({ days, cadence });
-        }
-        if (ds.setTimeRm) return saveSettings({ times: s.times.filter((t) => t !== ds.setTimeRm) }, `${ds.setTimeRm} 알림을 뺐어요`);
-        if (ds.setChannel) {
-          const channels = Object.assign({}, s.channels, { [ds.setChannel]: !s.channels[ds.setChannel] });
-          const name = CHANNELS.find((c) => c[0] === ds.setChannel)[1];
-          return saveSettings({ channels }, `${name} 알림을 ${channels[ds.setChannel] ? '켰어요' : '껐어요'}`);
-        }
-        if (ds.setStyle) return saveSettings({ questionStyle: ds.setStyle }, '질문 스타일을 바꿨어요');
-        if (ds.setAct === 'time-add') {
-          const v = root.querySelector('.set-time-add .set-time-input').value;
-          if (!v) return;
-          if (s.times.includes(v)) { App.ui.toast('이미 있는 시간이에요'); return; }
-          if (s.times.length >= 6) { App.ui.toast('시간은 최대 6개까지 정할 수 있어요'); return; }
-          return saveSettings({ times: s.times.concat(v).sort() }, `${v}에도 질문을 보내드릴게요`);
-        }
-        if (ds.setAct === 'demo') {
-          const list = window.SEED.recallPrompts;
-          const rp = list[Math.floor(Math.random() * list.length)];
-          App.store.pushQuestion({ text: rp.text, type: 'recall', targetExpId: null, hint: '떠오르는 장면 하나면 충분해요.' });
-          App.ui.pushToast('오늘의 질문이 도착했어요', rp.text, '#/ask');
-          const y = window.scrollY; App.rerender(); window.scrollTo(0, y); // 사이드바 배지 갱신
-          return;
-        }
-        if (ds.setAct === 'reset') {
-          App.ui.modal({
-            title: '프로토타입 데이터를 초기화할까요?',
-            body: '<p>지금까지 추가하거나 수정한 경험, 답변, 설정이 모두 처음 상태로 돌아가요. 되돌릴 수 없어요.</p>',
-            confirmText: '초기화', danger: true,
-            onConfirm: () => { App.store.reset(); App.rerender(); App.ui.toast('처음 상태로 되돌렸어요'); },
-          });
-        }
+        const b = ev.target.closest('[data-act]'); if (!b) return; const act = b.dataset.act;
+        if (act === 'gh-on') connectGithub();
+        else if (act === 'gh-off') { const old = S.github(); S.setGithub(null); drawGithub(); App.ui.toast('GitHub 연결을 해제했어요', { action: '되돌리기', onAction: ((me) => () => { if (meId() !== me || S.github()) return; S.setGithub(old); drawGithub(); App.ui.toast('되돌렸어요'); })(meId()) }); }
+        else if (act === 'leave') leave();
       }
-
       function onChange(ev) {
-        const t = ev.target;
-        const uf = t.getAttribute('data-set-user');
-        if (uf) {
-          const v = t.value.trim();
-          if (!v) { t.value = App.store.state.user[uf] || ''; App.ui.toast('비워 둘 수 없어요'); return; }
-          if (v === App.store.state.user[uf]) return;
-          return saveUser({ [uf]: v }, uf === 'name' ? '이름을 바꿨어요' : '목표 직무를 바꿨어요');
-        }
-        const qf = t.getAttribute('data-set-quiet');
-        if (qf) {
-          const quietHours = Object.assign({}, st().quietHours, { [qf]: t.value });
-          return saveSettings({ quietHours }, '방해 금지 시간을 바꿨어요');
-        }
+        const key = ev.target.getAttribute('data-user'); if (!key) return;
+        const v = ev.target.value.trim(); const field = ev.target.parentElement;
+        if (!v && key === 'name') { fieldError(field, '이름을 적어 주세요.'); return; }
+        fieldError(field, ''); ev.target.value = v; if (v === (S.state.user[key] || '')) return;
+        S.updateUser({ [key]: v });
+        if (key === 'name') { document.querySelectorAll('.account-name').forEach((x) => { x.textContent = v; }); document.querySelectorAll('.account .avatar').forEach((x) => { x.textContent = v.slice(0, 1); }); }
+        App.ui.toast('저장했어요');
       }
-      function onKey(ev) {
-        if (ev.key === 'Enter' && !ev.isComposing && ev.target.matches('[data-set-user]')) ev.target.blur();
-        if (ev.key === 'Enter' && ev.target.closest('.set-time-add')) { ev.preventDefault(); root.querySelector('[data-set-act=time-add]').click(); }
-      }
+      function onKey(ev) { if (ev.key === 'Enter' && !ev.isComposing && ev.target.matches('[data-user]')) ev.target.blur(); }
 
-      root.addEventListener('click', onClick);
-      root.addEventListener('change', onChange);
-      root.addEventListener('keydown', onKey);
-      return () => {
-        root.removeEventListener('click', onClick);
-        root.removeEventListener('change', onChange);
-        root.removeEventListener('keydown', onKey);
-      };
+      root.addEventListener('click', onClick); root.addEventListener('change', onChange); root.addEventListener('keydown', onKey);
+      return () => { root.removeEventListener('click', onClick); root.removeEventListener('change', onChange); root.removeEventListener('keydown', onKey); };
     },
   };
 })(window.App);

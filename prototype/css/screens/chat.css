@@ -1,0 +1,130 @@
+/* ===== AI 채팅: 왼쪽 프로젝트별 채팅 목록 + 오른쪽 채팅방 ===== */
+.chat-app { display: grid; grid-template-columns: 284px minmax(0, 1fr); height: calc(100vh - var(--topbar-h)); height: calc(100dvh - var(--topbar-h)); }
+.chat-tree, .chat-room { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.chat-tree { border-right: 1px solid var(--border); }
+.chat-room { position: relative; }
+
+/* ---------- 프로젝트 › 채팅 ---------- */
+.chat-tree-head { flex: none; display: flex; gap: 8px; padding: 16px 16px 12px; }
+.chat-tree-head .btn { flex: 1; padding-left: 8px; padding-right: 8px; }
+.chat-tree-list { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 10px 24px; }
+.chat-proj + .chat-proj { margin-top: 12px; }
+.chat-proj-row, .chat-row { position: relative; display: flex; align-items: center; min-height: 38px; border-radius: var(--radius-sm); }
+.chat-proj-row:hover, .chat-row:hover { background: var(--surface-2); }
+.chat-proj-btn { flex: 1; min-width: 0; min-height: 38px; display: flex; align-items: center; gap: 6px; padding: 4px 6px; border: 0; border-radius: var(--radius-sm); background: none; text-align: left; font-weight: 600; }
+.chat-proj-btn > svg { color: var(--text-3); }
+.chat-proj-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-proj-gh { flex: none; color: var(--text-3); }
+.chat-row-link { flex: 1; min-width: 0; min-height: 38px; display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 28px; border-radius: var(--radius-sm); font-size: var(--fs-sm); color: var(--text-2); }
+.chat-row-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-row-when { margin-left: auto; flex: none; font-size: var(--fs-xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.chat-row.is-on .chat-row-title { padding: 1px 5px; margin: 0 -5px; border-radius: var(--radius-mark); background: var(--hl); color: var(--text); font-weight: 700; }
+.chat-proj-btn:focus-visible, .chat-row-link:focus-visible { outline-offset: -2px; }
+.chat-row-acts { flex: none; display: flex; padding-right: 2px; }
+.chat-row > .chat-row-acts { position: absolute; right: 0; }
+.chat-row-acts .icon-btn { width: 34px; height: 34px; }
+.chat-none { padding: 8px 10px 8px 28px; font-size: var(--fs-sm); color: var(--text-3); }
+.chat-none.is-top { padding-left: 6px; }
+.chat-more { min-height: 34px; padding: 4px 10px 4px 28px; border: 0; background: none; font-size: var(--fs-sm); color: var(--text-3); }
+.chat-more:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+@media (hover: hover) and (min-width: 901px) {
+  .chat-row-acts { opacity: 0; }
+  :is(.chat-row, .chat-proj-row):is(:hover, :focus-within, :has([aria-expanded="true"][aria-haspopup])) > .chat-row-acts { opacity: 1; }
+  .chat-row:is(:hover, :focus-within, :has([aria-expanded="true"][aria-haspopup])) .chat-row-when { visibility: hidden; }
+}
+@media (hover: none), (max-width: 900px) { .chat-row > .chat-row-acts { position: static; } }
+
+/* ---------- 채팅방 ---------- */
+.chat-head { flex: none; display: flex; align-items: center; gap: 8px; min-height: 57px; padding: 8px 20px 8px 28px; border-bottom: 1px solid var(--border); }
+.chat-head-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+.chat-head-main .proj-chip { flex: 0 1 auto; max-width: 45%; }
+.chat-head h1 { min-width: 0; font-size: var(--fs-md); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-back { display: none; }
+.chat-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.chat-body:focus-visible { outline-offset: -2px; }
+.chat-col { position: relative; max-width: 760px; margin: 0 auto; padding: 28px 28px 24px; display: flex; flex-direction: column; gap: 20px; }
+.chat-m { display: flex; gap: 12px; min-width: 0; }
+.chat-m.is-me { justify-content: flex-end; }
+.chat-ai { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.chat-t { max-width: 64ch; white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat-b { max-width: min(520px, 85%); padding: 9px 14px; border-radius: 12px 12px 3px 12px; background: var(--primary-soft); white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat-typing { display: flex; gap: 4px; align-items: center; height: 24px; }
+.chat-typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); animation: chat-dot 1s infinite; }
+.chat-typing i:nth-of-type(2) { animation-delay: .15s; } .chat-typing i:nth-of-type(3) { animation-delay: .3s; }
+@keyframes chat-dot { 0%, 60%, 100% { opacity: .3; } 30% { opacity: 1; } }
+.chat-jump { position: absolute; left: 50%; bottom: 128px; transform: translateX(-50%); box-shadow: var(--shadow); }
+.chat-empty { margin: auto; }
+
+/* ---------- 제안 → 경험 카드 ---------- */
+.chat-prop { border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 16px 20px; }
+.chat-prop-head { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.chat-prop-head h2 { font-size: 16px; overflow-wrap: anywhere; }
+.chat-prop .banner { margin-top: 12px; }
+.chat-prop-rows { display: flex; flex-direction: column; gap: 12px; margin: 14px 0 16px; }
+.chat-prop-row { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 12px; align-items: start; }
+.chat-prop-row > :first-child { font-size: var(--fs-sm); line-height: 1.8; color: var(--text-3); }
+.chat-prop-row p { overflow-wrap: anywhere; }
+.chat-prop-row .textarea { min-height: 80px; }
+.chat-kws { display: flex; flex-wrap: wrap; gap: 5px; }
+.chat-prop-foot { display: flex; justify-content: flex-end; gap: 8px; }
+.chat-done { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--radius); }
+.chat-done > svg { color: var(--text-3); }
+.chat-done-main { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.chat-done-main > a { flex-basis: 100%; font-weight: 600; overflow-wrap: anywhere; }
+.chat-done-main > a:hover, .chat-made a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.chat-done .btn { flex: none; }
+
+/* ---------- 채팅 안의 GitHub ---------- */
+.chat-gh-repo { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+.chat-gh-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.chat-gh-btns { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+.chat-made .list-row-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 4px; }
+
+/* ---------- 입력 ---------- */
+.chat-foot { flex: none; border-top: 1px solid var(--border); }
+.chat-form { max-width: 760px; margin: 0 auto; padding: 8px 28px 20px; }
+.chat-form:not(:has(.chat-quick)) { padding-top: 16px; }
+.chat-quick { display: flex; flex-wrap: wrap; gap: 0 4px; margin: 0 -10px 4px; }
+.chat-input { position: relative; }
+.chat-input .textarea { min-height: 48px; max-height: 140px; resize: none; padding: 11px 56px 11px 14px; overflow-y: hidden; }
+.chat-send { position: absolute; right: 6px; bottom: 6px; color: var(--primary); }
+
+/* 새 채팅: 프로젝트 고르기 */
+.chat-pick { max-width: 520px; margin: 0 auto; padding: 40px 28px; display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
+.chat-pick h2 { font-size: var(--fs-lg); }
+.chat-pick .list { align-self: stretch; }
+
+@media (max-width: 900px) {
+  .chat-app { grid-template-columns: minmax(0, 1fr); height: calc(100dvh - var(--topbar-h) - 61px - env(safe-area-inset-bottom)); }
+  .chat-app:not(.is-room) > .chat-room, .chat-app.is-room > .chat-tree { display: none; }
+  .chat-app.is-room { height: 100dvh; }
+  .shell:has(.chat-app.is-room) :is(.topbar, .mobile-nav) { display: none; }
+  .chat-tree { border-right: 0; }
+  .chat-tree-head { padding: 16px var(--gutter) 8px; }
+  .chat-tree-list { padding: 4px calc(var(--gutter) - 6px) 24px; }
+  .chat-proj-row, .chat-row, .chat-proj-btn, .chat-row-link { min-height: 46px; }
+  .chat-row-link { font-size: var(--fs-md); padding-right: 4px; }
+  .chat-row-acts .icon-btn { width: 44px; height: 44px; }
+  .chat-back { display: inline-grid; margin-left: -4px; }
+  .chat-head { padding: 6px 8px; gap: 4px; }
+  .chat-col { padding: 20px var(--gutter); }
+  .chat-form { padding: 8px var(--gutter) calc(12px + env(safe-area-inset-bottom)); }
+  .chat-form:not(:has(.chat-quick)) { padding-top: 12px; }
+  .chat-send { width: 40px; height: 40px; right: 4px; bottom: 4px; }
+  .chat-input .textarea { min-height: 48px; }
+  .chat-pick { padding: 28px var(--gutter); }
+}
+@media (max-width: 600px) {
+  .chat-head-main { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .chat-head-main .proj-chip { max-width: 100%; font-size: var(--fs-xs); }
+  .chat-head h1 { max-width: 100%; }
+  .chat-head-card { width: 44px; padding: 0; border-color: transparent; }
+  .chat-head-card span { display: none; }
+  .chat-m.is-ai { flex-direction: column; gap: 8px; }
+  .chat-prop { padding: 16px; }
+  .chat-prop-row { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .chat-prop-foot .btn { flex: 1; }
+  .chat-gh-btns { flex: 1 1 100%; }
+  .chat-gh-btns .btn { flex: 1; }
+  .chat-quick .btn { padding-left: 8px; padding-right: 8px; }
+}

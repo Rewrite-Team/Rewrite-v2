@@ -1,0 +1,56 @@
+/* ===== GitHub 연결 흐름 (App.repoFlow, .rf-*) — 모달과 화면이 함께 쓴다 ===== */
+/* 새 프로젝트 · 연결 모달 */
+.rf-seg { margin-top: 6px; }
+.rf-pane { margin-top: 18px; min-height: 132px; color: var(--text); }
+.modal-body > .rf-pane:first-child { margin-top: 8px; }
+
+/* 계정 주소 */
+.rf-inline { display: flex; gap: 8px; }
+.rf-inline .input { flex: 1; min-width: 0; }
+.rf-busy { display: flex; align-items: center; gap: 10px; margin-top: 16px; color: var(--text-2); }
+.rf-account-foot { display: flex; gap: 4px; margin: 12px 0 0 -10px; }
+
+/* 레포 고르기 */
+.rf-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.rf-who { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.rf-who b { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rf-warn { margin-bottom: 12px; font-size: var(--fs-sm); }
+.rf-search { margin-bottom: 12px; }
+.rf-repo { align-items: center; }
+.rf-repo > input { margin-top: 0; }
+.rf-repo .choice-title, .rf-repo .choice-sub { overflow-wrap: anywhere; }
+.rf-repo .choice-sub { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.rf-repo-meta { flex: none; display: flex; gap: 12px; max-width: 45%; font-size: var(--fs-sm); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.rf-more { margin-top: 8px; }
+.rf-none { padding: 32px 0; text-align: center; color: var(--text-2); }
+
+/* STAR 초안 */
+.rf-draft + .rf-draft { margin-top: 12px; }
+.rf-draft { border: 1px solid var(--border-strong); border-radius: var(--radius); }
+.rf-draft:has(input:checked) { border-color: var(--primary); }
+.rf-draft .choice { border: 0; }
+.rf-draft .choice-title { -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.rf-draft-kws { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 8px; }
+.rf-draft-more { margin-top: -4px; font-size: var(--fs-sm); }
+.rf-draft-more > summary { padding: 8px 16px 8px 46px; color: var(--text-2); cursor: pointer; list-style: none; }
+.rf-draft-more > summary::-webkit-details-marker { display: none; }
+.rf-draft-more > summary:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+.rf-draft-more > summary:focus-visible { outline-offset: -2px; border-radius: var(--radius); }
+.rf-draft-more[open] > summary { color: var(--text); font-weight: 600; }
+.rf-star > div { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px; padding: 4px 16px 4px 46px; line-height: 1.65; }
+.rf-star dt { color: var(--text-3); }
+.rf-star dd { overflow-wrap: anywhere; }
+.rf-draft-more .meta { padding: 6px 16px 14px 46px; }
+
+@media (max-width: 900px) {
+  .rf-draft-more > summary { min-height: 44px; display: flex; align-items: center; }
+}
+@media (max-width: 600px) {
+  .rf-seg { display: flex; }
+  .rf-seg .seg-btn { flex: 1; padding: 3px 8px; }
+  .rf-repo { flex-wrap: wrap; }
+  .rf-repo > .choice-main { flex: 1 1 0; }
+  .rf-repo-meta { flex-basis: 100%; max-width: none; padding-left: 30px; margin-top: -8px; }
+  .rf-star > div { padding-left: 16px; }
+  .rf-draft-more .meta { padding-left: 16px; }
+}

@@ -1,0 +1,7 @@
+/* 휴지통 (.tr-*) */
+.tr-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 4px; }
+@media (max-width: 600px) {
+  .tr-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 12px; align-items: start; }
+  .tr-row > svg { margin-top: 3px; }
+  .tr-row > .list-row-actions { grid-column: 2; }
+}

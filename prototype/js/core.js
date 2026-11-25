@@ -1,174 +1,257 @@
 /* App core: store, router, ui helpers, mock AI. 모든 화면이 이 API만 사용한다. */
 window.App = window.App || {};
 (function (App) {
-  const LS_KEY = 'rewrite-proto-v9'; // v9: 위키 점검·완성도·체크인 제거, v8: 경험(대화) → 경험 카드 모델, 경험 후보 삭제, v7: 대화 기록(원문 채팅방) + 대화형 이전 기록 정리, v6: 경험 위키 (모든 기록 → ingest → 경험 페이지, 변경 기록·점검), v5: 깃허브 레포 분석 + 마스터 이력서, v2: 프로젝트와 경험 카드 분리 (1 프로젝트 : N 카드), v3: 완료 프로젝트 예시 추가, v4: 지난 질문 기록 시드 + 연속 기록을 답변 날짜에서 계산
+  // v13: 계정별 저장 · 휴지통 · 카드의 이력서 한 줄(resumeLine) · 자소서 여러 카드(expIds)와 본문(answer) · 지원 기업의 역량 맵 제거
+  const dataKey = (accountId) => `rewrite-proto-v13:${accountId}`;
+  const TRASH_DAYS = 30;
   const clone = (o) => JSON.parse(JSON.stringify(o));
 
   /* ---------------- Store ---------------- */
+  const blank = (me) => ({ user: { name: (me && me.name) || '', email: (me && me.email) || '', targetJob: '', onboarded: false }, projects: [], experiences: [], chats: [], github: null, applications: [], resume: Object.assign(EMPTY_RESUME(), { profile: Object.assign(EMPTY_RESUME().profile, { name: (me && me.name) || '', email: (me && me.email) || '' }) }), trash: [] });
+  let owner = null; // 지금 state 가 누구의 것인지 (다른 탭에서 계정이 바뀐 뒤 남의 저장소에 쓰지 않도록)
   function load() {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      if (raw) return JSON.parse(raw);
-    } catch (e) { /* ignore */ }
-    const s = clone(window.SEED);
-    return { user: s.user, settings: s.settings, projects: s.projects, experiences: s.experiences, inbox: s.inbox, applications: s.applications, resume: s.resume, wikiLog: [], wikiMeta: { lastQueue: '' }, threads: null };
+    const me = App.auth.current(); owner = me ? me.id : null;
+    if (!me) return blank(null);
+    let s = null;
+    try { const raw = localStorage.getItem(dataKey(me.id)); if (raw) s = JSON.parse(raw); } catch (e) { /* ignore */ }
+    if (!s && me.demo) { const d = clone(window.SEED); s = { user: Object.assign(d.user, { email: me.email }), projects: d.projects, experiences: d.experiences, chats: d.chats, github: d.github || null, applications: d.applications, resume: d.resume || EMPTY_RESUME(), trash: [] }; }
+    if (!s) s = blank(me);
+    s.trash = (s.trash || []).filter((t) => daysLeft(t) > 0); // 기간이 지난 휴지통 항목은 지운다
+    return s;
   }
   function EMPTY_RESUME() { return { profile: { name: '', headline: '', email: '', phone: '', github: '', blog: '', intro: '' }, skills: [], entries: [], versions: [] }; }
-  let state = load();
-  // 이전 버전 저장 데이터에는 지원 기업이 없을 수 있음
-  if (!Array.isArray(state.applications)) state.applications = clone(window.SEED.applications || []);
-  // 지원 상태 4단계로 통합 (이전 5단계 → 새 단계)
-  const LEGACY_STATUS = { interest: 'preparing', writing: 'preparing', submitted: 'applied', interview: 'applied', done: 'failed' };
-  state.applications.forEach((a) => { if (LEGACY_STATUS[a.status]) a.status = LEGACY_STATUS[a.status]; });
-  if (!state.resume) state.resume = clone(window.SEED.resume || EMPTY_RESUME());
-  // '건너뛰기'와 '나중에'를 '나중에 답하기' 하나로 합침: 예전 '나중에' 질문은 미뤄 둔 질문(skipped)으로
-  (state.inbox || []).forEach((q) => { if (q.status === 'later') q.status = 'skipped'; });
   const listeners = new Set();
-  function persist() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ } }
-  function emit() { if (App.ai) App.ai._ec = null; persist(); listeners.forEach((fn) => fn(state)); }
-  const today = () => new Date().toISOString().slice(0, 10);
+  function persist() { const me = App.auth.current(); if (!me || me.id !== owner) return; try { localStorage.setItem(dataKey(me.id), JSON.stringify(state)); } catch (e) { /* ignore */ } }
+  function emit() { persist(); listeners.forEach((fn) => fn(state)); }
   // 날짜는 로컬 기준
   const pad2 = (n) => String(n).padStart(2, '0');
   const fmtDay = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
   const localDay = () => fmtDay(new Date());
+  const today = localDay;
+  const nowAt = () => { const d = new Date(); return `${fmtDay(d)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
   const parseDay = (s) => { const [y, m, d] = String(s).split('-').map(Number); return new Date(y || 1970, (m || 1) - 1, d || 1); };
-  const projectShort = (t) => { const m = String(t || '').match(/「[^」]+」/); if (m) return m[0]; const parts = String(t || '').split(' — '); return `「${parts[parts.length - 1]}」`; };
+  const daysLeft = (t) => TRASH_DAYS - Math.floor((parseDay(today()) - parseDay(String(t.deletedAt).slice(0, 10))) / 86400000);
+  let state = load();
   const uid = (p) => p + Math.random().toString(36).slice(2, 8);
+  // 역량은 정해 둔 12개 안에서만 (없는 이름은 버린다)
+  const cleanKw = (list) => [...new Set((list || []).filter((k) => window.SEED.keywords.some((x) => x.name === k)))];
+  const EMPTY_STAR = () => ({ situation: '', task: '', action: '', result: '' });
 
   App.store = {
     get state() { return state; },
-    // 프로젝트 짧은 이름: '모여봄' → 모여봄, '팀 프로젝트 「모여봄」 — …' → 모여봄
-    projectName(p) { return projectShort(p && p.title).slice(1, -1); },
+    projectName(p) { return (p && p.title) || ''; },
     // 로컬 날짜 도우미
-    localDay, fmtDay, parseDay,
+    localDay, fmtDay, parseDay, nowAt,
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     touch() { emit(); },
-    reset() { try { localStorage.removeItem(LS_KEY); } catch (e) {} state = load(); emit(); },
+    dataKey,
+    // 로그인·로그아웃한 뒤 그 계정의 데이터로 바꾼다
+    switchAccount() { state = load(); this._dropRefs(); if (App.auth.current()) emit(); else listeners.forEach((fn) => fn(state)); },
+    // 다른 탭에서 저장한 내용을 다시 읽는다 (저장하지 않음)
+    reload() { state = load(); this._dropRefs(); },
+    reset() { const me = App.auth.current(); if (me) { try { localStorage.removeItem(dataKey(me.id)); } catch (e) {} } state = load(); if (me && !me.demo) state.user.onboarded = true; emit(); },
 
-    // 경험 카드
+    // ---------------- 경험 카드 (projectId 필수) ----------------
+    // AI 대화(applyProposal) 또는 GitHub 레포 분석(addGithubCards)으로만 만들어지고 고쳐진다. 사용자가 직접 쓰는 칸은 이력서 한 줄(setResumeLine)과 회고(setRetrospect)
     list() { return state.experiences.slice().sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')); },
     get(id) { return state.experiences.find((e) => e.id === id) || null; },
-    // 이 프로젝트에서 나온 경험 카드들
     cardsOf(projectId) { return this.list().filter((e) => e.projectId === projectId); },
     create(partial = {}) {
+      const p = this.getProject(partial.projectId); if (!p) return null; // 카드는 반드시 프로젝트 안에
       const exp = Object.assign({
-        id: uid('e'), title: '제목 없는 경험', category: '일상', period: { start: '', end: '' }, projectId: null, sourceLogIds: [],
-        role: '', summary: '', star: { situation: '', task: '', action: '', result: '' }, insights: '',
-        keywords: [], jobs: [], links: [], qa: [], createdAt: today(), updatedAt: today(),
+        id: uid('e'), projectId: null, title: '제목 없는 카드', period: clone(p.period || { start: '', end: '' }), role: p.role || '', summary: '',
+        star: EMPTY_STAR(), resumeLine: '', retrospect: '', keywords: [], source: 'chat', evidence: null, chatIds: [], createdAt: today(), updatedAt: today(),
       }, clone(partial));
-      state.experiences.push(exp); emit(); return exp;
-    },
-    update(id, patch) {
-      const exp = this.get(id); if (!exp) return null;
-      Object.assign(exp, clone(patch), { updatedAt: today() });
+      exp.star = Object.assign(EMPTY_STAR(), exp.star); exp.keywords = cleanKw(exp.keywords);
+        if (!exp.resumeLine && App.ai.starFilled(exp)) exp.resumeLine = App.ai.resumeLine(exp);
+      state.experiences.push(exp); p.updatedAt = today();
       emit(); return exp;
     },
-    remove(id) { state.experiences = state.experiences.filter((e) => e.id !== id); emit(); },
-    addQA(expId, q, a) {
-      const exp = this.get(expId); if (!exp) return;
-      exp.qa.push({ q, a, date: today() }); exp.updatedAt = today(); emit();
+    // 회고: 사용자가 직접 쓰는 글. AI 는 읽어서 고치지 않는다
+    setRetrospect(id, text) { const e = this.get(id); if (!e) return null; e.retrospect = String(text || '').trim(); emit(); return e; },
+    // 이력서 한 줄: 사용자가 고치면 그대로 남는다. 마스터 이력서에 담긴(직접 고치지 않은) 줄도 같이 바뀐다
+    setResumeLine(id, text) {
+      const e = this.get(id); if (!e) return null;
+      if (!e.resumeLineEdited) e.aiLine = e.resumeLine; // 되돌릴 AI 문장
+      e.resumeLine = String(text || '').trim().replace(/\s+/g, ' '); e.resumeLineEdited = true; this._syncLine(e); emit(); return e;
+    },
+    _syncLine(e) { if (e.resumeLine) state.resume.entries.forEach((en) => en.bullets.forEach((b) => { if (b.source && b.source.type === 'card' && b.source.expId === e.id && !b.edited) b.text = e.resumeLine; })); },
+    // 경험 카드를 휴지통으로
+    remove(id) { const e = this.get(id); if (!e) return null; state.experiences = state.experiences.filter((x) => x.id !== id); return this._toTrash('card', e.title, e.projectId, { experiences: [e] }); },
+    // 완전히 지워진 카드를 가리키던 채팅·지원 기업 연결을 푼다 (휴지통에 있는 카드는 되살릴 수 있으므로 남겨 둔다)
+    _dropRefs() {
+      const kept = new Set(state.trash.flatMap((t) => (t.data.experiences || []).map((e) => e.id)));
+      const ok = (id) => kept.has(id) || state.experiences.some((e) => e.id === id);
+      const chats = state.chats.concat(state.trash.flatMap((t) => t.data.chats || []));
+      const apps = state.applications.concat(state.trash.flatMap((t) => t.data.applications || []));
+      chats.forEach((c) => { if (c.cardId && !ok(c.cardId)) c.cardId = null; });
+      apps.forEach((a) => {
+        (a.essays || []).forEach((q) => { q.expIds = (q.expIds || []).filter(ok); });
+        (a.interview || []).forEach((q) => { if (q.expId && !ok(q.expId)) q.expId = null; });
+      });
     },
 
-    // 프로젝트 (이 프로젝트에 대한 경험(대화)·기록을 모으는 그릇). status: ongoing | done
+    // ---------------- 휴지통 ----------------
+    // state.trash = [{ id, type:'project'|'chat'|'card'|'app', title, projectId, deletedAt, data:{ projects?, chats?, experiences?, applications? } }]
+    // 프로젝트를 버리면 그 안의 채팅·경험 카드가 한 묶음으로 들어간다. 30일이 지나면 저절로 지워진다
+    TRASH_DAYS, daysLeft,
+    trash() { return state.trash.slice().reverse().sort((a, b) => b.deletedAt.localeCompare(a.deletedAt)); },
+    getTrash(id) { return state.trash.find((t) => t.id === id) || null; },
+    _toTrash(type, title, projectId, data) { const t = { id: uid('t'), type, title, projectId: projectId || null, deletedAt: nowAt(), data: clone(data) }; state.trash.push(t); emit(); return t; },
+    // 되살리기. 속한 프로젝트도 휴지통에 있으면 함께 되살린다 → { hash: 되살린 것의 주소, withProject: 함께 되살린 프로젝트 이름 }
+    restore(id) {
+      const t = this.getTrash(id); if (!t) return null; let withProject = '';
+      if (t.type !== 'project' && t.projectId && !this.getProject(t.projectId)) {
+        const pt = state.trash.find((x) => x.type === 'project' && x.projectId === t.projectId); if (!pt) return null;
+        this.restore(pt.id); withProject = pt.title;
+      }
+      const d = t.data;
+      (d.projects || []).forEach((p) => { p.repos = (p.repos || []).filter((r) => !this.projectOfRepo(r.owner, r.name)); state.projects.push(p); });
+      state.chats.push(...(d.chats || [])); state.experiences.push(...(d.experiences || [])); state.applications.push(...(d.applications || []));
+      state.trash = state.trash.filter((x) => x.id !== id); emit();
+      const one = { project: () => '#/vault/p/' + d.projects[0].id, chat: () => '#/chat/' + d.chats[0].id, card: () => '#/card/' + d.experiences[0].id, app: () => '#/apply/' + d.applications[0].id }[t.type]();
+      return { hash: one, withProject };
+    },
+    // 완전 삭제. 프로젝트를 완전히 지우면 그 프로젝트에서 따로 버린 채팅·카드도 함께 지운다
+    purge(id) {
+      const t = this.getTrash(id); if (!t) return;
+      state.trash = state.trash.filter((x) => x.id !== id && !(t.type === 'project' && x.projectId === t.projectId));
+      this._dropRefs(); emit();
+    },
+    emptyTrash() { state.trash = []; this._dropRefs(); emit(); },
+
+    // ---------------- 프로젝트 (해커톤·팀과제·알바·스터디도 모두 프로젝트). status: ongoing | done ----------------
     projects() { return state.projects.slice().sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')); },
     getProject(id) { return state.projects.find((p) => p.id === id) || null; },
     createProject(partial = {}) {
       const p = Object.assign({
-        id: uid('p'), title: '', period: { start: '', end: '' }, status: 'ongoing', role: '', summary: '', links: [], logs: [],
-        createdAt: today(), updatedAt: today(),
+        id: uid('p'), title: '', period: { start: '', end: '' }, status: 'ongoing', role: '', summary: '', repos: [], createdAt: today(), updatedAt: today(),
       }, clone(partial));
       state.projects.push(p); emit(); return p;
     },
     updateProject(id, patch) { const p = this.getProject(id); if (!p) return null; Object.assign(p, clone(patch), { updatedAt: today() }); emit(); return p; },
-    addLog(projectId, log) {
-      const p = this.getProject(projectId); if (!p) return null;
-      const l = Object.assign({ id: uid('l'), date: today(), keywords: App.ai.extractKeywords(log.text || '') }, log);
-      p.logs.push(l); p.updatedAt = today(); emit(); return l;
-    },
-    updateLog(projectId, logId, patch) {
-      const p = this.getProject(projectId); if (!p) return;
-      const log = p.logs.find((l) => l.id === logId); if (!log) return;
-      Object.assign(log, clone(patch)); p.updatedAt = today(); emit();
-    },
-    removeLog(projectId, logId) {
-      const p = this.getProject(projectId); if (!p) return;
-      p.logs = p.logs.filter((l) => l.id !== logId); p.updatedAt = today();
-      state.experiences.forEach((e) => { if (e.sourceLogIds) e.sourceLogIds = e.sourceLogIds.filter((x) => x !== logId); });
-      emit();
-    },
-    // 질문 답변이 쌓일 곳: 프로젝트 로그 또는 경험 카드
-    questionTarget(q) {
-      if (q && q.targetProjectId) { const p = this.getProject(q.targetProjectId); if (p) return { kind: 'project', id: p.id, title: p.title, href: '#/vault/p/' + p.id, place: '프로젝트 로그' }; }
-      if (q && q.targetExpId) { const e = this.get(q.targetExpId); if (e) return { kind: 'card', id: e.id, title: e.title, href: '#/card/' + e.id, place: '경험' }; }
-      return null;
+    // 프로젝트를 휴지통으로 (그 안의 채팅·경험 카드까지 한 묶음)
+    removeProject(id) {
+      const p = this.getProject(id); if (!p) return null;
+      const mine = (x) => x.projectId === id;
+      const data = { projects: [p], chats: state.chats.filter(mine), experiences: state.experiences.filter(mine) };
+      state.projects = state.projects.filter((x) => x.id !== id); state.chats = state.chats.filter((x) => !mine(x)); state.experiences = state.experiences.filter((x) => !mine(x));
+      return this._toTrash('project', p.title, id, data);
     },
 
-    // 오늘의 질문 인박스
-    // 지운 질문(deleted)은 목록에서 빠지지만, 같은 질문을 곧바로 다시 묻지 않도록 자리만 남는다
-    inbox() { return state.inbox.filter((q) => !q.deleted); },
-    pending() { return state.inbox.filter((q) => q.status === 'pending' && !q.deleted); },
-    getQuestion(qid) { return state.inbox.find((x) => x.id === qid && !x.deleted) || null; },
-    /* 질문함에서 질문(대화방) 지우기: 질문과 그 질문으로 나눈 대화 원문만 지운다.
-       이미 위키에 반영된 경험·변경 기록·프로젝트 타임라인 기록은 그대로 남는다. 연속 기록(답한 날)도 유지 */
-    deleteQuestion(qid) {
-      const q = state.inbox.find((x) => x.id === qid); if (!q) return false;
-      if (App.wiki && App.wiki.threads) App.wiki.threads().filter((t) => t.questionId === qid).map((t) => t.id).forEach((id) => App.wiki.deleteThread(id, true));
-      if (q.status === 'pending') q.status = 'skipped'; // 코드 질문이 바로 다시 도착하지 않게
-      q.deleted = true; delete q.answer; delete q.hint;
-      emit(); return true;
+    // ---------------- 채팅 (프로젝트 안의 대화방, 프로젝트마다 여러 개) ----------------
+    // chat = { id, projectId, title, cardId, msgs:[{ id, who:'ai'|'me', text, at, kind?:'proposal', proposal? }], createdAt, updatedAt }
+    chats() { return state.chats.slice().reverse().sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')); },
+    chatsOf(projectId) { return this.chats().filter((c) => c.projectId === projectId); },
+    getChat(id) { return state.chats.find((c) => c.id === id) || null; },
+    createChat(partial = {}) {
+      const c = Object.assign({ id: uid('c'), projectId: null, title: '새 채팅', cardId: null, msgs: [], createdAt: nowAt(), updatedAt: nowAt() }, clone(partial));
+      state.chats.push(c); emit(); return c;
     },
-    // opts (프로젝트 질문일 때): { type, keywords } — 프로젝트 화면에서 답하면 사용자가 고른 유형·키워드를 그대로 쓴다
-    // opts.decision: 대화에서 사용자가 정한 반영 방법 { mode:'update'|'new'|'timeline'|'skip', expId, field, text, title } — App.wiki.plan 참고
-    // 답변은 모두 경험 위키를 지난다 (App.wiki.ingest). 반환값: 위키 반영 결과 entry — 화면은 App.wiki.reportHTML(entry) 로 보여 준다
-    answer(qid, text, opts = {}) {
-      const q = state.inbox.find((x) => x.id === qid); if (!q) return null;
-      q.status = 'answered'; q.answer = text; q.answeredAt = localDay();
-      let entry = null;
-      if (q.targetProjectId && this.getProject(q.targetProjectId) && !q.findingId) {
-        // 프로젝트에 대한 질문: 원문은 타임라인(로그)에, 이야기는 위키의 경험 페이지에
-        const t = opts.type || q.logType || (/결정|선택/.test(q.text) ? 'decision' : /문제|이슈|에러/.test(q.text) ? 'issue' : /팀원|의견|협업/.test(q.text) ? 'collab' : 'milestone');
-        const p = this.getProject(q.targetProjectId);
-        const log = { id: uid('l'), date: localDay(), type: t, text, keywords: opts.keywords || App.ai.extractKeywords(text), fromQuestion: q.text };
-        p.logs.push(log); p.updatedAt = localDay();
-        entry = App.wiki.ingest({ type: 'checkin', text, question: q.text, questionId: q.id, projectId: p.id, logId: log.id, logType: t, keywords: log.keywords, decision: opts.decision, threadId: opts.threadId });
-        const tid = opts.threadId || App.wiki.activeThread(); if (tid) log.threadId = tid;
-      } else if (q.findingId) {
-        // 코드 분석에서 나온 질문: 그 코드가 근거로 붙은 경험으로
-        entry = App.wiki.ingest({ type: 'answer', text, question: q.text, questionId: q.id, projectId: q.targetProjectId, findingId: q.findingId, decision: opts.decision, threadId: opts.threadId });
+    updateChat(id, patch) { const c = this.getChat(id); if (!c) return null; Object.assign(c, clone(patch)); emit(); return c; },
+    removeChat(id) { const c = this.getChat(id); if (!c) return null; state.chats = state.chats.filter((x) => x.id !== id); return this._toTrash('chat', c.title, c.projectId, { chats: [c] }); },
+    addMsg(chatId, msg) {
+      const c = this.getChat(chatId); if (!c) return null;
+      const m = Object.assign({ id: uid('m'), who: 'ai', text: '', at: nowAt() }, clone(msg));
+      c.msgs.push(m); c.updatedAt = m.at; emit(); return m;
+    },
+    updateMsg(chatId, msgId, patch) { const c = this.getChat(chatId); const m = c && c.msgs.find((x) => x.id === msgId); if (!m) return null; Object.assign(m, clone(patch)); emit(); return m; },
+    /* AI 정리 제안을 반영: 새 경험 카드를 만들거나 기존 카드를 고친다 (결과는 항상 카드).
+       proposal = { mode:'new'|'update', cardId, title, changes, keywords, resumeLine?, status:'pending'|'applied'|'undone', fixed? }
+       change   = { field, add } 지금 카드 내용 뒤에 덧붙임 | { field, after } 통째로 바꿈 (사용자가 말로 고쳐 달라고 한 경우, fixed)
+       덧붙이기는 반영하는 시점의 카드 내용에 더하므로, 그사이 다른 채팅에서 고친 내용을 덮어쓰지 않는다 */
+    applyProposal(chatId, msgId) {
+      const c = this.getChat(chatId); const m = c && c.msgs.find((x) => x.id === msgId); if (!m || !m.proposal || m.proposal.status === 'applied') return null;
+      const pr = m.proposal; let e;
+      const changes = pr.changes.filter((ch) => String(ch.after || ch.add || '').trim());
+      const join = (cur, add) => (cur && cur.trim() ? (cur.includes(add.trim()) ? cur : `${cur.trim()} ${add.trim()}`) : add.trim());
+      const put = (t) => changes.forEach((ch) => {
+        const o = ch.field in EMPTY_STAR() ? t.star : ['summary', 'role', 'title'].includes(ch.field) ? t : null; if (!o) return;
+        o[ch.field] = ch.add != null ? join(o[ch.field], ch.add) : ch.after;
+      });
+      if (pr.mode === 'update') {
+        e = this.get(pr.cardId); if (!e) return null; // 그사이 지운 카드
+        if (!changes.length && JSON.stringify(cleanKw(pr.keywords)) === JSON.stringify(e.keywords)) return null;
+        pr.snap = clone(e); put(e); e.keywords = cleanKw(pr.keywords); e.updatedAt = today();
+        if (!pr.fixed && !e.resumeLineEdited) { e.resumeLine = (pr.resumeLine || '').trim() || App.ai.resumeLine(e); this._syncLine(e); }
       } else {
-        entry = App.wiki.ingest({ type: 'answer', text, question: q.text, questionId: q.id, expId: q.targetExpId || null, stage: q.stage || null, decision: opts.decision, threadId: opts.threadId });
+        if (!changes.some((ch) => ch.field in EMPTY_STAR())) return null; // 빈 카드는 만들지 않는다
+        e = this.create(Object.assign({ projectId: c.projectId, title: pr.title, keywords: pr.keywords }, pr.keepId ? { id: pr.keepId } : {})); if (!e) return null;
+        pr.snap = null; put(e);
+        if (!e.summary) e.summary = App.ai.brief(e.star.action || e.star.situation || e.star.result || '', 80);
+        e.resumeLine = (pr.resumeLine || '').trim() || App.ai.resumeLine(e);
+        if (pr.keepRetro) { e.retrospect = pr.keepRetro; pr.keepRetro = ''; }
+        // 되돌렸다가 다시 반영하면 이 카드를 쓰던 자소서·면접 연결도 되살린다
+        (pr.keepRefs || []).forEach((x) => { const a = this.getApp(x.app); const q = a && a[x.list].find((y) => y.id === x.item); if (!q) return; if (x.list === 'essays') { if (!q.expIds.includes(e.id)) q.expIds.push(e.id); } else if (!q.expId) q.expId = e.id; });
+        pr.keepRefs = [];
+        pr.cardId = e.id;
       }
-      if (entry) q.wikiEntry = entry.id;
-      emit(); return entry;
+      if (!e.chatIds.includes(c.id)) e.chatIds.push(c.id);
+      pr.prevCardId = c.cardId; c.cardId = e.id; pr.status = 'applied'; pr.appliedAt = e.rev = uid('r');
+      const p = this.getProject(c.projectId); if (p) p.updatedAt = today();
+      emit(); return e;
     },
-    // 질문이 답변된 날 (로컬 'YYYY-MM-DD')
-    answerDay(q) { return (q && (q.answeredAt || (q.askedAt || '').slice(0, 10))) || ''; },
-    // 'YYYY-MM-DD' → 그날 도착한 질문 목록 (askedAt 기준, 도착 시각 순)
-    dayHistory() {
-      const map = {};
-      state.inbox.forEach((q) => { const d = (q.askedAt || '').slice(0, 10); if (!d || q.deleted) return; (map[d] = map[d] || []).push(q); });
-      Object.keys(map).forEach((d) => map[d].sort((a, b) => (a.askedAt || '').localeCompare(b.askedAt || '')));
-      return map;
+    // 되돌리기는 그 카드에 마지막으로 반영된 제안만 (e.rev 로 확인). 사용자가 쓴 회고는 지우지 않는다
+    canUndo(pr) { const e = pr && pr.status === 'applied' && pr.appliedAt && this.get(pr.cardId); return !!e && e.rev === pr.appliedAt; },
+    undoProposal(chatId, msgId) {
+      const c = this.getChat(chatId); const m = c && c.msgs.find((x) => x.id === msgId); if (!m || !this.canUndo(m.proposal)) return false;
+      const pr = m.proposal; const i = state.experiences.findIndex((e) => e.id === pr.cardId); const cur = state.experiences[i]; const retro = cur.retrospect;
+      if (pr.snap) state.experiences[i] = Object.assign(clone(pr.snap), { retrospect: retro }, cur.resumeLineEdited ? { resumeLine: cur.resumeLine, resumeLineEdited: true } : {});
+      else {
+        pr.keepRetro = retro; pr.keepId = cur.id; pr.keepRefs = [];
+        state.applications.forEach((a) => { a.essays.forEach((q) => { if ((q.expIds || []).includes(cur.id)) pr.keepRefs.push({ app: a.id, list: 'essays', item: q.id }); }); a.interview.forEach((q) => { if (q.expId === cur.id) pr.keepRefs.push({ app: a.id, list: 'interview', item: q.id }); }); });
+        state.experiences.splice(i, 1); pr.cardId = null;
+      }
+      c.cardId = pr.prevCardId || null; pr.status = 'undone'; if (pr.snap) this._syncLine(state.experiences[i]); this._dropRefs(); emit(); return true;
     },
-    // 답변이 1개 이상 있는 날 집합
-    answeredDays() {
-      const set = new Set();
-      state.inbox.forEach((q) => { if (q.status === 'answered') { const d = this.answerDay(q); if (d) set.add(d); } });
-      return set;
-    },
-    // 현재 연속 기록에 포함된 날들 (최근 → 과거). 오늘 아직 답이 없으면 어제부터 센다 (기록은 아직 살아 있음)
-    streakDays() {
-      const set = this.answeredDays(); const out = [];
-      const d = new Date(); d.setHours(0, 0, 0, 0);
-      if (!set.has(fmtDay(d))) d.setDate(d.getDate() - 1);
-      while (set.has(fmtDay(d))) { out.push(fmtDay(d)); d.setDate(d.getDate() - 1); }
-      return out;
-    },
-    streak() { return this.streakDays().length; },
-    setQuestionStatus(qid, status) { const q = state.inbox.find((x) => x.id === qid); if (q) { q.status = status; emit(); } },
-    pushQuestion(q) { state.inbox.unshift(Object.assign({ id: uid('q'), status: 'pending', askedAt: today() + ' ' + new Date().toTimeString().slice(0, 5) }, q)); emit(); },
 
-    // 지원 기업 (기업 + 직무 단위로 역량 맵·자소서·면접 준비를 따로 관리)
+    // ---------------- GitHub ----------------
+    // state.github = { login, name, url, source:'github'|'sample', fetchedAt, owners:[{ login, type:'user'|'org', name, projects:[{ number, title, url }], repos:[{ owner, name, url, description, language, pushedAt, fork }] }] } | null
+    github() { return state.github; },
+    setGithub(account) { state.github = account ? clone(account) : null; emit(); return state.github; },
+    // 이 레포를 연결한 프로젝트
+    projectOfRepo(owner, name) { const k = `${owner}/${name}`.toLowerCase(); return state.projects.find((p) => (p.repos || []).some((r) => `${r.owner}/${r.name}`.toLowerCase() === k)) || null; },
+    // repo = { owner, name, url, branch, analyzedAt, commits, prs }
+    linkRepo(projectId, repo) {
+      const p = this.getProject(projectId); if (!p) return null;
+      const k = `${repo.owner}/${repo.name}`.toLowerCase();
+      state.projects.forEach((x) => { if (x.id !== projectId) x.repos = (x.repos || []).filter((r) => `${r.owner}/${r.name}`.toLowerCase() !== k); });
+      p.repos = p.repos || []; const cur = p.repos.find((r) => `${r.owner}/${r.name}`.toLowerCase() === k);
+      if (cur) Object.assign(cur, clone(repo)); else p.repos.push(clone(repo));
+      p.updatedAt = today(); emit(); return p;
+    },
+    unlinkRepo(projectId, owner, name) {
+      const p = this.getProject(projectId); if (!p) return null; const k = `${owner}/${name}`.toLowerCase();
+      p.repos = (p.repos || []).filter((r) => `${r.owner}/${r.name}`.toLowerCase() !== k); emit(); return p;
+    },
+    // GitHub 레포로 프로젝트 만들기: 이름은 레포 이름 그대로. 이미 이 레포를 연결한 프로젝트가 있으면 그 프로젝트를 돌려준다
+    createProjectFromRepo(repo) {
+      const cur = this.projectOfRepo(repo.owner, repo.name); if (cur) return cur;
+      const p = this.createProject({ title: repo.name, summary: repo.description || '' });
+      this.linkRepo(p.id, { owner: repo.owner, name: repo.name, url: repo.url, branch: repo.branch || '' });
+      return this.getProject(p.id);
+    },
+    // 레포 분석 결과(STAR 초안) → 경험 카드. drafts: [{ key, title, summary, star, keywords, period?, role?, evidence }]. key 가 같은 카드가 이미 있으면 건너뛴다
+    addGithubCards(projectId, drafts) {
+      // 같은 작업으로 만든 카드가 휴지통에 있으면 새로 만들지 않고 되살린다
+      const made = drafts.filter((d) => !this.cardByKey(d.key)).map((d) => {
+        const t = state.trash.find((x) => x.type === 'card' && x.projectId === projectId && x.data.experiences.some((e) => e.key === d.key || ((e.evidence || {}).keys || []).includes(d.key)));
+        if (t) { this.restore(t.id); return this.get(t.data.experiences[0].id); }
+        const { trashed, ...draft } = d; return this.create(Object.assign(draft, { projectId, source: 'github' }));
+      }).filter(Boolean);
+      // 기간을 비워 둔 프로젝트는 카드의 기간으로 채운다. 마지막 작업이 두 달보다 오래됐으면 끝난 프로젝트
+      const p = this.getProject(projectId);
+      if (p && made.length && !(p.period && p.period.start)) {
+        const ms = made.map((e) => e.period).filter((x) => x && x.start); const starts = ms.map((m) => m.start).sort(); const last = ms.map((m) => m.end || m.start).sort().pop() || '';
+        const d = new Date(); d.setMonth(d.getMonth() - 2); const old = last && last < fmtDay(d).slice(0, 7);
+        this.updateProject(projectId, { period: { start: starts[0] || '', end: old ? last : '' }, status: old ? 'done' : 'ongoing' });
+      }
+      return made;
+    },
+    cardByKey(key) { return (key && state.experiences.find((e) => e.key === key || (e.evidence && (e.evidence.keys || []).includes(key)))) || null; },
+
+    // 지원 기업 (기업 + 직무 단위로 자소서·면접 준비를 따로 관리)
+    // essay = { id, text, limit, keywords, expIds:[고른 경험 카드], answer:'자소서 본문', note } · interview = { id, text, keywords, source, expId, note, checked }
     // status: preparing(지원 준비중) | applied(지원 완료) | passed(합격) | failed(불합격)
     // rank: 같은 상태 칸 안에서 사용자가 끌어다 정한 순서
     apps() {
@@ -186,62 +269,35 @@ window.App = window.App || {};
       emit();
     },
     getApp(id) { return state.applications.find((a) => a.id === id) || null; },
+    _cleanApp(a) { ['essays', 'interview'].forEach((k) => (a[k] || []).forEach((q) => { q.keywords = cleanKw(q.keywords); })); return a; },
     createApp(partial = {}) {
       const app = Object.assign({
         id: uid('a'), company: '', job: '', status: 'preparing', deadline: '', url: '', jdText: '',
-        competencies: [], essays: [], interview: [], pins: {}, memo: '', createdAt: today(), updatedAt: today(),
+        essays: [], interview: [], memo: '', createdAt: today(), updatedAt: today(),
       }, clone(partial));
-      state.applications.push(app); emit(); return app;
+      state.applications.push(this._cleanApp(app)); emit(); return app;
     },
-    updateApp(id, patch) { const a = this.getApp(id); if (!a) return null; Object.assign(a, clone(patch), { updatedAt: today() }); emit(); return a; },
-    removeApp(id) { state.applications = state.applications.filter((a) => a.id !== id); emit(); },
+    updateApp(id, patch) { const a = this.getApp(id); if (!a) return null; this._cleanApp(Object.assign(a, clone(patch), { updatedAt: today() })); emit(); return a; },
+    removeApp(id) { const a = this.getApp(id); if (!a) return null; state.applications = state.applications.filter((x) => x.id !== id); return this._toTrash('app', a.company, null, { applications: [a] }); },
     // list: 'essays' | 'interview'
     addAppItem(appId, list, item) {
       const a = this.getApp(appId); if (!a) return null;
       const it = Object.assign({ id: uid(list === 'essays' ? 'q' : 'i') }, clone(item));
-      a[list].push(it); a.updatedAt = today(); emit(); return it;
+      a[list].push(it); this._cleanApp(a); a.updatedAt = today(); emit(); return it;
     },
     updateAppItem(appId, list, itemId, patch) {
       const a = this.getApp(appId); if (!a) return null;
       const it = a[list].find((x) => x.id === itemId); if (!it) return null;
-      Object.assign(it, clone(patch)); a.updatedAt = today(); emit(); return it;
+      Object.assign(it, clone(patch)); this._cleanApp(a); a.updatedAt = today(); emit(); return it;
     },
     removeAppItem(appId, list, itemId) {
       const a = this.getApp(appId); if (!a) return;
       a[list] = a[list].filter((x) => x.id !== itemId); a.updatedAt = today(); emit();
     },
-    // 기업별 대표 경험 고정 (expId null 이면 해제)
-    setPin(appId, kw, expId) {
-      const a = this.getApp(appId); if (!a) return;
-      a.pins = Object.assign({}, a.pins); if (expId) a.pins[kw] = expId; else delete a.pins[kw];
-      a.updatedAt = today(); emit();
-    },
-
-
-    // ---------------- 깃허브 레포 분석 (project.repo) ----------------
-    // repo = { url, owner, name, branch, source:'github'|'sample', analyzedAt, meta:{description,stars,languages:{lang:pct},topics}, stack:[], findings:[Finding] }
-    // Finding = { id, category, title, bullet, detail, tags:[], confidence:'high'|'mid', evidence:[{path,start,end,code,url}], status:'new'|'added'|'dismissed' }
-    setRepo(projectId, repo) {
-      const p = this.getProject(projectId); if (!p) return null;
-      // 다시 분석해도 이미 이력서에 담은 항목은 '담음' 상태 유지
-      const added = new Set(this.resumeBullets().map((b) => b.source && b.source.findingId).filter(Boolean));
-      p.repo = clone(repo); (p.repo.findings || []).forEach((f) => { if (added.has(f.id)) f.status = 'added'; else if (!f.status) f.status = 'new'; });
-      p.updatedAt = today(); emit(); return p.repo;
-    },
-    removeRepo(projectId) { const p = this.getProject(projectId); if (!p) return; delete p.repo; emit(); },
-    updateFinding(projectId, findingId, patch) {
-      const p = this.getProject(projectId); const f = p && p.repo && (p.repo.findings || []).find((x) => x.id === findingId); if (!f) return null;
-      Object.assign(f, clone(patch)); emit(); return f;
-    },
-    findFinding(findingId) {
-      for (const p of state.projects) { const f = p.repo && (p.repo.findings || []).find((x) => x.id === findingId); if (f) return { project: p, finding: f }; }
-      return null;
-    },
-
     // ---------------- 마스터 이력서 (state.resume) ----------------
     // 이력서에 쓸 수 있는 모든 재료가 쌓이는 곳. included=true 인 것만 '현재 이력서'에 보인다.
     // entry = { id, section:'project'|'career'|'activity'|'education'|'award', title, org, period:{start,end}, role, projectId?, included, order, bullets:[Bullet] }
-    // Bullet = { id, text, included, addedAt, source:{ type:'github'|'card'|'log'|'manual', projectId?, findingId?, expId?, logId?, evidence?:[{path,start,end,url}] } }
+    // Bullet = { id, text, edited?(이력서에서 직접 고침), included, addedAt, source:{ type:'card'|'manual', projectId?, expId? } }
     // skill = { id, name, group:'언어'|'프레임워크·라이브러리'|'DB·인프라'|'도구·협업', included, source? }
     // version = { id, name, note, savedAt, snapshot:{profile,skills,entries} }
     resume() { return state.resume; },
@@ -255,29 +311,16 @@ window.App = window.App || {};
     updateResumeEntry(id, patch) { const e = this.resumeEntry(id); if (!e) return null; Object.assign(e, clone(patch)); emit(); return e; },
     removeResumeEntry(id) {
       const e = this.resumeEntry(id); if (!e) return;
-      e.bullets.forEach((b) => this._releaseFinding(b));
       state.resume.entries = state.resume.entries.filter((x) => x.id !== id); emit();
     },
     reorderResumeEntries(orderIds) { orderIds.forEach((id, i) => { const e = this.resumeEntry(id); if (e) e.order = i; }); emit(); },
-    // 프로젝트에 해당하는 이력서 항목 (없으면 프로젝트 정보로 만든다)
-    resumeEntryFor(projectId, create = true) {
-      let e = state.resume.entries.find((x) => x.projectId === projectId);
-      if (!e && create) {
-        const p = this.getProject(projectId); if (!p) return null;
-        e = { id: uid('re'), section: 'project', title: p.title, org: '', period: clone(p.period || { start: '', end: '' }), role: p.role || '', projectId, included: true, order: state.resume.entries.length, bullets: [] };
-        state.resume.entries.push(e); emit();
-      }
-      return e || null;
-    },
-    // items: [{ text, source }] → 프로젝트 항목에 bullet 으로 추가. 같은 findingId 는 중복 추가하지 않는다. tags 는 기술 스택 풀에 쌓인다.
-    addResumeBullets(projectId, items, opts = {}) {
-      const e = projectId ? this.resumeEntryFor(projectId) : this.resumeEntry(opts.entryId); if (!e) return null;
+    // items: [{ text, source }] → 이력서 항목에 bullet 으로 추가. 같은 경험 카드(expId)는 중복 추가하지 않는다
+    addResumeBullets(entryId, items) {
+      const e = this.resumeEntry(entryId); if (!e) return null;
       items.forEach((it) => {
         const src = clone(it.source || { type: 'manual' });
-        if (src.findingId && e.bullets.some((b) => b.source && b.source.findingId === src.findingId)) return;
+        if (src.expId && e.bullets.some((b) => b.source && b.source.expId === src.expId)) return;
         e.bullets.push({ id: uid('rb'), text: it.text, included: it.included !== false, addedAt: localDay(), source: src });
-        if (src.findingId) { const ff = this.findFinding(src.findingId); if (ff) ff.finding.status = 'added'; }
-        (it.tags || []).forEach((t) => this._poolSkill(t, src));
       });
       emit(); return e;
     },
@@ -287,17 +330,11 @@ window.App = window.App || {};
     },
     removeResumeBullet(entryId, bulletId) {
       const e = this.resumeEntry(entryId); if (!e) return;
-      const b = e.bullets.find((x) => x.id === bulletId); if (b) this._releaseFinding(b);
       e.bullets = e.bullets.filter((x) => x.id !== bulletId); emit();
     },
     reorderResumeBullets(entryId, orderIds) {
       const e = this.resumeEntry(entryId); if (!e) return;
       e.bullets.sort((a, b) => orderIds.indexOf(a.id) - orderIds.indexOf(b.id)); emit();
-    },
-    _releaseFinding(b) { if (b.source && b.source.findingId) { const ff = this.findFinding(b.source.findingId); if (ff && ff.finding.status === 'added') ff.finding.status = 'new'; } },
-    _poolSkill(name, source) {
-      if (!name || state.resume.skills.some((s) => s.name.toLowerCase() === String(name).toLowerCase())) return;
-      state.resume.skills.push({ id: uid('rs'), name, group: App.store.skillGroup(name), included: false, source: clone(source || null) });
     },
     skillGroup(name) {
       const n = String(name).toLowerCase();
@@ -318,29 +355,25 @@ window.App = window.App || {};
     restoreResumeVersion(id) {
       const r = state.resume; const v = r.versions.find((x) => x.id === id); if (!v) return;
       Object.assign(r, clone(v.snapshot));
-      // 되돌린 이력서에 없는 코드 분석 항목은 다시 '새 재료'로
-      const added = new Set(this.resumeBullets().map((b) => b.source && b.source.findingId).filter(Boolean));
-      state.projects.forEach((p) => ((p.repo && p.repo.findings) || []).forEach((f) => { if (added.has(f.id)) f.status = 'added'; else if (f.status === 'added') f.status = 'new'; }));
       emit();
     },
     removeResumeVersion(id) { state.resume.versions = state.resume.versions.filter((x) => x.id !== id); emit(); },
 
-    // 사용자/설정
-    updateUser(patch) { Object.assign(state.user, patch); emit(); },
-    updateSettings(patch) { Object.assign(state.settings, patch); emit(); },
+    // 사용자
+    updateUser(patch) { Object.assign(state.user, patch); if (patch.name) App.auth.rename(patch.name); emit(); },
   };
 
+  App.store._dropRefs();
+
   /* ---------------- Keywords ---------------- */
+  // 역량 카테고리 12개 고정 (window.SEED.keywords). 새로 만들 수 없다
   App.keywords = {
     all() { return window.SEED.keywords; },
-    get(name) { return window.SEED.keywords.find((k) => k.name === name) || { name, tone: 'gray', desc: '사용자 정의 키워드', hints: [] }; },
+    names() { return window.SEED.keywords.map((k) => k.name); },
+    has(name) { return window.SEED.keywords.some((k) => k.name === name); },
+    clean: cleanKw,
+    get(name) { return window.SEED.keywords.find((k) => k.name === name) || { name, tone: 'gray', desc: '', hints: [] }; },
     tone(name) { return this.get(name).tone; },
-    // 키워드별 경험 수
-    counts() {
-      const m = {};
-      state.experiences.forEach((e) => e.keywords.forEach((k) => { m[k] = (m[k] || 0) + 1; }));
-      return m;
-    },
   };
 
   /* ---------------- Mock AI ---------------- */
@@ -349,66 +382,42 @@ window.App = window.App || {};
     extractKeywords(text) {
       const found = [];
       window.SEED.keywords.forEach((k) => { if (k.hints.some((h) => text.includes(h))) found.push(k.name); });
-      return found.slice(0, 4);
+      return found.slice(0, 3);
     },
-    // STAR 단계 순서로 다음 꼬리질문 선택. ctx = { stage, turn, lastAnswer, alt }
-    nextQuestion(ctx) {
-      const F = window.SEED.followups;
-      if (ctx.alt) return { stage: ctx.stage, text: F.alt[(ctx.turn || 0) % F.alt.length] };
-      const order = ['situation', 'task', 'action', 'result'];
-      const pool = F[ctx.stage] || F.situation;
-      const text = pool[(ctx.turn || 0) % pool.length];
-      return { stage: ctx.stage, text, next: order[Math.min(order.indexOf(ctx.stage) + 1, 3)] };
-    },
-    // 자소서/면접 질문에서 숨은 키워드 추출 + 경험 추천
-    // opts.focus: 지원 기업의 요구 역량 → 해당 키워드를 가진 경험에 가산점
-    analyzeQuestion(text, opts = {}) {
-      let kws = this.extractKeywords(text);
-      const extra = { '갈등': '갈등조정', '주도': '주도성', '실패': '끈기', '새로운 기술': '학습능력', '고객': '고객지향', '사용자': '고객지향', '개선': '문제해결' };
+    // 자소서/면접 질문 → 핵심 역량 1~3개
+    questionKeywords(text) {
+      const kws = this.extractKeywords(text);
+      const extra = { '갈등': '커뮤니케이션', '주도': '추진력', '실패': '도전정신', '새로운 기술': '학습능력', '고객': '기획력', '사용자': '기획력', '개선': '문제 해결력', '협업': '협업능력', '도전': '도전정신', '창의': '창의력' };
       Object.keys(extra).forEach((w) => { if (text.includes(w) && !kws.includes(extra[w])) kws.push(extra[w]); });
-      if (!kws.length) kws = (opts.focus && opts.focus.length ? opts.focus.slice(0, 2) : ['문제해결', '협업']);
-      kws = kws.slice(0, 3);
-      const focus = opts.focus || [];
-      const counts = this.expCounts();
-      const recs = state.experiences.map((e) => {
-        const hit = e.keywords.filter((k) => kws.includes(k)).length;
-        const fhit = e.keywords.filter((k) => focus.includes(k) && !kws.includes(k)).length;
-        const score = Math.min(98, Math.round(hit * 30 + fhit * 6 + Math.min(5, counts[e.id] || 0) * 7));
-        return { exp: e, score, matched: e.keywords.filter((k) => kws.includes(k)) };
-      }).filter((r) => r.matched.length).sort((a, b) => b.score - a.score);
-      return { keywords: kws, recommendations: recs };
+      return cleanKw(kws.length ? kws : ['문제 해결력', '협업능력']).slice(0, 3);
     },
-    // 경험 카드마다 담긴 경험(끝낸 대화) 수 { cardId: n }
-    // (한 번 그리는 동안은 캐시 — 저장(emit)되거나 다음 틱이면 다시 센다)
-    _ec: null,
-    expCounts() {
-      if (this._ec) return this._ec;
-      const m = {};
-      if (App.wiki && App.wiki.experienceItems) App.wiki.experienceItems().forEach((it) => (it.cardIds || []).forEach((id) => { m[id] = (m[id] || 0) + 1; }));
-      this._ec = m; Promise.resolve().then(() => { this._ec = null; });
-      return m;
+    // 핵심 역량에 맞는 모든 경험 카드 (맞는 역량이 많은 순 → STAR 가 잘 채워진 순) [{ exp, matched:[역량] }]
+    cardsFor(keywords) {
+      return this.rankCards(state.experiences).map((exp) => ({ exp, matched: exp.keywords.filter((k) => (keywords || []).includes(k)) }))
+        .filter((r) => r.matched.length).sort((a, b) => b.matched.length - a.matched.length);
     },
-    // 대표 카드 순서: 경험을 많이 모은 카드 먼저, 같으면 최근 수정순
+    // 경험 카드 → 이력서 한 줄 (essay-writer.js 가 제공한다)
+    resumeLine(exp) { return exp.summary || exp.title; },
+    // 채워진 STAR 칸 수 (0~4)
+    starFilled(e) { return ['situation', 'task', 'action', 'result'].filter((k) => (e.star || {})[k]).length; },
+    // 대표 카드 순서: STAR 가 더 채워지고 결과에 수치가 있는 카드 먼저, 같으면 최근 수정순
     rankCards(list) {
-      const n = this.expCounts();
-      return list.slice().sort((a, b) => (n[b.id] || 0) - (n[a.id] || 0) || String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+      const n = (e) => this.starFilled(e) + (/\d/.test((e.star || {}).result || '') ? 0.5 : 0);
+      return list.slice().sort((a, b) => n(b) - n(a) || String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
     },
-    // 카드에서 비어 있는 부분을 채울 다음 질문
-    gapQuestion(e) {
-      const F = window.SEED.followups;
-      for (const k of ['situation', 'task', 'action', 'result']) if (!e.star[k]) return { stage: k, text: F[k][0] };
-      if (!/\d/.test(e.star.result)) return { stage: 'result', text: F.result[0] };
-      if (!e.insights) return { stage: 'insight', text: '이 경험 이후 당신이 다르게 하게 된 것이 있나요?' };
-      return null;
+    // 문장을 max 자 안쪽으로 짧게
+    brief(t, max = 60) {
+      const s = String(t || '').trim().replace(/\s+/g, ' '); if (s.length <= max) return s;
+      const first = s.split(/(?<=[.!?。])\s+/)[0]; return first.length <= max ? first : first.slice(0, max) + '…';
     },
     // 채용공고(JD) 텍스트 → 요구 역량 [{ name, weight(1~3), reason }]
     analyzeJD(text) {
       const t = String(text || '');
       const extra = {
-        '트래픽': '문제해결', '장애': '문제해결', '안정': '꼼꼼함', '품질': '꼼꼼함', '코드 리뷰': '협업', '리뷰': '커뮤니케이션',
-        '유관 부서': '커뮤니케이션', '이해관계자': '커뮤니케이션', '빠르게': '학습능력', '성장': '학습능력', '신기술': '학습능력',
-        '오너십': '주도성', '주인의식': '주도성', '능동': '주도성', '지표': '분석력', '로그': '분석력', '고객': '고객지향', '사용자': '고객지향',
-        '설계': '의사결정', '아키텍처': '의사결정', '리딩': '리더십',
+        '트래픽': '문제 해결력', '장애': '문제 해결력', '안정': '실행력', '품질': '실행력', '코드 리뷰': '협업능력', '리뷰': '커뮤니케이션', '협업': '협업능력',
+        '유관 부서': '커뮤니케이션', '이해관계자': '커뮤니케이션', '빠르게': '학습능력', '성장': '도전정신', '신기술': '학습능력', '도전': '도전정신',
+        '오너십': '추진력', '주인의식': '추진력', '능동': '추진력', '지표': '분석적 사고', '로그': '분석적 사고', '고객': '기획력', '사용자': '기획력', '기획': '기획력',
+        '설계': '의사결정 능력', '아키텍처': '의사결정 능력', '리딩': '리더십', '아이디어': '창의력',
       };
       const score = {}; const why = {};
       const sentences = t.split(/[\n.·•]/).map((x) => x.trim()).filter(Boolean);
@@ -418,42 +427,35 @@ window.App = window.App || {};
         found.forEach((k) => { score[k] = (score[k] || 0) + 1; if (!why[k]) why[k] = sen.length > 48 ? sen.slice(0, 48) + '…' : sen; });
       });
       let list = Object.keys(score).map((k) => ({ name: k, weight: Math.min(3, score[k]), reason: why[k] }));
-      if (!list.length) list = [{ name: '문제해결', weight: 2, reason: '' }, { name: '협업', weight: 2, reason: '' }];
+      if (!list.length) list = [{ name: '문제 해결력', weight: 2, reason: '' }, { name: '협업능력', weight: 2, reason: '' }];
       return list.sort((a, b) => b.weight - a.weight).slice(0, 6);
     },
-    // 지원 기업 준비도
+    // 자소서 문항을 다 썼는가: 본문이 있고, AI 가 비워 둔 [ ] 가 남아 있지 않고, 글자 수를 넘지 않는다
+    essayDone(q) {
+      const t = String(q.answer || '').trim(); if (!t || (q.limit && t.length > q.limit)) return false;
+      return !(((q.gen && q.gen.text) || '').match(/\[[^[\]\n]+\]/g) || []).some((s) => t.includes(s));
+    },
+    // 지원 기업 준비도: 다 쓴 자소서 문항 비율과 준비를 마친 면접 질문 비율의 평균
     readiness(app) {
-      const exps = state.experiences;
-      const comps = (app.competencies || []).map((c) => {
-        const pinned = app.pins && app.pins[c.name] ? exps.find((e) => e.id === app.pins[c.name]) : null;
-        // 그 역량 키워드가 붙은 경험 카드가 하나라도 있으면 준비됨
-        const cands = this.rankCards(exps.filter((e) => e.keywords.includes(c.name)));
-        const exp = pinned || cands[0] || null;
-        return { name: c.name, weight: c.weight, exp, pinned: !!pinned, count: cands.length, ready: !!exp };
-      });
       const essays = app.essays || []; const iv = app.interview || [];
-      const essaysDone = essays.filter((q) => q.expId).length;
-      const ivDone = iv.filter((q) => q.checked).length;
-      // 역량·자소서·면접 세 영역을 항상 같은 비중으로 평균. 아직 비어 있는 영역은 0 (준비 안 됨)
+      const essaysDone = essays.filter((q) => this.essayDone(q)).length; const ivDone = iv.filter((q) => q.checked).length;
       const ratio = (done, total) => (total ? done / total : 0);
-      const parts = [ratio(comps.filter((c) => c.ready).length, comps.length), ratio(essaysDone, essays.length), ratio(ivDone, iv.length)];
-      const score = Math.round(parts.reduce((a, b) => a + b, 0) / parts.length * 100);
-      return { score, competencies: comps, essaysDone, essaysTotal: essays.length, interviewDone: ivDone, interviewTotal: iv.length };
+      return { score: Math.round((ratio(essaysDone, essays.length) + ratio(ivDone, iv.length)) / 2 * 100), essaysDone, essaysTotal: essays.length, interviewDone: ivDone, interviewTotal: iv.length };
     },
     // 지원 기업별 예상 면접 질문 생성 [{ text, keywords, source: 'competency'|'essay'|'common', expId }]
     interviewSuggestions(app) {
       const out = [];
       out.push({ text: `${app.company}에 지원한 이유는 무엇인가요?`, keywords: [], source: 'common', expId: null });
       out.push({ text: '1분 자기소개를 해 주세요.', keywords: [], source: 'common', expId: null });
-      (app.competencies || []).forEach((c) => {
+      if (String(app.jdText || '').trim()) this.analyzeJD(app.jdText).slice(0, 4).forEach((c) => {
         const k = App.keywords.get(c.name);
-        out.push({ text: `${k.desc.replace(/ 경험$/, '')} 경험을 구체적으로 말씀해 주세요.`, keywords: [c.name], source: 'competency', expId: (app.pins || {})[c.name] || null });
+        out.push({ text: `${k.desc.replace(/ 경험$/, '')} 경험을 구체적으로 말씀해 주세요.`, keywords: [c.name], source: 'competency', expId: null });
       });
-      (app.essays || []).filter((q) => q.expId).forEach((q) => {
-        const e = state.experiences.find((x) => x.id === q.expId); if (!e) return;
+      (app.essays || []).forEach((q) => (q.expIds || []).forEach((id) => {
+        const e = state.experiences.find((x) => x.id === id); if (!e) return;
         out.push({ text: `자소서에 쓴 「${e.title.split(' — ')[0]}」에서 다른 선택지는 없었나요? 왜 그 방법을 택했나요?`, keywords: q.keywords || [], source: 'essay', expId: e.id });
         if (!/\d/.test(e.star.result || '')) out.push({ text: `「${e.title.split(' — ')[0]}」의 결과를 수치로 설명할 수 있나요?`, keywords: q.keywords || [], source: 'essay', expId: e.id });
-      });
+      }));
       return out;
     },
     // 경험 카드를 짧은 STAR 문장으로 (답변 카드·개요용)
@@ -465,7 +467,7 @@ window.App = window.App || {};
         return o.length > max + 30 ? o.slice(0, max) + '…' : o;
       };
       const st = e.star || {};
-      return { situation: first([st.situation, st.task].filter(Boolean).join(' '), 70), action: first(st.action, 90), result: first(st.result, 70), insight: first(e.insights, 60) };
+      return { situation: first([st.situation, st.task].filter(Boolean).join(' '), 70), action: first(st.action, 90), result: first(st.result, 70) };
     },
     // 짧은 지연으로 AI 응답 흉내
     think(ms = 700) { return new Promise((r) => setTimeout(r, ms)); },
@@ -478,63 +480,93 @@ window.App = window.App || {};
 
   App.ui = {
     esc,
-    keywordChip(name, opts = {}) {
-      const cls = ['kw', opts.size === 'lg' ? 'kw-lg' : '', opts.ai ? 'kw-ai' : '', opts.clickable ? 'clickable' : ''].join(' ');
-      const x = opts.removable ? `<span class="x" data-remove-kw="${esc(name)}">×</span>` : '';
-      return `<span class="${cls}" data-tone="${App.keywords.tone(name)}" data-kw="${esc(name)}">#${esc(name)}${x}</span>`;
-    },
+    keywordChip(name, matched) { return `<span class="kw${matched ? ' is-match' : ''}" data-kw="${esc(name)}">${esc(name)}</span>`; },
     statusTag(status) { const [t, c] = STATUS[status] || STATUS.ongoing; return `<span class="tag ${c}">${t}</span>`; },
     progress(pct) { return `<div class="progress"><span style="width:${pct}%"></span></div>`; },
-    period(p) { if (!p || !p.start) return '기간 미입력'; return `${p.start.replace('-', '.')} ~ ${p.end ? p.end.replace('-', '.') : '진행중'}`; },
-    // 경험 카드 요약 아이템. 클릭 시 상세로 이동
+    period(p) { if (!p || !p.start) return '기간 미입력'; if (p.end === p.start) return p.start.replace('-', '.'); return `${p.start.replace('-', '.')} ~ ${p.end ? p.end.replace('-', '.') : '진행중'}`; },
+    date(s) { const d = parseDay(String(s || '').slice(0, 10)); return s ? `${d.getMonth() + 1}월 ${d.getDate()}일` : ''; },
+    // 어느 프로젝트의 카드인지 — 경험 카드가 보이는 모든 곳에 붙인다. opts.link 면 프로젝트로 가는 링크
+    projChip(projectId, opts = {}) {
+      const p = App.store.getProject(projectId); const pt = p ? null : App.store.trash().find((t) => t.type === 'project' && t.projectId === projectId); const name = p ? p.title : pt ? pt.title : '지워진 프로젝트';
+      return opts.link && p ? `<a class="proj-chip" href="#/vault/p/${encodeURIComponent(p.id)}">${App.icon('folder', 15)}<span>${esc(name)}</span></a>` : `<span class="proj-chip">${App.icon('folder', 15)}<span>${esc(name)}</span></span>`;
+    },
+    // 휴지통에 있는 경험 카드 (없으면 null)
+    trashedCard(id) { for (const t of App.store.trash()) { const e = (t.data.experiences || []).find((x) => x.id === id); if (e) return e; } return null; },
+    // 휴지통에 있는 카드를 가리킬 때: 어느 프로젝트의 어떤 카드였는지까지
+    goneCard(id) { const e = this.trashedCard(id); return e ? `${this.projChip(e.projectId)}<span>${esc(e.title)} (휴지통)</span>` : '<span>지워진 카드</span>'; },
+    // 경험 카드 요약 아이템. 클릭 시 상세로 이동. opts: { compact, matched:[강조할 역량] }
     expCard(e, opts = {}) {
-      return `<div class="card exp-card" data-href="#/card/${e.id}">
-        <div class="exp-card-top"><span>${esc(e.category)}</span><span>·</span><span>${this.period(e.period)}</span></div>
-        <div class="exp-card-title">${esc(e.title)}</div>
-        ${(() => { const p = e.projectId && App.store.getProject(e.projectId); return p ? `<div class="exp-card-from">▤ ${esc(p.title.split(' — ')[0])}에서</div>` : ''; })()}
-        ${opts.compact ? '' : `<div class="exp-card-sum">${esc(e.summary || '아직 요약이 없어요. 질문에 답하면 자동으로 채워져요.')}</div>`}
-        <div class="exp-card-kws">${e.keywords.map((k) => this.keywordChip(k)).join('')}</div>
-        <div class="exp-card-foot"><span>경험 ${App.ai.expCounts()[e.id] || 0}개</span></div>
-      </div>`;
+      return `<article class="card exp-card" data-href="#/card/${e.id}">
+        <div class="exp-card-top">${this.projChip(e.projectId)}<span class="exp-card-period">${esc(this.period(e.period))}</span>${e.source === 'github' ? `<span class="exp-src">${App.icon('github', 15)}GitHub</span>` : ''}</div>
+        <a class="exp-card-title" href="#/card/${e.id}"><span>${esc(e.title)}</span></a>
+        ${opts.compact ? '' : `<p class="exp-card-sum">${esc(e.resumeLine || e.summary)}</p>`}
+        <div class="exp-card-kws">${e.keywords.map((k) => this.keywordChip(k, (opts.matched || []).includes(k))).join('')}</div>
+      </article>`;
     },
-    toast(msg) {
-      const el = document.createElement('div'); el.className = 'toast'; el.textContent = msg;
-      document.getElementById('toast-root').appendChild(el); setTimeout(() => el.remove(), 2600);
+    // toast(msg, { action:'되돌리기', onAction })
+    toast(msg, opts = {}) {
+      const root = document.getElementById('toast-root');
+      const el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'status'); el.textContent = msg;
+      if (opts.action) {
+        const b = document.createElement('button'); b.type = 'button'; b.textContent = opts.action;
+        b.onclick = () => { el.remove(); opts.onAction(); }; el.appendChild(b);
+      }
+      root.appendChild(el); setTimeout(() => el.remove(), opts.action ? 6000 : 2600);
     },
-    // 서비스가 먼저 말 거는 푸시 알림 시뮬레이션
-    pushToast(title, body, href) {
-      const el = document.createElement('div'); el.className = 'toast push';
-      el.innerHTML = `<div class="ai-dot">R</div><div><div class="t-title">${esc(title)}</div><div class="t-body">${esc(body)}</div></div>`;
-      el.onclick = () => { if (href) App.navigate(href); el.remove(); };
-      document.getElementById('toast-root').appendChild(el); setTimeout(() => el.remove(), 7000);
+    // 휴지통으로 보낸 뒤 안내 + 되돌리기. entry = App.store.remove*() 가 돌려준 휴지통 항목
+    trashed(entry, name) {
+      if (!entry) return;
+      this.toast(`${name || `「${entry.title}」`} 항목을 휴지통으로 옮겼어요`, { action: '되돌리기', onAction: () => { const r = App.store.restore(entry.id); if (r) { App.navigate(r.hash); App.ui.toast('되돌렸어요'); } } });
     },
-    // modal({ title, body(html), confirmText, cancelText, danger, onConfirm })
+    // modal({ title, body(html), confirmText, cancelText, danger, size:'lg', hideCancel, hideConfirm, onConfirm(root)→false 면 닫지 않음(Promise 가능), onOpen(root), onClose })
     modal(o) {
-      const root = document.getElementById('modal-root');
-      root.innerHTML = `<div class="modal-backdrop"><div class="modal">
-        <div class="modal-head">${esc(o.title || '')}</div><div class="modal-body">${o.body || ''}</div>
-        <div class="modal-foot"><button class="btn" data-m="cancel">${esc(o.cancelText || '취소')}</button>
-        <button class="btn ${o.danger ? 'btn-danger' : 'btn-primary'}" data-m="ok">${esc(o.confirmText || '확인')}</button></div></div></div>`;
-      const close = () => { root.innerHTML = ''; };
-      root.querySelector('[data-m=cancel]').onclick = close;
-      root.querySelector('.modal-backdrop').onclick = (ev) => { if (ev.target.classList.contains('modal-backdrop')) close(); };
-      root.querySelector('[data-m=ok]').onclick = () => { const r = o.onConfirm && o.onConfirm(root); if (r !== false) close(); };
+      const root = document.getElementById('modal-root'); const back = document.activeElement;
+      root.innerHTML = `<div class="modal-backdrop"><div class="modal ${o.size === 'lg' ? 'modal-lg' : ''}" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-head" id="modal-title">${esc(o.title || '')}</div><div class="modal-body">${o.body || ''}</div>
+        ${o.hideCancel && o.hideConfirm ? '' : `<div class="modal-foot">${o.hideCancel ? '' : `<button type="button" class="btn" data-m="cancel">${esc(o.cancelText || '취소')}</button>`}
+        ${o.hideConfirm ? '' : `<button type="button" class="btn ${o.danger ? 'btn-danger' : 'btn-primary'}" data-m="ok">${esc(o.confirmText || '확인')}</button>`}</div>`}</div></div>`;
+      const box = root.querySelector('.modal'); const me = root.firstElementChild;
+      const close = () => { if (root.firstElementChild !== me) return; root.innerHTML = ''; document.removeEventListener('keydown', onKey, true); if (o.onClose) o.onClose(); if (back && back.isConnected && back.focus) back.focus({ preventScroll: true }); };
+      const onKey = (ev) => {
+        if (root.firstElementChild !== me) { document.removeEventListener('keydown', onKey, true); return; }
+        if (ev.key === 'Escape') { ev.stopPropagation(); close(); return; }
+        if (ev.key !== 'Tab') return;
+        const f = [...box.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex="0"]')].filter((x) => x.offsetParent !== null); if (!f.length) return;
+        const first = f[0], last = f[f.length - 1];
+        if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); } else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); } else if (!box.contains(document.activeElement)) { ev.preventDefault(); first.focus(); }
+      };
+      document.addEventListener('keydown', onKey, true);
+      const cancel = root.querySelector('[data-m=cancel]'); const ok = root.querySelector('[data-m=ok]');
+      if (cancel) cancel.onclick = close;
+      me.onmousedown = (ev) => { if (ev.target === me) close(); };
+      if (ok) ok.onclick = async () => { const r = o.onConfirm && o.onConfirm(root); if (r && r.then) { ok.disabled = true; const v = await r.catch(() => false); ok.disabled = false; if (v !== false) close(); } else if (r !== false) close(); };
+      box.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && !ev.isComposing && ok && ev.target.matches('input:not([type=checkbox]):not([type=radio]):not([type=search])') && !ev.target.closest('form')) { ev.preventDefault(); ok.click(); } });
+      if (o.onOpen) o.onOpen(root, close);
+      if (!box.contains(document.activeElement)) { const f = box.querySelector('input:not([type=checkbox]):not([type=radio]),textarea,select') || (o.danger ? cancel : ok) || cancel; if (f) f.focus(); }
+      return close;
     },
-    closeModal() { document.getElementById('modal-root').innerHTML = ''; },
+    closeModal() { const b = document.querySelector('#modal-root > .modal-backdrop'); if (b) document.getElementById('modal-root').innerHTML = ''; },
   };
 
   /* ---------------- Router ---------------- */
   // 화면 등록: App.screens.<name> = { title, layout?: 'shell'|'full', render(params) => html, mount?(root, params) => cleanupFn? }
   App.screens = App.screens || {};
   App.routes = [
-    ['#/onboarding', 'onboarding'], ['#/home', 'home'], ['#/discover', 'discover'],
-    // 질문함: 질문 하나 = 대화방 하나. 옛 주소(#/daily, #/chat)도 질문함으로 연결
-    ['#/ask/:room', 'ask'], ['#/ask', 'ask'], ['#/daily', 'ask'], ['#/chat', 'ask'],
-    // 프로젝트는 경험 위키 안의 묶음 페이지 (#/projects/:id 는 옛 주소 호환)
-    ['#/vault/p/:id', 'projects'], ['#/projects/:id', 'projects'], ['#/projects', 'vault'], ['#/vault', 'vault'], ['#/graph', 'graph'], ['#/card/:id', 'card'],
+    ['#/login', 'login'], ['#/signup', 'signup'], ['#/onboarding', 'onboarding'], ['#/home', 'home'],
+    // AI 채팅: 프로젝트마다 여러 채팅방. #/chat/new?project=&card=&kw=&text=&github=1 은 새 채팅 (github=1: GitHub 에서 이야깃거리 찾기부터)
+    ['#/chat/:room', 'chat'], ['#/chat', 'chat'],
+    // 프로젝트는 경험 위키 안의 묶음 페이지. /github 는 연결한 레포를 분석해 이 프로젝트의 경험 카드를 만드는 화면
+    ['#/vault/p/:id/github', 'projectGithub'], ['#/vault/p/:id', 'projects'], ['#/vault', 'vault'], ['#/graph', 'graph'], ['#/card/:id', 'card'],
     ['#/apply/:id/:tab', 'apply'], ['#/apply/:id', 'apply'], ['#/apply', 'apply'],
-    ['#/competency', 'apply'], ['#/match', 'apply'], ['#/settings', 'settings'], ['#/resume', 'resume'],
+    ['#/settings', 'settings'], ['#/resume', 'resume'], ['#/trash', 'trash'],
   ];
+  // 옛 주소 → 새 주소
+  App.legacyHash = (hash) => (/^#\/ask(?=\/|\?|$)/.test(hash) ? hash.replace(/^#\/ask/, '#/chat') : /^#\/github/.test(hash) ? '#/vault' : /^#\/apply\/[^/]+\/competency/.test(hash) ? hash.replace(/\/competency.*/, '') : null);
+  // 채팅 시작: AI 채팅의 새 채팅을 연다. { projectId, cardId(이 카드를 고치는 대화), keyword(이 역량 경험 찾기), text, github }
+  App.startChat = ({ projectId = '', cardId = '', keyword = '', text = '', github = false } = {}) => {
+    const q = new URLSearchParams(); if (projectId) q.set('project', projectId); if (cardId) q.set('card', cardId); if (keyword) q.set('kw', keyword); if (text) q.set('text', text); if (github) q.set('github', '1');
+    const s = q.toString(); App.navigate('#/chat/new' + (s ? '?' + s : ''));
+  };
   App.navigate = (hash) => { if (location.hash === hash) window.dispatchEvent(new HashChangeEvent('hashchange')); else location.hash = hash; };
   App.matchRoute = function (hash) {
     const [path, qs] = (hash || '#/home').split('?');
@@ -543,7 +575,7 @@ window.App = window.App || {};
       const pp = pattern.split('/'), hp = path.split('/');
       if (pp.length !== hp.length) continue;
       const params = {}; let ok = true;
-      pp.forEach((seg, i) => { if (seg.startsWith(':')) params[seg.slice(1)] = decodeURIComponent(hp[i]); else if (seg !== hp[i]) ok = false; });
+      pp.forEach((seg, i) => { if (seg.startsWith(':')) { try { params[seg.slice(1)] = decodeURIComponent(hp[i]); } catch (e) { ok = false; } } else if (seg !== hp[i]) ok = false; });
       if (ok) return { name, params: Object.assign(params, query) };
     }
     return { name: 'home', params: query };

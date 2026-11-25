@@ -1,70 +1,83 @@
-/* App shell: sidebar + topbar + router mount. */
+/* App shell: 로그인 확인 → 사이드바 + 상단바 + 화면. */
 (function (App) {
+  const esc = (s) => App.ui.esc(s);
   const NAV = [
-    // 하나의 흐름: 기록한다 → 위키가 정리한다 → 꺼내 쓴다
-    { group: '① 기록하기' },
-    { href: '#/home', name: 'home', ico: '⌂', label: '홈' },
-    { href: '#/ask', name: 'ask', ico: '✉', label: '질문함', badge: () => App.store.pending().length, badgeTitle: '아직 답하지 않은 오늘의 질문' },
-    { group: '② 경험 위키' },
-    { href: '#/graph', name: 'graph', ico: '◉', label: '경험 그래프' },
-    { href: '#/vault', name: 'vault', ico: '▦', label: '경험 위키' },
-    { group: '③ 꺼내 쓰기' },
-    { href: '#/resume', name: 'resume', ico: '☰', label: '마스터 이력서' },
-    { href: '#/apply', name: 'apply', ico: '◎', label: '지원 기업', apps: true },
+    { href: '#/home', name: 'home', icon: 'home', label: '홈' },
+    { href: '#/chat', name: 'chat', icon: 'chat', label: 'AI 채팅' },
+    { href: '#/vault', name: 'vault', icon: 'wiki', label: '경험 위키' },
+    { href: '#/graph', name: 'graph', icon: 'graph', label: '경험 그래프' },
+    { href: '#/resume', name: 'resume', icon: 'resume', label: '마스터 이력서' },
+    { href: '#/apply', name: 'apply', icon: 'building', label: '지원 기업', apps: true },
   ];
-  const MOBILE = [['#/home', 'home', '⌂', '홈'], ['#/ask', 'ask', '✉', '질문함'], ['#/graph', 'graph', '◉', '그래프'], ['#/vault', 'vault', '▦', '위키'], ['#/resume', 'resume', '☰', '이력서'], ['#/apply', 'apply', '◎', '지원']];
-  const APP_STATUS_TONE = { preparing: '#4b4fd6', applied: '#f2994a', passed: '#2f9e6b', failed: '#b9b3a8' };
-
-  // 지원 기업 하위 메뉴 (기업마다 하나씩)
-  function appSubnav(params) {
-    const apps = App.store.activeApps();
-    if (!apps.length) return '';
-    return `<div class="nav-sub">${apps.map((a) => `<a class="nav-sub-item ${params && params.id === a.id ? 'active' : ''}" href="#/apply/${a.id}" title="${App.ui.esc(a.company + ' · ' + a.job)}">
-      <span class="nav-sub-dot" style="background:${APP_STATUS_TONE[a.status] || '#ccc'}"></span><span class="nav-sub-name">${App.ui.esc(a.company)}</span><span class="nav-sub-job">${App.ui.esc(a.job.replace(/\s*\(.*\)$/, ''))}</span></a>`).join('')}</div>`;
-  }
-
-  // 메뉴에 없는 화면 → 어느 메뉴 탭에 속하는지 (사이드바 강조 + 상단 경로 표시)
-  const NAV_PARENT = { card: 'vault', discover: 'ask', projects: 'vault' };
+  const MOBILE = [['home', '홈'], ['chat', 'AI 채팅'], ['vault', '위키'], ['resume', '이력서'], ['apply', '지원']];
+  const PUBLIC = new Set(['login', 'signup']); // 로그인하지 않아도 볼 수 있는 화면
+  // 메뉴에 없는 화면 → 어느 메뉴에 속하는지 (사이드바 강조)
+  const NAV_PARENT = { card: 'vault', projects: 'vault', projectGithub: 'vault' };
 
   let cleanup = null;
+  let returnTo = null; // 로그인하면 돌아갈 곳 { hash, who: 그때 쓰던 계정 }. 다른 계정으로 들어오면 쓰지 않는다
+  let lastWho = '';
 
+  // 지원 기업 하위 메뉴 (진행 중인 기업마다 하나씩)
+  function appSubnav(currentId) {
+    const apps = App.store.activeApps(); if (!apps.length) return '';
+    return `<div class="nav-sub">${apps.map((a) => `<a class="nav-sub-item ${currentId === a.id ? 'active' : ''}" href="#/apply/${a.id}" title="${esc(a.company)} ${esc(a.job)}"><span class="nav-sub-name">${esc(a.company)}</span></a>`).join('')}</div>`;
+  }
+  // 계정 메뉴 (사이드바 아래 · 모바일 상단바)
+  function accountMenu(compact) {
+    const u = App.store.state.user; const me = App.auth.current();
+    return `<div class="menu ${compact ? '' : 'menu-up'}">
+      <button type="button" class="account" aria-haspopup="menu" aria-expanded="false" aria-label="계정 메뉴"><span class="avatar">${esc((u.name || '나').slice(0, 1))}</span><span class="account-text"><span class="account-name">${esc(u.name)}</span><span class="account-email">${esc(me ? me.email : '')}</span></span>${App.icon('more', 18)}</button>
+      <div class="menu-list"><a href="#/settings">${App.icon('settings', 16)}설정</a>${compact ? `<a href="#/graph">${App.icon('graph', 16)}경험 그래프</a><a href="#/trash">${App.icon('trash', 16)}휴지통</a>` : ''}<button type="button" data-logout>${App.icon('logout', 16)}로그아웃</button></div>
+    </div>`;
+  }
   function sidebar(active, params) {
-    const u = App.store.state.user;
+    const n = App.store.trash().length;
     return `<aside class="sidebar">
-      <a class="brand" href="#/home"><div class="brand-mark">R</div><div><div class="brand-name">Rewrite</div><div class="brand-sub">경험을 다시 쓰다</div></div></a>
-      ${NAV.map((n) => n.group ? `<div class="nav-group-label">${n.group}</div>` : `
-        <a class="nav-item ${active === n.name ? 'active' : ''}" href="${n.href}"><span class="ico">${n.ico}</span>${n.label}
-        ${n.badge && n.badge() ? `<span class="badge-count ${n.badgeTone === 'soft' ? 'badge-soft' : ''}" ${n.badgeTitle ? `title="${n.badgeTitle}"` : ''}>${n.badge()}</span>` : ''}${n.beta ? '<span class="beta">BETA</span>' : ''}</a>
-        ${n.apps ? appSubnav(active === 'apply' ? params : null) : ''}`).join('')}
+      <a class="brand" href="#/home"><span class="brand-mark">R</span><span class="brand-name">Rewrite</span></a>
+      <nav aria-label="메뉴">${NAV.map((x) => `<a class="nav-item ${active === x.name && !(x.apps && params.id) ? 'active' : ''}" href="${x.href}" ${active === x.name ? 'aria-current="page"' : ''}><span class="ico">${App.icon(x.icon, 20)}</span><span class="nav-label">${x.label}</span></a>${x.apps ? appSubnav(active === 'apply' ? params.id : '') : ''}`).join('')}</nav>
       <div class="sidebar-foot">
-        <div class="avatar">${App.ui.esc(u.name.slice(0, 1))}</div>
-        <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px">${App.ui.esc(u.name)}</div><div class="subtle" style="font-size:12px">${App.ui.esc(u.targetJob)} 준비중</div></div>
-        <a class="btn btn-ghost btn-sm" href="#/settings" title="설정">⚙</a>
+        <a class="sidebar-link ${active === 'trash' ? 'active' : ''}" href="#/trash"><span class="ico">${App.icon('trash', 20)}</span><span class="nav-label">휴지통</span>${n ? `<span class="sidebar-count">${n}</span>` : ''}</a>
+        ${accountMenu(false)}
       </div>
     </aside>`;
   }
 
+  // 로그인 여부에 따라 보여 줄 주소를 정한다. 다른 곳으로 보내야 하면 그 주소를 돌려준다
+  function guard(name) {
+    const me = App.auth.current();
+    if (!me) { if (PUBLIC.has(name)) return ''; returnTo = location.hash && location.hash !== '#/home' ? { hash: location.hash, who: lastWho } : null; return '#/login'; }
+    lastWho = me.id;
+    const onboarded = App.store.state.user.onboarded;
+    if (PUBLIC.has(name)) return onboarded ? '#/home' : '#/onboarding';
+    if (!onboarded && name !== 'onboarding') return '#/onboarding';
+    if (onboarded && name === 'onboarding') return '#/home';
+    return '';
+  }
+
   function render() {
-    if (cleanup) { try { cleanup(); } catch (e) {} cleanup = null; }
+    if (cleanup) { try { cleanup(); } catch (e) { console.error(e); } cleanup = null; }
+    const moved = App.legacyHash(location.hash); if (moved) { location.replace(moved); return; }
     const { name, params } = App.matchRoute(location.hash);
+    const go = guard(name); if (go) { location.replace(go); return; }
     const screen = App.screens[name];
     const root = document.getElementById('app');
-    if (!screen) { root.innerHTML = `<div class="empty"><div class="big">🚧</div>화면 준비중: ${name}</div>`; return; }
+    if (!screen) { root.innerHTML = `<div class="empty">화면을 찾을 수 없어요</div>`; return; }
     const body = screen.render(params);
     if (screen.layout === 'full') {
       root.innerHTML = `<div class="fullscreen">${body}</div>`;
+      document.title = 'Rewrite';
     } else {
       const title = typeof screen.title === 'function' ? screen.title(params) : (screen.title || '');
       const navName = NAV_PARENT[name] || name;
-      const parent = NAV_PARENT[name] ? NAV.find((n) => n.name === NAV_PARENT[name]) : null;
-      // 화면이 crumb(params) → [{label, href}] 를 주면 그걸 사용, 아니면 NAV_PARENT
-      const crumbs = screen.crumb ? (screen.crumb(params) || []) : parent ? [{ label: parent.label, href: parent.href }] : [];
-      const crumb = crumbs.map((c) => `<a class="topbar-crumb" href="${c.href}">${App.ui.esc(c.label)}</a><span class="topbar-sep">›</span>`).join('');
+      // 화면이 crumb(params) → [{label, href}] 를 주면 상단바에 경로를 보여 준다. actions(params) → html 은 상단바 오른쪽
+      const crumbs = screen.crumb ? (screen.crumb(params) || []) : [];
+      document.title = `${title} | Rewrite`;
       root.innerHTML = `<div class="shell">${sidebar(navName, params)}<main class="main">
-        <div class="topbar"><div class="topbar-title">${crumb}${App.ui.esc(title)}</div>
-          <div class="topbar-actions"></div></div>
+        <div class="topbar"><div class="topbar-title">${crumbs.map((c) => `<a class="topbar-crumb" href="${c.href}">${esc(c.label)}</a><span class="topbar-sep">${App.icon('chevron-right', 14)}</span>`).join('')}<span class="topbar-now">${esc(title)}</span></div>
+          <div class="topbar-actions">${screen.actions ? screen.actions(params) : ''}</div>${accountMenu(true)}</div>
         <div id="screen">${body}</div></main>
-        <nav class="mobile-nav">${MOBILE.map(([h, n, i, l]) => `<a href="${h}" class="${navName === n ? 'active' : ''}"><span class="ico">${i}</span>${l}</a>`).join('')}</nav>
+        <nav class="mobile-nav" aria-label="메뉴">${MOBILE.map(([n, l]) => { const x = NAV.find((i) => i.name === n); return `<a href="${x.href}" class="${navName === n ? 'active' : ''}"><span class="ico">${App.icon(x.icon, 22)}</span><span class="nav-label">${l}</span></a>`; }).join('')}</nav>
       </div>`;
     }
     const mountRoot = root.querySelector('#screen') || root.querySelector('.fullscreen');
@@ -72,32 +85,41 @@
     window.scrollTo(0, 0);
   }
 
-  /* 기록의 입구는 질문함 하나. 어디서 「기록하기」를 눌러도 질문함의 새 대화방이 열린다
-     preset: { projectId?, text? } — 새 대화방이 이 값을 한 번 꺼내 쓴다 (App.consumeCapturePreset) */
-  let capturePreset = null;
-  function openCapture(preset = {}) {
-    capturePreset = { projectId: preset.projectId || '', text: preset.text || '' };
-    App.navigate('#/ask/new' + (preset.projectId ? '?project=' + encodeURIComponent(preset.projectId) : ''));
-  }
-  App.consumeCapturePreset = () => { const p = capturePreset; capturePreset = null; return p; };
-  App.capture = openCapture;
-  document.addEventListener('click', (ev) => { const b = ev.target.closest('[data-capture]'); if (b) { ev.preventDefault(); openCapture({ projectId: b.getAttribute('data-capture-project') || '' }); } });
+  // 로그인·가입한 뒤: 새 계정은 온보딩, 아니면 원래 가려던 곳
+  App.afterLogin = () => { const me = App.auth.current(); const to = returnTo && (!returnTo.who || returnTo.who === me.id) ? returnTo.hash : ''; returnTo = null; App.navigate(App.store.state.user.onboarded ? to || '#/home' : '#/onboarding'); };
+  App.logout = () => { if (cleanup) { try { cleanup(); } catch (e) { console.error(e); } cleanup = null; } App.auth.logout(); returnTo = null; App.ui.closeModal(); App.navigate('#/login'); App.ui.toast('로그아웃했어요'); };
 
+  // [data-chat] 버튼: 새 채팅을 연다 (data-chat-project · data-chat-card · data-chat-kw · data-chat-github)
+  document.addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-chat]'); if (!b) return;
+    ev.preventDefault();
+    App.startChat({ projectId: b.getAttribute('data-chat-project') || '', cardId: b.getAttribute('data-chat-card') || '', keyword: b.getAttribute('data-chat-kw') || '', github: b.hasAttribute('data-chat-github') });
+  });
   // 카드 아이템 공통 클릭 위임: [data-href]
   document.addEventListener('click', (ev) => {
     const el = ev.target.closest('[data-href]');
-    if (el && !ev.target.closest('button, a, input, textarea, select, [data-remove-kw]')) App.navigate(el.getAttribute('data-href'));
+    if (el && !ev.target.closest('button, a, input, textarea, select, label, .menu')) App.navigate(el.getAttribute('data-href'));
   });
+  // 공통 메뉴: .menu > button[aria-haspopup] + .menu-list
+  const closeMenus = (except, focusBack) => document.querySelectorAll('.menu.is-open').forEach((m) => { if (m !== except) { m.classList.remove('is-open'); const b = m.querySelector('[aria-haspopup]'); b.setAttribute('aria-expanded', 'false'); if (focusBack && m.contains(document.activeElement)) b.focus(); } });
+  document.addEventListener('click', (ev) => {
+    const b = ev.target.closest('.menu > [aria-haspopup]'); const m = b && b.parentElement; closeMenus(m);
+    if (m) { const open = m.classList.toggle('is-open'); b.setAttribute('aria-expanded', String(open)); }
+    if (ev.target.closest('[data-logout]')) App.logout();
+  });
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeMenus(null, true); });
 
   App.rerender = render;
-  window.addEventListener('hashchange', render);
-  window.addEventListener('DOMContentLoaded', () => {
-    if (!location.hash) location.hash = App.store.state.user.onboarded ? '#/home' : '#/onboarding';
-    render();
-    // 데모: 서비스가 먼저 말을 거는 순간 시뮬레이션 (진입 8초 후 1회)
-    setTimeout(() => {
-      const p = App.store.pending()[0];
-      if (p && !location.hash.startsWith('#/ask') && !location.hash.startsWith('#/onboarding')) App.ui.pushToast('오늘의 질문이 도착했어요', p.text, '#/ask');
-    }, 8000);
+  window.addEventListener('hashchange', () => { App.ui.closeModal(); render(); });
+  // 다른 탭에서 로그아웃·로그인하면 따라간다
+  // 같은 계정으로 다른 탭에서 저장했으면 그 내용을 읽어 두고, 이 탭으로 돌아올 때 다시 그린다
+  let stale = false;
+  window.addEventListener('storage', (ev) => {
+    const me = App.auth.current();
+    if (ev.key === 'rewrite-session') { App.ui.closeModal(); App.store.switchAccount(); render(); }
+    else if (me && ev.key === App.store.dataKey(me.id)) { App.store.reload(); stale = true; }
   });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && stale) { stale = false; render(); } });
+  window.addEventListener('pageshow', (ev) => { if (ev.persisted) { App.store.switchAccount(); render(); } });
+  window.addEventListener('DOMContentLoaded', () => { if (!location.hash) location.replace('#/home'); render(); });
 })(window.App);
