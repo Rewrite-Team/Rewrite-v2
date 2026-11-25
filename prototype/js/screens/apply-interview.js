@@ -36,7 +36,7 @@
     const ask = `<button type="button" class="btn btn-primary" data-iv="suggest" ${ui.loading ? 'disabled' : ''}>${ui.loading ? '<span class="spinner"></span>질문 찾는 중' : `${I('sparkle', 16)}예상 질문 받기`}</button>`;
     const add = `<button type="button" class="btn" data-iv="add">${I('plus', 16)}직접 추가</button>`;
     if (!list.length) return `<div class="empty"><div class="empty-title">아직 면접 질문이 없어요</div><p>공고와 자소서를 보고 나올 만한 질문을 찾아 드려요.</p><div class="row row-wrap iv-empty">${ask}${add}</div></div>`;
-    return `<div class="iv"><div class="iv-bar"><span class="muted">준비 완료 ${list.filter((q) => q.checked).length}/${list.length}</span><span class="row spacer">${add}${ask}</span></div>
+    return `<div class="iv"><div class="iv-bar"><span class="row spacer">${add}${ask}</span></div>
       <ul class="list">${list.map((q) => item(q, ui)).join('')}</ul></div>`;
   }
 

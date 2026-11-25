@@ -270,7 +270,7 @@
     render(params) {
       const cur = current(params);
       if (cur.projectId && U().fold[cur.projectId]) { delete U().fold[cur.projectId]; saveFold(); } // 연 채팅의 프로젝트는 펼쳐 둔다
-      return `<div class="chat-app ${params.room ? 'is-room' : ''}"><aside class="chat-tree">${treeHTML(cur)}</aside><section class="chat-room">${cur.isNew ? newHTML(params, cur) : cur.chat ? roomHTML(cur.chat) : emptyHTML(cur)}</section></div>`;
+      return `<div class="chat-app ${params.room ? 'is-room' : ''}"><aside class="chat-tree">${!cur.isNew && !cur.chat && !cur.missing ? '<h1 class="sr-only">AI 채팅</h1>' : ''}${treeHTML(cur)}</aside><section class="chat-room">${cur.isNew ? newHTML(params, cur) : cur.chat ? roomHTML(cur.chat) : emptyHTML(cur)}</section></div>`;
     },
     mount(root, params) {
       const u = U(); const cur = current(params); const draftKey = cur.chatId || (cur.isNew ? 'new:' + cur.projectId : '');

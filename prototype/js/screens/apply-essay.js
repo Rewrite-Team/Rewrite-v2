@@ -43,10 +43,9 @@
   function headHtml(q, i) {
     const kws = q.keywords || [];
     return `<button type="button" class="btn btn-ghost btn-sm ae-back" data-ae="back">${I('chevron-left', 16)}문항 목록</button>
-      <header class="ae-q"><div class="ae-q-top"><h2>${i + 1}번 문항</h2>
+      <header class="ae-q"><div class="ae-q-top"><h2 class="ae-q-text"><span class="ae-q-n">${i + 1}</span>${esc(q.text)}</h2>
         <div class="menu"><button type="button" class="icon-btn" aria-haspopup="menu" aria-expanded="false" aria-label="문항 더 보기">${I('more')}</button>
           <div class="menu-list"><button type="button" data-ae="edit">${I('edit', 16)}문항과 역량 고치기</button><hr><button type="button" class="is-danger" data-ae="del">${I('trash', 16)}문항 지우기</button></div></div></div>
-        <p class="ae-q-text">${esc(q.text)}</p>
         <dl class="ae-facts"><div><dt>글자 수</dt><dd>${q.limit ? `${num(q.limit)}자 이내` : '제한 없음'}</dd></div>
           <div><dt>핵심 역량</dt><dd class="row row-wrap">${kws.length ? kws.map((k) => App.ui.keywordChip(k, true)).join('') : '<span class="subtle">특정 역량을 묻지 않아요</span>'}<button type="button" class="icon-btn ae-kw-edit" data-ae="edit" aria-label="핵심 역량 고치기">${I('edit', 15)}</button></dd></div></dl></header>`;
   }

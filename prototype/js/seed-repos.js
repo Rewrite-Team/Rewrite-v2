@@ -594,10 +594,10 @@ module.exports = function verifySlack(req, res, next) {
         r('moyeobom-team', 'moyeobom-frontend', '「모여봄」 웹 프론트엔드', 'TypeScript', '2026-11-18'),
       ] },
       { login: 'cse-capstone', type: 'org', name: '컴퓨터공학과 캡스톤', projects: [board('cse-capstone', 4, '빈강의실 일정')], repos: [
-        r('cse-capstone', 'empty-classroom', '캡스톤 디자인 — 빈 강의실 찾기 & 예약 웹앱', 'Java', '2025-06-13'),
+        r('cse-capstone', 'empty-classroom', '캡스톤 디자인: 빈 강의실 찾기와 예약 웹앱', 'Java', '2025-06-13'),
       ] },
       { login: 'campus-hack', type: 'org', name: '교내 해커톤', projects: [board('campus-hack', 2, '분실물 찾기 할 일')], repos: [
-        r('campus-hack', 'lost-found-server', '24시간 해커톤 — 분실물 찾기 서비스', 'Java', '2025-05-18'),
+        r('campus-hack', 'lost-found-server', '24시간 해커톤: 분실물 찾기 서비스', 'Java', '2025-05-18'),
       ] },
     ],
   };

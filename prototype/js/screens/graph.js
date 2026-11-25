@@ -77,7 +77,7 @@
 
   /* ---------------- 화면 ---------------- */
   App.screens.graph = {
-    title: '경험 그래프',
+    title: '경험 그래프', bar: true,
     render() {
       if (!S.list().length) return `<div class="page"><div class="empty"><div class="empty-title">아직 경험 카드가 없어요</div><p>AI와 이야기하면 카드가 만들어지고, 여기에서 이어진 모습을 볼 수 있어요.</p><button type="button" class="btn btn-primary" data-chat>${I('chat', 16)}AI 채팅 시작</button></div></div>`;
       const me = (App.auth.current() || {}).id; if (ui.me !== me) { ui.me = me; ui.project = ''; ui.pos = {}; }

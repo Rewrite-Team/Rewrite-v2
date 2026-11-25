@@ -50,15 +50,14 @@
   function appCard(a) {
     const r = App.ai.readiness(a); const url = cleanUrl(a.url); const name = esc(a.company || '이름 없는 기업');
     return `<article class="card ap-card" data-href="${hrefOf(a.id)}" data-id="${esc(a.id)}">
-      <div class="ap-card-top"><a class="ap-card-co" href="${hrefOf(a.id)}" draggable="false">${name}</a>${dday(a)}</div>
-      <div class="ap-card-job">${esc(a.job)}</div>
-      <div class="ap-card-foot"><span class="subtle">${r.essaysTotal ? `자소서 ${r.essaysDone}/${r.essaysTotal}` : ''}</span>
-        ${url ? `<a class="icon-btn" href="${esc(url)}" target="_blank" rel="noopener" draggable="false" title="채용공고" aria-label="${name} 채용공고 새 창에서 열기">${I('external', 16)}</a>` : ''}
+      <div class="ap-card-top"><a class="ap-card-co" href="${hrefOf(a.id)}" draggable="false">${name}</a>${dday(a)}
         <div class="menu"><button type="button" class="icon-btn" aria-haspopup="menu" aria-expanded="false" aria-label="${name} 더 보기">${I('more')}</button>
           <div class="menu-list"><span class="ap-menu-label">상태 바꾸기</span>
             ${STATUS_ORDER.map((s) => `<button type="button" data-move="${s}" ${s === a.status ? 'aria-current="true"' : ''}><span class="dot" data-status="${s}"></span>${STATUS[s]}${s === a.status ? I('check', 16) : ''}</button>`).join('')}
-            <hr><button type="button" class="is-danger" data-act="trash">${I('trash', 16)}휴지통으로 옮기기</button></div></div>
-      </div></article>`;
+            <hr><button type="button" class="is-danger" data-act="trash">${I('trash', 16)}휴지통으로 옮기기</button></div></div></div>
+      <div class="ap-card-job">${esc(a.job)}</div>
+      ${r.essaysTotal || url ? `<div class="ap-card-foot"><span class="subtle">${r.essaysTotal ? `자소서 ${r.essaysDone}/${r.essaysTotal}` : ''}</span>
+        ${url ? `<a class="icon-btn" href="${esc(url)}" target="_blank" rel="noopener" draggable="false" title="채용공고" aria-label="${name} 채용공고 새 창에서 열기">${I('external', 16)}</a>` : ''}</div>` : ''}</article>`;
   }
   function renderBoard() {
     const apps = App.store.apps(); const add = `<button type="button" class="btn btn-primary" data-act="add">${I('plus', 16)}지원 기업 추가</button>`;

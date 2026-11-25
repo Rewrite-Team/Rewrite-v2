@@ -310,12 +310,12 @@
     return ui;
   }
   App.screens.resume = {
-    title: '마스터 이력서',
+    title: '마스터 이력서', bar: true,
     actions: () => actionsHTML(),
     render() {
       freshUI();
       const seg = (v, l) => `<button type="button" class="seg-btn ${ui.view === v ? 'is-on' : ''}" aria-pressed="${ui.view === v}" data-act="view" data-v="${v}">${l}</button>`;
-      return `<div class="page rs-page" data-view="${ui.view}"><div class="rs-left"><header class="rs-top"><h1 class="page-title">마스터 이력서</h1><div class="seg">${seg('edit', '편집')}${seg('preview', '미리보기')}</div></header>
+      return `<div class="page rs-page" data-view="${ui.view}"><div class="rs-left"><header class="rs-top"><div class="seg">${seg('edit', '편집')}${seg('preview', '미리보기')}</div></header>
         <div class="rs-editor" data-editor>${editorHTML()}</div></div>
         <div class="rs-preview" data-preview tabindex="0" role="region" aria-label="이력서 미리보기"><div class="paper rs-paper" data-paper>${paperHTML()}</div></div></div>`;
     },

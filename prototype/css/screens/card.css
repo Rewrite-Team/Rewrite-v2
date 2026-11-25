@@ -3,7 +3,7 @@
 .cd-head > div:first-child { flex: 1; min-width: 0; }
 .cd-proj { display: flex; margin-bottom: 8px; }
 .cd-meta { margin-top: 8px; }
-.cd-kws { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.cd-kws { display: flex; flex-wrap: wrap; row-gap: 4px; margin-top: 10px; }
 
 /* 이력서 한 줄 */
 .cd-line-top { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
@@ -16,7 +16,7 @@
 /* STAR */
 .cd-star { border-top: 1px solid var(--border); }
 .cd-star > div { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 4px 16px; padding: 18px 0; border-bottom: 1px solid var(--border); }
-.cd-star dt { font-weight: 700; }
+.cd-star dt { font-weight: 600; font-size: var(--fs-sm); line-height: 26px; color: var(--text-3); }
 .cd-star dd { max-width: 64ch; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* 회고 */

@@ -22,13 +22,14 @@
 | 그림자 | 떠 있는 것만: 메뉴·종이 `--shadow`, 모달 `--shadow-lg`. 카드는 그림자 없음 |
 
 ## 3. 글자
+글꼴은 Pretendard 하나(`--font`). 근거 코드만 고정폭이다.
 크기 다섯 개: `--fs-xs` 12(태그·하단 메뉴) · `--fs-sm` 13.5(보조) · `--fs-md` 15(본문) · `--fs-lg` 17(섹션 제목) · `--fs-xl` 24(페이지 제목, 모바일 22).
 굵기: 400 본문, 500 조작, 600 이름·버튼, 700 제목. 800은 로고와 `.ai-dot`만. 글 읽는 폭은 64ch 이하.
 
 ## 4. 간격과 배치
 - 간격: 4 · 8 · 12 · 16 · 20 · 28 · 40. 섹션 사이 40(`.section`), 카드 사이 16(`.grid`), 카드 안 16~20.
-- 페이지: `.page`(최대 1200) 또는 `.page-narrow`(840, 읽고 쓰는 화면), 가운데 정렬. 안쪽 글은 왼쪽 정렬.
-- `h1`은 페이지 안(`.page-head`). 상단바는 경로와 `.topbar-actions`만 둔다. 주 버튼은 한 화면에 하나.
+- 페이지: `.page`(최대 `--page-w` 1200). 읽고 쓰는 화면은 `.page.page-narrow`(안쪽 폭만 760). 왼쪽 시작선은 어느 화면이나 같다.
+- 제목은 한 화면에 `h1` 하나, 한 번만. 상단바는 세 가지: 기본은 숨김(모바일은 로고), `crumb`이 있으면 위로 가는 경로(현재 이름은 넣지 않는다), `bar: true`면 제목과 `actions`(이력서·그래프처럼 화면을 꽉 쓰는 곳). 화면에 붙는 요소는 `--topbar-h`를 기준으로 한다. 주 버튼은 한 화면에 하나.
 - 면의 위계: ① 목록은 `.list` ② 묶음·보조는 `.panel` ③ 하나씩 꺼내 쓰는 물건(경험 카드)만 테두리 카드(`.exp-card`, `.card`). 카드 안에 카드 금지.
 - 두 단: `.split > div + .split-side` (1100px 아래 한 단, 같은 너비는 `.split-even`). 중단점은 1100 / 900(사이드바 → 하단 메뉴, 조작 44px) / 600(모달이 아래에서 올라옴).
 
@@ -44,10 +45,10 @@
   <div class="page-head-actions">…</div></header>
 <h2 class="section-title">최근 채팅 <span class="count">3</span><a class="more" href="#">전체 보기</a></h2>
 
-<!-- 경험 카드: proj-chip 은 어디서나 반드시 보인다. 고른 카드는 .is-on -->
+<!-- 경험 카드(색인 카드): 머리칸은 프로젝트와 기간, 줄 아래가 본문. proj-chip 은 어디서나 반드시 보이고, 바탕 없이 글자로만. 고른 카드는 .is-on -->
 <article class="exp-card" data-href="#/card/1">
-  <div class="exp-card-top"><span class="proj-chip">${I('folder',15)}<span>모여봄</span></span><span class="exp-src">${I('github',15)}GitHub</span></div>
-  <a class="exp-card-title" href="#/card/1">제목</a><div class="exp-card-sum">요약</div>
+  <div class="exp-card-top"><span class="proj-chip">${I('folder',15)}<span>모여봄</span></span><span class="exp-card-period">2026.10</span><span class="exp-src">${I('github',15)}GitHub</span></div>
+  <a class="exp-card-title" href="#/card/1"><span>제목</span></a><div class="exp-card-sum">요약</div>
   <div class="exp-card-kws"><span class="kw is-match">문제 해결력</span><span class="kw">협업능력</span></div></article>
 
 <!-- 목록 (.list-flush 는 위아래 선 없음) -->
@@ -69,7 +70,7 @@
 <label class="switch"><input type="checkbox" aria-label="이력서에 포함"><span></span></label>
 
 <span class="chip"><span>Spring Boot</span><button class="chip-x" aria-label="Spring Boot 지우기">${I('close',14)}</button></span>
-<span class="tag tag-ongoing">진행중</span> <!-- tag-done tag-warn tag-danger --> <span class="dot" data-status="preparing"></span> <!-- applied passed failed -->
+<span class="tag tag-ongoing">진행중</span> <!-- 끝난 프로젝트는 기간으로 알 수 있어 표시하지 않는다. tag-done tag-warn tag-danger --> <span class="dot" data-status="preparing"></span> <!-- applied passed failed -->
 <div class="banner banner-warn" role="status">${I('warning')}<span>저장하지 않은 문장이 있어요.</span><button class="btn btn-sm">저장</button></div>
 <ol class="steps"><li class="is-done">커밋 읽기</li><li class="is-now">STAR 초안 쓰기</li><li>역량 고르기</li></ol>
 <div class="empty"><div class="empty-title">아직 경험 카드가 없어요</div><p>AI와 이야기하면 첫 카드가 만들어져요.</p><button class="btn btn-primary">대화 시작하기</button></div>
@@ -87,4 +88,4 @@
 
 ## 6. 한다 / 하지 않는다
 - 한다: 토큰과 공용 클래스를 먼저 쓰고 화면 CSS에는 배치만. 아이콘 버튼에는 `aria-label`. 빈 화면에는 다음 행동 하나. 버튼 이름과 결과 알림의 말을 맞춘다(저장 → 저장했어요).
-- 하지 않는다: 색 값 직접 쓰기, 유니코드 기호·이모지 아이콘, 가운뎃점으로 잇는 정보(`.meta` 사용), 버튼 끝 화살표, 번호 붙인 묶음 이름, 대문자 라벨, 제목 위 작은 라벨, 왼쪽 색 띠, 그라데이션, 떠오르는 hover, 역량마다 다른 색, 같은 정보 두 번.
+- 하지 않는다: 색 값 직접 쓰기, 유니코드 기호·이모지 아이콘, 가운뎃점으로 잇는 정보(`.meta` 사용), 버튼 끝 화살표, 번호 붙인 묶음 이름, 대문자 라벨, 제목 위 작은 라벨, 왼쪽 색 띠, 그라데이션, 떠오르는 hover, 역량마다 다른 색, 같은 정보 두 번, 제목을 줄표로 잇기(「무엇 — 무엇」).

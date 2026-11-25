@@ -96,10 +96,7 @@
 
   App.screens.projectGithub = {
     title: 'GitHub로 경험 카드 만들기',
-    crumb(params) {
-      const p = S.getProject(params.id);
-      return [{ label: '경험 위키', href: '#/vault' }].concat(p ? [{ label: p.title, href: '#/vault/p/' + encodeURIComponent(p.id) }] : []);
-    },
+    crumb: () => [{ label: '경험 위키', href: '#/vault' }], // 프로젝트는 제목 아래 이름이 링크다
     render(params) {
       const p = S.getProject(params.id);
       if (!p) return `<div class="page"><div class="empty"><div class="empty-title">프로젝트를 찾을 수 없어요</div><a class="btn" href="#/vault">경험 위키로</a></div></div>`;

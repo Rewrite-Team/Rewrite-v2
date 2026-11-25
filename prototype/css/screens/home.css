@@ -1,19 +1,8 @@
 /* ===== 홈 (.home-*) ===== */
-.home-start { margin-top: 24px; }
-.home-start h1, .home-empty h1 { font-size: var(--fs-xl); letter-spacing: -0.025em; }
-.home-start h1 { margin-bottom: 16px; }
+.home-empty h1 { font-size: var(--fs-xl); letter-spacing: -0.025em; }
+.home .page-head + .section { margin-top: 0; }
+.home .home-empty { max-width: none; }
 .home-empty { padding-top: 96px; padding-bottom: 40px; }
-
-/* 한 줄 입력과 프로젝트 고르기를 한 칸에 */
-.home-composer { border: 1px solid var(--field-border); border-radius: var(--radius); background: var(--surface); transition: border-color .12s, box-shadow .12s; }
-.home-composer:has(.home-text:focus) { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary), 0 0 0 4px var(--primary-soft); }
-.home-text { display: block; width: 100%; padding: 18px 18px 10px; border: 0; background: none; font-size: 16px; line-height: 1.5; }
-.home-text:focus-visible { outline: none; }
-.home-composer-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px 10px; }
-.home-project { position: relative; display: flex; min-width: 0; color: var(--text-2); }
-.home-project > svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; }
-.home-project .select { border-color: transparent; padding-left: 34px; font-weight: 600; max-width: 320px; }
-.home-project .select:hover { border-color: var(--border-strong); }
 
 .home-chat > .list-row-title { flex: 1; }
 .home-chat > .proj-chip { flex: 0 1 auto; max-width: 45%; }
@@ -21,11 +10,8 @@
 .home .list-row-actions .tag { min-width: 52px; justify-content: center; font-variant-numeric: tabular-nums; }
 
 @media (max-width: 600px) {
-  .home-start { margin-top: 4px; }
   .home-empty { padding-top: 64px; }
   .home-chat { flex-direction: column; align-items: flex-start; gap: 4px; }
   .home-chat > .list-row-title { flex: none; max-width: 100%; }
   .home-chat > .proj-chip { max-width: 100%; }
-  .home-composer-foot .btn { flex: none; }
-  .home-project .select { max-width: 100%; }
 }

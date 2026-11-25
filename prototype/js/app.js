@@ -70,11 +70,12 @@
     } else {
       const title = typeof screen.title === 'function' ? screen.title(params) : (screen.title || '');
       const navName = NAV_PARENT[name] || name;
-      // 화면이 crumb(params) → [{label, href}] 를 주면 상단바에 경로를 보여 준다. actions(params) → html 은 상단바 오른쪽
+      // 제목은 화면 안의 h1 하나뿐이다. 상단바는 세 가지:
+      //  crumb(params) → [{label, href}] 가 있으면 위로 가는 경로 / bar: true 면 제목(h1)과 actions(params) / 둘 다 없으면 넓은 화면에서는 숨긴다
       const crumbs = screen.crumb ? (screen.crumb(params) || []) : [];
       document.title = `${title} | Rewrite`;
-      root.innerHTML = `<div class="shell">${sidebar(navName, params)}<main class="main">
-        <div class="topbar"><div class="topbar-title">${crumbs.map((c) => `<a class="topbar-crumb" href="${c.href}">${esc(c.label)}</a><span class="topbar-sep">${App.icon('chevron-right', 14)}</span>`).join('')}<span class="topbar-now">${esc(title)}</span></div>
+      root.innerHTML = `<div class="shell ${screen.bar ? 'has-bar' : crumbs.length ? 'has-crumb' : 'is-plain'}">${sidebar(navName, params)}<main class="main">
+        <div class="topbar">${screen.bar ? `<h1 class="page-title topbar-h1">${esc(title)}</h1>` : crumbs.length ? `<nav class="topbar-path" aria-label="경로">${App.icon('chevron-left', 16)}${crumbs.map((c) => `<a class="topbar-crumb" href="${c.href}">${esc(c.label)}</a>`).join('<span class="topbar-sep" aria-hidden="true">/</span>')}</nav>` : '<a class="brand" href="#/home"><span class="brand-mark">R</span><span class="brand-name">Rewrite</span></a>'}
           <div class="topbar-actions">${screen.actions ? screen.actions(params) : ''}</div>${accountMenu(true)}</div>
         <div id="screen">${body}</div></main>
         <nav class="mobile-nav" aria-label="메뉴">${MOBILE.map(([n, l]) => { const x = NAV.find((i) => i.name === n); return `<a href="${x.href}" class="${navName === n ? 'active' : ''}"><span class="ico">${App.icon(x.icon, 22)}</span><span class="nav-label">${l}</span></a>`; }).join('')}</nav>

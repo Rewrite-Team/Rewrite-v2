@@ -22,7 +22,7 @@
       <section class="section"><h2 class="section-title">GitHub 계정</h2><div class="set-rows" data-github>${githubHTML()}</div></section>
       <section class="section"><h2 class="section-title">계정</h2><div class="set-rows">
         ${row('이메일', `<span class="set-value">${esc(me.email)}</span><button type="button" class="btn btn-sm" data-logout>로그아웃</button>`)}
-        ${row('회원 탈퇴', '<span class="set-value subtle">계정과 모든 데이터를 지워요</span><button type="button" class="btn btn-sm btn-ghost btn-danger" data-act="leave">회원 탈퇴</button>')}
+        ${row('회원 탈퇴', '<span class="set-value subtle">계정과 모든 데이터를 지워요</span><button type="button" class="btn btn-sm btn-ghost btn-danger" data-act="leave">탈퇴하기</button>')}
       </div></section></div>`;
   }
 

@@ -1,7 +1,6 @@
 /* ===== 마스터 이력서 (.rs-*): 왼쪽 편집 · 오른쪽 종이 ===== */
 .rs-page { display: grid; grid-template-columns: minmax(0, 43fr) minmax(0, 57fr); gap: 24px; align-items: start; max-width: 1640px; padding-top: 20px; padding-bottom: 48px; }
-.rs-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin-bottom: 12px; }
-.rs-top .seg { display: none; }
+.rs-top { display: none; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin-bottom: 12px; }
 .rs-left { min-width: 0; }
 
 /* 섹션 */
@@ -138,7 +137,7 @@
 }
 @media screen and (max-width: 1100px) {
   .rs-page { grid-template-columns: minmax(0, 1fr); padding-bottom: 112px; }
-  .rs-top .seg { display: inline-flex; }
+  .rs-top { display: flex; }
   .rs-preview { position: static; height: auto; overflow: visible; padding: 0; background: none; }
   .rs-page[data-view="edit"] .rs-preview, .rs-page[data-view="preview"] .rs-editor { display: none; }
   .rs-page[data-view="preview"] { gap: 8px; }

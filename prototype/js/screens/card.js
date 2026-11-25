@@ -90,10 +90,7 @@
 
   App.screens.card = {
     title: (params) => { const e = S.get(params.id); return e ? e.title : '경험 카드'; },
-    crumb(params) {
-      const e = S.get(params.id); const p = e && S.getProject(e.projectId);
-      return [{ label: '경험 위키', href: '#/vault' }].concat(p ? [{ label: p.title, href: '#/vault/p/' + encodeURIComponent(p.id) }] : []);
-    },
+    crumb: () => [{ label: '경험 위키', href: '#/vault' }], // 프로젝트는 제목 위 이름이 링크다
     render(params) {
       const e = S.get(params.id); if (!e) return missingHTML(params.id);
       return `<div class="page page-narrow">${headHTML(e)}${lineHTML(e)}${starHTML(e)}${retroHTML(e)}${usedHTML(e)}${evidenceHTML(e)}</div>`;

@@ -141,7 +141,7 @@ window.SEED = (function () {
     {
       id: 'e8',
       projectId: 'p1',
-      title: 'API 명세 먼저 합의하기 — 프론트와의 협업',
+      title: '프론트와 API 명세 먼저 합의하기',
       period: { start: '2026-10', end: '2026-11' },
       role: '백엔드',
       summary: '프론트가 API 응답 형식 변경으로 재작업이 잦자, Swagger 명세를 먼저 합의하고 구현하는 규칙을 제안해 수정 요청을 크게 줄였다.',
@@ -246,7 +246,7 @@ window.SEED = (function () {
     {
       id: 'e6',
       projectId: 'p8',
-      title: '24시간 안에 MVP — 기능 범위 줄이기',
+      title: '24시간 해커톤에서 MVP 범위 줄이기',
       period: { start: '2025-05', end: '2025-05' },
       role: '백엔드 + 발표',
       summary: '교내 해커톤에서 기능 범위를 과감히 줄이자고 제안해 분실물 찾기 서비스 데모를 완성하고 장려상을 받았다.',
@@ -330,7 +330,7 @@ window.SEED = (function () {
     {
       id: 'e12',
       projectId: 'p2',
-      title: '쓰는 사람에 맞춘 설계 — 슬랙 봇과 Postgres',
+      title: '쓰는 사람에 맞춰 슬랙 봇과 Postgres 고르기',
       period: { start: '2026-10', end: '2026-11' },
       role: '1인 개발',
       summary: '친구들이 슬랙에서 바로 쓰고 싶다는 말에 웹 대신 슬랙 봇으로 방향을 바꾸고, 여럿이 동시에 입력하는 상황을 고려해 SQLite 대신 Postgres를 골랐다.',
@@ -538,7 +538,7 @@ window.SEED = (function () {
           proposal: {
             mode: 'new',
             cardId: 'e8',
-            title: 'API 명세 먼저 합의하기 — 프론트와의 협업',
+            title: '프론트와 API 명세 먼저 합의하기',
             changes: [
               { field: 'situation', before: '', after: '「모여봄」 개발 중 프론트 팀원이 API 응답 형식이 자꾸 바뀌어 힘들다고 이야기함.' },
               { field: 'task', before: '', after: '백엔드 담당으로서 프론트의 재작업을 줄일 방법이 필요했음.' },
@@ -742,7 +742,7 @@ window.SEED = (function () {
           proposal: {
             mode: 'new',
             cardId: 'e6',
-            title: '24시간 안에 MVP — 기능 범위 줄이기',
+            title: '24시간 해커톤에서 MVP 범위 줄이기',
             changes: [
               { field: 'situation', before: '', after: '24시간 교내 해커톤, 3인 팀. 시작 8시간쯤 지난 중간 점검에서 계획한 기능의 절반도 못 만든 상태였음.' },
               { field: 'task', before: '', after: '시간 안에 실제로 동작하는 데모를 완성해야 했음.' },
@@ -898,7 +898,7 @@ window.SEED = (function () {
           proposal: {
             mode: 'new',
             cardId: 'e12',
-            title: '쓰는 사람에 맞춘 설계 — 슬랙 봇과 Postgres',
+            title: '쓰는 사람에 맞춰 슬랙 봇과 Postgres 고르기',
             changes: [
               { field: 'situation', before: '', after: '친구 3명과 공동 생활비를 관리할 가계부 서비스를 만들기로 함. 친구들이 실제로 쓰겠다고 함.' },
               { field: 'task', before: '', after: '1인 개발로, 친구들이 실제로 계속 쓸 수 있는 형태와 기술을 정해야 했음.' },
@@ -1189,7 +1189,7 @@ window.SEED = (function () {
           checked: true,
         },
       ],
-      memo: '결제 도메인 — 정합성/트랜잭션 공부해 두기',
+      memo: '결제 도메인의 정합성과 트랜잭션 공부해 두기',
       createdAt: '2026-11-12',
       updatedAt: '2026-11-18',
     },

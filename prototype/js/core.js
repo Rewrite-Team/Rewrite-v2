@@ -476,12 +476,12 @@ window.App = window.App || {};
   /* ---------------- UI helpers ---------------- */
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   // 프로젝트 상태 태그 (진행중 / 완료)
-  const STATUS = { ongoing: ['진행중', 'tag-ongoing'], done: ['완료', 'tag-done'] };
-
+  
   App.ui = {
     esc,
     keywordChip(name, matched) { return `<span class="kw${matched ? ' is-match' : ''}" data-kw="${esc(name)}">${esc(name)}</span>`; },
-    statusTag(status) { const [t, c] = STATUS[status] || STATUS.ongoing; return `<span class="tag ${c}">${t}</span>`; },
+    // 끝난 프로젝트는 기간이 말해 준다. 진행중일 때만 표시한다
+    statusTag(status) { return status === 'done' ? '' : '<span class="tag tag-ongoing">진행중</span>'; },
     progress(pct) { return `<div class="progress"><span style="width:${pct}%"></span></div>`; },
     period(p) { if (!p || !p.start) return '기간 미입력'; if (p.end === p.start) return p.start.replace('-', '.'); return `${p.start.replace('-', '.')} ~ ${p.end ? p.end.replace('-', '.') : '진행중'}`; },
     date(s) { const d = parseDay(String(s || '').slice(0, 10)); return s ? `${d.getMonth() + 1}월 ${d.getDate()}일` : ''; },
