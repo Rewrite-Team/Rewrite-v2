@@ -18,6 +18,7 @@ a.pj-repo-name:hover { text-decoration: underline; text-underline-offset: 3px; }
 .pj-sec-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 12px; }
 .pj-sec-head .section-title { margin: 0; }
 .pj-empty { padding-top: 28px; }
+.pj-make { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 
 /* 수정 모달 */
 .pj-form { padding-top: 6px; }
@@ -50,6 +51,11 @@ a.pj-repo-name:hover { text-decoration: underline; text-underline-offset: 3px; }
   .pj-gh-off { flex-wrap: wrap; }
   .pj-gh-off p { flex-basis: calc(100% - 40px); }
   .pj-gh-off .btn, .pj-gh-acts > .btn { width: 100%; }
-  .pj-head .page-head-actions { margin: -6px -10px 0 0; }
+  .page-head.pj-head { flex-wrap: wrap; position: relative; }
+  .pj-head > div:first-child { flex-basis: 100%; }
+  .pj-head h1 { padding-right: 48px; }
+  .pj-head .page-head-actions { width: 100%; }
+  .pj-head .page-head-actions > .btn { flex: 1; }
+  .pj-head .page-head-actions > .menu { position: absolute; top: -6px; right: -10px; }
   .pj-months { grid-template-columns: minmax(0, 1fr); gap: 18px; }
 }

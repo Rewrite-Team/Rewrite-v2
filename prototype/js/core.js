@@ -1,8 +1,9 @@
 /* App core: store, router, ui helpers, mock AI. 모든 화면이 이 API만 사용한다. */
 window.App = window.App || {};
 (function (App) {
+  // v14: 대화방은 프로젝트의 것 (chat.cardId 없음, focus 로 오른쪽 카드를 펼친다)
   // v13: 계정별 저장 · 휴지통 · 카드의 이력서 한 줄(resumeLine) · 자소서 여러 카드(expIds)와 본문(answer) · 지원 기업의 역량 맵 제거
-  const dataKey = (accountId) => `rewrite-proto-v13:${accountId}`;
+  const dataKey = (accountId) => `rewrite-proto-v14:${accountId}`;
   const TRASH_DAYS = 30;
   const clone = (o) => JSON.parse(JSON.stringify(o));
 
@@ -22,7 +23,8 @@ window.App = window.App || {};
   function EMPTY_RESUME() { return { profile: { name: '', headline: '', email: '', phone: '', github: '', blog: '', intro: '' }, skills: [], entries: [], versions: [] }; }
   const listeners = new Set();
   function persist() { const me = App.auth.current(); if (!me || me.id !== owner) return; try { localStorage.setItem(dataKey(me.id), JSON.stringify(state)); } catch (e) { /* ignore */ } }
-  function emit() { persist(); listeners.forEach((fn) => fn(state)); }
+  let dryRun = false; // S.dry() 안: 바꾼 것을 저장하지도 알리지도 않는다
+  function emit() { if (dryRun) return; persist(); listeners.forEach((fn) => fn(state)); }
   // 날짜는 로컬 기준
   const pad2 = (n) => String(n).padStart(2, '0');
   const fmtDay = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
@@ -31,8 +33,8 @@ window.App = window.App || {};
   const nowAt = () => { const d = new Date(); return `${fmtDay(d)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
   const parseDay = (s) => { const [y, m, d] = String(s).split('-').map(Number); return new Date(y || 1970, (m || 1) - 1, d || 1); };
   const daysLeft = (t) => TRASH_DAYS - Math.floor((parseDay(today()) - parseDay(String(t.deletedAt).slice(0, 10))) / 86400000);
-  let state = load();
   const uid = (p) => p + Math.random().toString(36).slice(2, 8);
+  let state = load();
   // 역량은 정해 둔 12개 안에서만 (없는 이름은 버린다)
   const cleanKw = (list) => [...new Set((list || []).filter((k) => window.SEED.keywords.some((x) => x.name === k)))];
   const EMPTY_STAR = () => ({ situation: '', task: '', action: '', result: '' });
@@ -52,7 +54,7 @@ window.App = window.App || {};
     reset() { const me = App.auth.current(); if (me) { try { localStorage.removeItem(dataKey(me.id)); } catch (e) {} } state = load(); if (me && !me.demo) state.user.onboarded = true; emit(); },
 
     // ---------------- 경험 카드 (projectId 필수) ----------------
-    // AI 대화(applyProposal) 또는 GitHub 레포 분석(addGithubCards)으로만 만들어지고 고쳐진다. 사용자가 직접 쓰는 칸은 이력서 한 줄(setResumeLine)과 회고(setRetrospect)
+    // 대화방(feed), GitHub 레포 분석(addGithubCards), 직접 만들기(createManual)로 생긴다. 사용자는 카드에서 제목·STAR·역량(edit), 이력서 한 줄(setResumeLine), 회고(setRetrospect)를 직접 고친다
     list() { return state.experiences.slice().sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')); },
     get(id) { return state.experiences.find((e) => e.id === id) || null; },
     cardsOf(projectId) { return this.list().filter((e) => e.projectId === projectId); },
@@ -60,12 +62,24 @@ window.App = window.App || {};
       const p = this.getProject(partial.projectId); if (!p) return null; // 카드는 반드시 프로젝트 안에
       const exp = Object.assign({
         id: uid('e'), projectId: null, title: '제목 없는 카드', period: clone(p.period || { start: '', end: '' }), role: p.role || '', summary: '',
-        star: EMPTY_STAR(), resumeLine: '', retrospect: '', keywords: [], source: 'chat', evidence: null, chatIds: [], createdAt: today(), updatedAt: today(),
+        star: EMPTY_STAR(), resumeLine: '', retrospect: '', keywords: [], source: 'chat', evidence: null, createdAt: today(), updatedAt: today(),
       }, clone(partial));
       exp.star = Object.assign(EMPTY_STAR(), exp.star); exp.keywords = cleanKw(exp.keywords);
         if (!exp.resumeLine && App.ai.starFilled(exp)) exp.resumeLine = App.ai.resumeLine(exp);
       state.experiences.push(exp); p.updatedAt = today();
       emit(); return exp;
+    },
+    // 직접 만들기: AI 없이 제목만으로 빈 카드를 만든다. 나머지는 카드에서 직접 쓴다
+    createManual(projectId, title) { return this.create({ projectId, title, titled: true, source: 'manual' }); },
+    // 카드에서 직접 고치기 — patch: { title?, star?: { situation… }, keywords? }
+    // rev 를 바꿔서 대화방의 「되돌리기」가 직접 고친 것을 덮지 않게 한다. 이력서 한 줄은 따로(setResumeLine)
+    edit(id, patch = {}) {
+      const e = this.get(id); if (!e) return null;
+      if (patch.title != null && patch.title.trim()) { e.title = patch.title.trim(); e.titled = true; }
+      if (patch.star) Object.keys(EMPTY_STAR()).forEach((k) => { if (patch.star[k] != null) e.star[k] = String(patch.star[k]).trim(); });
+      if (patch.keywords) e.keywords = cleanKw(patch.keywords);
+      e.rev = uid('r'); e.updatedAt = today(); const p = this.getProject(e.projectId); if (p) p.updatedAt = today();
+      emit(); return e;
     },
     // 회고: 사용자가 직접 쓰는 글. AI 는 읽어서 고치지 않는다
     setRetrospect(id, text) { const e = this.get(id); if (!e) return null; e.retrospect = String(text || '').trim(); emit(); return e; },
@@ -76,15 +90,20 @@ window.App = window.App || {};
       e.resumeLine = String(text || '').trim().replace(/\s+/g, ' '); e.resumeLineEdited = true; this._syncLine(e); emit(); return e;
     },
     _syncLine(e) { if (e.resumeLine) state.resume.entries.forEach((en) => en.bullets.forEach((b) => { if (b.source && b.source.type === 'card' && b.source.expId === e.id && !b.edited) b.text = e.resumeLine; })); },
-    // 경험 카드를 휴지통으로
-    remove(id) { const e = this.get(id); if (!e) return null; state.experiences = state.experiences.filter((x) => x.id !== id); return this._toTrash('card', e.title, e.projectId, { experiences: [e] }); },
+    // 경험 카드를 휴지통으로. 대화방은 프로젝트의 것이라 그대로 남는다
+    remove(id) {
+      const e = this.get(id); if (!e) return null;
+      state.experiences = state.experiences.filter((x) => x.id !== id);
+      state.chats.forEach((c) => { if (c.focus === id) c.focus = null; if (c.last && c.last.cardId === id) c.last = null; });
+      return this._toTrash('card', e.title, e.projectId, { experiences: [e] });
+    },
     // 완전히 지워진 카드를 가리키던 채팅·지원 기업 연결을 푼다 (휴지통에 있는 카드는 되살릴 수 있으므로 남겨 둔다)
     _dropRefs() {
       const kept = new Set(state.trash.flatMap((t) => (t.data.experiences || []).map((e) => e.id)));
       const ok = (id) => kept.has(id) || state.experiences.some((e) => e.id === id);
       const chats = state.chats.concat(state.trash.flatMap((t) => t.data.chats || []));
       const apps = state.applications.concat(state.trash.flatMap((t) => t.data.applications || []));
-      chats.forEach((c) => { if (c.cardId && !ok(c.cardId)) c.cardId = null; });
+      chats.forEach((c) => { if (c.focus && !ok(c.focus)) c.focus = null; });
       apps.forEach((a) => {
         (a.essays || []).forEach((q) => { q.expIds = (q.expIds || []).filter(ok); });
         (a.interview || []).forEach((q) => { if (q.expId && !ok(q.expId)) q.expId = null; });
@@ -130,6 +149,11 @@ window.App = window.App || {};
       state.projects.push(p); emit(); return p;
     },
     updateProject(id, patch) { const p = this.getProject(id); if (!p) return null; Object.assign(p, clone(patch), { updatedAt: today() }); emit(); return p; },
+    // 완료: 끝난 달이 비어 있으면 이번 달로 적는다 (시작한 달을 모르면 비워 둔다). 다시 진행하면 끝난 달을 지운다
+    setProjectDone(id, done) {
+      const p = this.getProject(id); if (!p) return null; const { start = '', end = '' } = p.period || {}; const now = today().slice(0, 7);
+      return this.updateProject(id, { status: done ? 'done' : 'ongoing', period: { start, end: !done ? '' : end || (start && (start > now ? start : now)) } });
+    },
     // 프로젝트를 휴지통으로 (그 안의 채팅·경험 카드까지 한 묶음)
     removeProject(id) {
       const p = this.getProject(id); if (!p) return null;
@@ -139,70 +163,88 @@ window.App = window.App || {};
       return this._toTrash('project', p.title, id, data);
     },
 
-    // ---------------- 채팅 (프로젝트 안의 대화방, 프로젝트마다 여러 개) ----------------
-    // chat = { id, projectId, title, cardId, msgs:[{ id, who:'ai'|'me', text, at, kind?:'proposal', proposal? }], createdAt, updatedAt }
+    // ---------------- 대화방 (프로젝트마다 여러 개. 나누는 기준은 사용자가 정한다) ----------------
+    // chat = { id, projectId, title, focus, last?, msgs:[{ id, who:'ai'|'me', text, at, card?, kind?:'github'|'link', stage?, touch? }], createdAt, updatedAt }
+    // focus: 오른쪽에서 펼쳐 보는 카드 (사용자가 고르거나, AI 가 방금 고친 카드). 그 프로젝트의 카드는 모두 오른쪽에 보인다
+    // msg.card: 그 말이 담긴(me) / 그 말이 묻는(ai) 경험 카드 · ai.touch: { card, created, fields:[...] } 이 답에서 바꾼 카드와 칸
+    // me 메시지: done 카드에 담은 말 · command 카드에 담지 않는 말
+    rename(chatId, title) { const c = this.getChat(chatId); if (!c) return; c.title = title; c.named = true; emit(); },
     chats() { return state.chats.slice().reverse().sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')); },
     chatsOf(projectId) { return this.chats().filter((c) => c.projectId === projectId); },
     getChat(id) { return state.chats.find((c) => c.id === id) || null; },
     createChat(partial = {}) {
-      const c = Object.assign({ id: uid('c'), projectId: null, title: '새 채팅', cardId: null, msgs: [], createdAt: nowAt(), updatedAt: nowAt() }, clone(partial));
+      const c = Object.assign({ id: uid('c'), projectId: null, title: '새 채팅', focus: null, msgs: [], createdAt: nowAt(), updatedAt: nowAt() }, clone(partial));
       state.chats.push(c); emit(); return c;
     },
     updateChat(id, patch) { const c = this.getChat(id); if (!c) return null; Object.assign(c, clone(patch)); emit(); return c; },
-    removeChat(id) { const c = this.getChat(id); if (!c) return null; state.chats = state.chats.filter((x) => x.id !== id); return this._toTrash('chat', c.title, c.projectId, { chats: [c] }); },
+    // 오른쪽에서 펼칠 카드 (null 이면 모든 카드)
+    setFocus(chatId, cardId) { const c = this.getChat(chatId); if (!c) return; const e = cardId && this.get(cardId); c.focus = e && e.projectId === c.projectId ? cardId : null; emit(); },
+    dropChat(id) { state.chats = state.chats.filter((x) => x.id !== id); emit(); }, // 담은 이야기가 없는 빈 방
+    removeChat(id) {
+      const c = this.getChat(id); if (!c) return null; state.chats = state.chats.filter((x) => x.id !== id);
+      return this._toTrash('chat', c.title, c.projectId, { chats: [c] });
+    },
     addMsg(chatId, msg) {
       const c = this.getChat(chatId); if (!c) return null;
       const m = Object.assign({ id: uid('m'), who: 'ai', text: '', at: nowAt() }, clone(msg));
       c.msgs.push(m); c.updatedAt = m.at; emit(); return m;
     },
     updateMsg(chatId, msgId, patch) { const c = this.getChat(chatId); const m = c && c.msgs.find((x) => x.id === msgId); if (!m) return null; Object.assign(m, clone(patch)); emit(); return m; },
-    /* AI 정리 제안을 반영: 새 경험 카드를 만들거나 기존 카드를 고친다 (결과는 항상 카드).
-       proposal = { mode:'new'|'update', cardId, title, changes, keywords, resumeLine?, status:'pending'|'applied'|'undone', fixed? }
-       change   = { field, add } 지금 카드 내용 뒤에 덧붙임 | { field, after } 통째로 바꿈 (사용자가 말로 고쳐 달라고 한 경우, fixed)
-       덧붙이기는 반영하는 시점의 카드 내용에 더하므로, 그사이 다른 채팅에서 고친 내용을 덮어쓰지 않는다 */
-    applyProposal(chatId, msgId) {
-      const c = this.getChat(chatId); const m = c && c.msgs.find((x) => x.id === msgId); if (!m || !m.proposal || m.proposal.status === 'applied') return null;
-      const pr = m.proposal; let e;
-      const changes = pr.changes.filter((ch) => String(ch.after || ch.add || '').trim());
+    /* 들은 말을 이 프로젝트의 카드 하나에 담는다. cardId 가 없으면 새 카드를 만든다.
+       changes: { field, add } 뒤에 덧붙임 | { field, after } 통째로 바꿈 · patch(e): 담은 뒤의 카드로 요약과 이력서 한 줄을 정한다
+       담은 카드가 그 방의 focus 가 된다. last 는 마지막으로 담은 일의 앞모습 (무엇이 바뀌었는지 보여 주고 되돌리는 데 쓴다) */
+    feed(chatId, { cardId = null, changes = [], keywords, title = '', patch }) {
+      const c = this.getChat(chatId); if (!c) return null;
+      let e = cardId ? this.get(cardId) : null; if (cardId && (!e || e.projectId !== c.projectId)) return null;
+      const before = e ? clone(e) : null;
+      if (!e) {
+        if (!changes.some((ch) => ch.field in EMPTY_STAR() && ch.add)) return null; // 빈 카드는 만들지 않는다
+        e = this.create({ projectId: c.projectId, title: title || '제목 없는 카드', auto: true }); if (!e) return null; // auto: 이력서 한 줄을 이야기에 맞춰 다시 쓴다
+      }
       const join = (cur, add) => (cur && cur.trim() ? (cur.includes(add.trim()) ? cur : `${cur.trim()} ${add.trim()}`) : add.trim());
-      const put = (t) => changes.forEach((ch) => {
-        const o = ch.field in EMPTY_STAR() ? t.star : ['summary', 'role', 'title'].includes(ch.field) ? t : null; if (!o) return;
-        o[ch.field] = ch.add != null ? join(o[ch.field], ch.add) : ch.after;
-      });
-      if (pr.mode === 'update') {
-        e = this.get(pr.cardId); if (!e) return null; // 그사이 지운 카드
-        if (!changes.length && JSON.stringify(cleanKw(pr.keywords)) === JSON.stringify(e.keywords)) return null;
-        pr.snap = clone(e); put(e); e.keywords = cleanKw(pr.keywords); e.updatedAt = today();
-        if (!pr.fixed && !e.resumeLineEdited) { e.resumeLine = (pr.resumeLine || '').trim() || App.ai.resumeLine(e); this._syncLine(e); }
-      } else {
-        if (!changes.some((ch) => ch.field in EMPTY_STAR())) return null; // 빈 카드는 만들지 않는다
-        e = this.create(Object.assign({ projectId: c.projectId, title: pr.title, keywords: pr.keywords }, pr.keepId ? { id: pr.keepId } : {})); if (!e) return null;
-        pr.snap = null; put(e);
-        if (!e.summary) e.summary = App.ai.brief(e.star.action || e.star.situation || e.star.result || '', 80);
-        e.resumeLine = (pr.resumeLine || '').trim() || App.ai.resumeLine(e);
-        if (pr.keepRetro) { e.retrospect = pr.keepRetro; pr.keepRetro = ''; }
-        // 되돌렸다가 다시 반영하면 이 카드를 쓰던 자소서·면접 연결도 되살린다
-        (pr.keepRefs || []).forEach((x) => { const a = this.getApp(x.app); const q = a && a[x.list].find((y) => y.id === x.item); if (!q) return; if (x.list === 'essays') { if (!q.expIds.includes(e.id)) q.expIds.push(e.id); } else if (!q.expId) q.expId = e.id; });
-        pr.keepRefs = [];
-        pr.cardId = e.id;
-      }
-      if (!e.chatIds.includes(c.id)) e.chatIds.push(c.id);
-      pr.prevCardId = c.cardId; c.cardId = e.id; pr.status = 'applied'; pr.appliedAt = e.rev = uid('r');
+      changes.forEach((ch) => { const o = ch.field in EMPTY_STAR() ? e.star : ['summary', 'role', 'title'].includes(ch.field) ? e : null; if (o) o[ch.field] = ch.add != null ? join(o[ch.field], ch.add) : ch.after; });
+      if (keywords) e.keywords = cleanKw(keywords);
+      if (patch) patch(e);
+      this._syncLine(e);
+      e.rev = uid('r'); e.updatedAt = today(); c.last = { cardId: e.id, before, rev: e.rev }; c.focus = e.id;
       const p = this.getProject(c.projectId); if (p) p.updatedAt = today();
-      emit(); return e;
+      emit(); return { card: e, created: !before, before };
     },
-    // 되돌리기는 그 카드에 마지막으로 반영된 제안만 (e.rev 로 확인). 사용자가 쓴 회고는 지우지 않는다
-    canUndo(pr) { const e = pr && pr.status === 'applied' && pr.appliedAt && this.get(pr.cardId); return !!e && e.rev === pr.appliedAt; },
-    undoProposal(chatId, msgId) {
-      const c = this.getChat(chatId); const m = c && c.msgs.find((x) => x.id === msgId); if (!m || !this.canUndo(m.proposal)) return false;
-      const pr = m.proposal; const i = state.experiences.findIndex((e) => e.id === pr.cardId); const cur = state.experiences[i]; const retro = cur.retrospect;
-      if (pr.snap) state.experiences[i] = Object.assign(clone(pr.snap), { retrospect: retro }, cur.resumeLineEdited ? { resumeLine: cur.resumeLine, resumeLineEdited: true } : {});
-      else {
-        pr.keepRetro = retro; pr.keepId = cur.id; pr.keepRefs = [];
-        state.applications.forEach((a) => { a.essays.forEach((q) => { if ((q.expIds || []).includes(cur.id)) pr.keepRefs.push({ app: a.id, list: 'essays', item: q.id }); }); a.interview.forEach((q) => { if (q.expId === cur.id) pr.keepRefs.push({ app: a.id, list: 'interview', item: q.id }); }); });
-        state.experiences.splice(i, 1); pr.cardId = null;
+    // 미리 해 보기: 지금 상태의 복사본에서 fn 을 돌려 결과만 돌려준다. 진짜 상태는 그대로 (AI 가 바꾸기 전에 허락을 받을 때)
+    dry(fn) {
+      if (dryRun) return fn(); const real = state; state = clone(real); dryRun = true;
+      try { const r = fn(); return r == null ? r : clone(r); } finally { state = real; dryRun = false; }
+    },
+    // AI 채팅이 카드를 바꾸기 전에 허락을 받는가: 'ask' 매번 묻기 | 'auto' 바로 반영
+    cardPerm() { return state.user.cardPerm === 'ask' ? 'ask' : 'auto'; },
+    setCardPerm(v) { state.user.cardPerm = v === 'ask' ? 'ask' : 'auto'; emit(); },
+    /* 허락받은 제안을 반영한다. p = { op:'create'|'update'|'delete', cardId, before, after }
+       → { card, created } | { removed, trash } | { error:'gone'|'changed'|'project' }. 제안한 뒤에 카드가 바뀌었으면 반영하지 않는다 */
+    applyProposal(chatId, p) {
+      const c = this.getChat(chatId); if (!c) return { error: 'gone' };
+      if (p.op === 'delete') { const e = this.get(p.cardId); if (!e) return { error: 'gone' }; return { removed: e, trash: this.remove(e.id) }; }
+      if (p.op === 'create') {
+        const pr = this.getProject(c.projectId); if (!pr) return { error: 'project' };
+        if (this.get(p.after.id)) return { error: 'changed' };
+        const e = Object.assign(clone(p.after), { projectId: c.projectId, rev: uid('r'), createdAt: today(), updatedAt: today() });
+        state.experiences.push(e); this._syncLine(e); c.last = { cardId: e.id, before: null, rev: e.rev }; c.focus = e.id; pr.updatedAt = today();
+        emit(); return { card: e, created: true };
       }
-      c.cardId = pr.prevCardId || null; pr.status = 'undone'; if (pr.snap) this._syncLine(state.experiences[i]); this._dropRefs(); emit(); return true;
+      const i = state.experiences.findIndex((x) => x.id === p.cardId); const cur = state.experiences[i]; if (!cur) return { error: 'gone' };
+      if ((cur.rev || '') !== (p.before.rev || '')) return { error: 'changed' };
+      const before = clone(cur); const e = Object.assign(clone(p.after), { retrospect: cur.retrospect, rev: uid('r'), updatedAt: today() }); // 회고는 사용자의 글이라 그대로
+      state.experiences[i] = e; this._syncLine(e); c.last = { cardId: e.id, before, rev: e.rev }; c.focus = e.id;
+      const pr = this.getProject(c.projectId); if (pr) pr.updatedAt = today();
+      emit(); return { card: e, created: false };
+    },
+    // 마지막으로 담은 일만 되돌린다. 그 뒤에 카드가 바뀌었으면 되돌리지 않는다. 새로 만든 카드는 휴지통으로. 회고와 직접 고친 이력서 한 줄은 그대로 둔다
+    canRevert(chatId) { const c = this.getChat(chatId); const e = c && c.last && this.get(c.last.cardId); return !!(e && c.last.rev === e.rev); },
+    revert(chatId) {
+      if (!this.canRevert(chatId)) return null; const c = this.getChat(chatId); const i = state.experiences.findIndex((x) => x.id === c.last.cardId); const cur = state.experiences[i];
+      if (!c.last.before) { c.last = null; const t = this.remove(cur.id); return { removed: cur, trash: t }; }
+      const line = cur.resumeLineEdited ? { resumeLine: cur.resumeLine, resumeLineEdited: true, aiLine: cur.aiLine } : {};
+      state.experiences[i] = Object.assign(clone(c.last.before), { retrospect: cur.retrospect }, line);
+      c.last = null; this._syncLine(state.experiences[i]); emit(); return { card: state.experiences[i] };
     },
 
     // ---------------- GitHub ----------------
@@ -480,8 +522,7 @@ window.App = window.App || {};
   App.ui = {
     esc,
     keywordChip(name, matched) { return `<span class="kw${matched ? ' is-match' : ''}" data-kw="${esc(name)}">${esc(name)}</span>`; },
-    // 끝난 프로젝트는 기간이 말해 준다. 진행중일 때만 표시한다
-    statusTag(status) { return status === 'done' ? '' : '<span class="tag tag-ongoing">진행중</span>'; },
+    statusTag(status) { return status === 'done' ? '<span class="tag tag-done">완료</span>' : '<span class="tag tag-ongoing">진행중</span>'; },
     progress(pct) { return `<div class="progress"><span style="width:${pct}%"></span></div>`; },
     period(p) { if (!p || !p.start) return '기간 미입력'; if (p.end === p.start) return p.start.replace('-', '.'); return `${p.start.replace('-', '.')} ~ ${p.end ? p.end.replace('-', '.') : '진행중'}`; },
     date(s) { const d = parseDay(String(s || '').slice(0, 10)); return s ? `${d.getMonth() + 1}월 ${d.getDate()}일` : ''; },
@@ -503,6 +544,36 @@ window.App = window.App || {};
         <div class="exp-card-kws">${e.keywords.map((k) => this.keywordChip(k, (opts.matched || []).includes(k))).join('')}</div>
       </article>`;
     },
+    // GitHub 근거 (경험 카드 · GitHub 초안): { counts: 커밋·PR·코드 수, body: 상세 } | 없으면 null
+    evidence(x) {
+      const ev = x || {}; const sample = !!(window.SEED.repoSamples || {})[String(ev.repo || '').toLowerCase()];
+      // 예시 레포는 실제로 없는 주소라서 링크를 걸지 않는다
+      const link = (url, html, cls) => (!sample && /^https:\/\//.test(url || '') ? `<a class="${cls}" href="${esc(url)}" target="_blank" rel="noopener">${html}</a>` : `<span class="${cls}">${html}</span>`);
+      const row = (url, tag, text, date) => link(url, `<b>${esc(tag)}</b><span>${esc(text)}</span><time>${esc(this.date(date))}</time>`, 'cd-ev-row');
+      const code = (f) => {
+        const hl = new Set(f.hl || []); const start = f.start || 1; const range = f.end && f.end !== start ? `${start}-${f.end}` : start;
+        const lines = String(f.code || '').split('\n').map((t, i) => `<span class="cd-code-line${hl.has(start + i) ? ' is-hl' : ''}"><i>${start + i}</i>${esc(t) || ' '}</span>`).join('');
+        return `<div class="cd-code">${link(f.url, `${esc(f.path)}:${range}`, 'cd-code-path')}<pre tabindex="0" aria-label="${esc(f.path)}">${lines}</pre></div>`;
+      };
+      const groups = [
+        ['커밋', '개', (ev.commits || []).map((c) => row(c.url, String(c.sha || '').slice(0, 7), c.message, c.date))],
+        ['PR', '개', (ev.prs || []).map((p) => row(p.url, '#' + p.number, p.title, p.date))],
+        ['코드', '곳', (ev.files || []).map(code)],
+      ].filter(([, , items]) => items.length);
+      if (!groups.length) return null;
+      return {
+        counts: groups.map(([l, u, i]) => `<span>${l} ${i.length}${u}</span>`).join(''),
+        body: `${ev.repo ? `<p class="meta"><span>${App.icon('github', 15)}${esc(ev.repo)}</span>${sample ? '<span class="tag">예시</span>' : ''}</p>` : ''}${groups.map(([label, , items]) => `<div><h3 class="label">${label}</h3>${items.join('')}</div>`).join('')}`,
+      };
+    },
+    /* 직접 쓰는 칸: <div data-wr> 안에 입력칸 하나와 wrFoot(). 고치면 저장·취소가 켜진다.
+       저장을 누르면 입력칸에서 'wr-save' 가 난다(화면이 저장하고 wrSaved). 화면을 떠날 때도 화면이 저장한다 */
+    wrFoot(extra = '') { return `<div class="wr-foot">${extra}<span class="subtle wr-state" role="status" data-wr-state></span><button type="button" class="btn btn-sm btn-ghost" data-wr-cancel hidden>취소</button><button type="button" class="btn btn-sm" data-wr-save disabled>저장</button></div>`; },
+    wrSync(t, state = '') {
+      const box = t && t.closest('[data-wr]'); if (!box) return; const on = t.value !== t.defaultValue; const b = box.querySelector('[data-wr-save]');
+      b.disabled = !on; b.classList.toggle('btn-primary', on); box.querySelector('[data-wr-cancel]').hidden = !on; box.querySelector('[data-wr-state]').textContent = on ? '' : state;
+    },
+    wrSaved(t) { const had = t.closest('[data-wr]').contains(document.activeElement); t.defaultValue = t.value; this.wrSync(t, '저장했어요'); if (had && document.activeElement !== t) t.focus(); },
     // toast(msg, { action:'되돌리기', onAction })
     toast(msg, opts = {}) {
       const root = document.getElementById('toast-root');
@@ -514,9 +585,9 @@ window.App = window.App || {};
       root.appendChild(el); setTimeout(() => el.remove(), opts.action ? 6000 : 2600);
     },
     // 휴지통으로 보낸 뒤 안내 + 되돌리기. entry = App.store.remove*() 가 돌려준 휴지통 항목
-    trashed(entry, name) {
+    trashed(entry, name, msg) {
       if (!entry) return;
-      this.toast(`${name || `「${entry.title}」`} 항목을 휴지통으로 옮겼어요`, { action: '되돌리기', onAction: () => { const r = App.store.restore(entry.id); if (r) { App.navigate(r.hash); App.ui.toast('되돌렸어요'); } } });
+      this.toast(msg || `${name || `「${entry.title}」`} 항목을 휴지통으로 옮겼어요`, { action: '되돌리기', onAction: () => { const r = App.store.restore(entry.id); if (r) { App.navigate(r.hash); App.ui.toast('되돌렸어요'); } } });
     },
     // modal({ title, body(html), confirmText, cancelText, danger, size:'lg', hideCancel, hideConfirm, onConfirm(root)→false 면 닫지 않음(Promise 가능), onOpen(root), onClose })
     modal(o) {
@@ -553,18 +624,19 @@ window.App = window.App || {};
   App.screens = App.screens || {};
   App.routes = [
     ['#/login', 'login'], ['#/signup', 'signup'], ['#/onboarding', 'onboarding'], ['#/home', 'home'],
-    // AI 채팅: 프로젝트마다 여러 채팅방. #/chat/new?project=&card=&kw=&text=&github=1 은 새 채팅 (github=1: GitHub 에서 이야깃거리 찾기부터)
+    // AI 채팅: 프로젝트마다 여러 채팅방. #/chat/new?project=&card=&kw=&text=&github=1 은 새 채팅 (card: 오른쪽에서 먼저 펼칠 카드 · github=1: GitHub 에서 이야깃거리 찾기부터)
     ['#/chat/:room', 'chat'], ['#/chat', 'chat'],
     // 프로젝트는 경험 위키 안의 묶음 페이지. /github 는 연결한 레포를 분석해 이 프로젝트의 경험 카드를 만드는 화면
-    ['#/vault/p/:id/github', 'projectGithub'], ['#/vault/p/:id', 'projects'], ['#/vault', 'vault'], ['#/graph', 'graph'], ['#/card/:id', 'card'],
+    ['#/vault/p/:id/github', 'projectGithub'], ['#/vault/p/:id', 'projects'], ['#/vault', 'vault'], ['#/graph', 'graph'], ['#/timeline', 'timeline'], ['#/card/:id', 'card'],
     ['#/apply/:id/:tab', 'apply'], ['#/apply/:id', 'apply'], ['#/apply', 'apply'],
     ['#/settings', 'settings'], ['#/resume', 'resume'], ['#/trash', 'trash'],
   ];
   // 옛 주소 → 새 주소
   App.legacyHash = (hash) => (/^#\/ask(?=\/|\?|$)/.test(hash) ? hash.replace(/^#\/ask/, '#/chat') : /^#\/github/.test(hash) ? '#/vault' : /^#\/apply\/[^/]+\/competency/.test(hash) ? hash.replace(/\/competency.*/, '') : null);
-  // 채팅 시작: AI 채팅의 새 채팅을 연다. { projectId, cardId(이 카드를 고치는 대화), keyword(이 역량 경험 찾기), text, github }
+  // 채팅 시작: AI 채팅의 새 채팅을 연다. { projectId, cardId(오른쪽에서 이 카드를 펼쳐 두고 시작), keyword(이 역량 경험 찾기), text, github }
   App.startChat = ({ projectId = '', cardId = '', keyword = '', text = '', github = false } = {}) => {
-    const q = new URLSearchParams(); if (projectId) q.set('project', projectId); if (cardId) q.set('card', cardId); if (keyword) q.set('kw', keyword); if (text) q.set('text', text); if (github) q.set('github', '1');
+    const card = cardId && App.store.get(cardId); if (card) projectId = card.projectId;
+    const q = new URLSearchParams(); if (projectId) q.set('project', projectId); if (card) q.set('card', card.id); if (keyword) q.set('kw', keyword); if (text) q.set('text', text); if (github) q.set('github', '1');
     const s = q.toString(); App.navigate('#/chat/new' + (s ? '?' + s : ''));
   };
   App.navigate = (hash) => { if (location.hash === hash) window.dispatchEvent(new HashChangeEvent('hashchange')); else location.hash = hash; };

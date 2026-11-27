@@ -1,5 +1,5 @@
 /* 프로젝트 — #/vault/p/:id
-   머리 → GitHub → 경험 카드 → 채팅. 수정 모달은 App.ui.openProjectModal(p, done) (p 가 없으면 새 프로젝트: App.repoFlow) */
+   머리 → GitHub → 경험 카드. 수정 모달은 App.ui.openProjectModal(p, done) (p 가 없으면 새 프로젝트: App.repoFlow) */
 (function (App) {
   const esc = (s) => App.ui.esc(s); const S = App.store;
   const me = () => (App.auth.current() || {}).id;
@@ -41,8 +41,15 @@
     });
   };
 
+  // 완료 ↔ 진행중. 프로젝트 화면과 경험 위키 목록에서 쓴다
+  App.ui.setProjectDone = function (id, done) {
+    const p = S.getProject(id); if (!p) return; const who = me(); const before = { status: p.status, period: Object.assign({}, p.period) };
+    S.setProjectDone(id, done); App.rerender();
+    App.ui.toast(done ? `「${p.title}」 프로젝트를 완료했어요` : `「${p.title}」 프로젝트를 다시 진행해요`, { action: '되돌리기', onAction: () => { if (me() !== who || !S.getProject(id)) return; S.updateProject(id, before); App.rerender(); App.ui.toast('되돌렸어요'); } });
+  };
+
   function remove(p) {
-    const n = [[S.cardsOf(p.id).length, '경험 카드', '장'], [S.chatsOf(p.id).length, '채팅', '개']].filter(([c]) => c).map(([c, l, u]) => `${l} ${c}${u}`).join(', ');
+    const n = [[S.cardsOf(p.id).length, '경험 카드', '장'], [S.chatsOf(p.id).length, '대화방', '개']].filter(([c]) => c).map(([c, l, u]) => `${l} ${c}${u}`).join(', ');
     App.ui.modal({
       title: '프로젝트를 휴지통으로 옮길까요?', confirmText: '휴지통으로 옮기기', danger: true,
       body: `<p>「${esc(p.title)}」${n ? ` 안의 ${n}도 함께 옮겨요.` : ' 프로젝트를 옮겨요.'} ${S.TRASH_DAYS}일 안에 되돌릴 수 있어요.</p>`,
@@ -56,7 +63,8 @@
     return `<header class="page-head pj-head"><div><h1>${esc(p.title)}</h1>
         <div class="meta pj-meta">${App.ui.statusTag(p.status)}${period ? `<span>${App.icon('calendar', 15)}${esc(period)}</span>` : ''}${p.role ? `<span>${esc(p.role)}</span>` : ''}</div>
         ${p.summary ? `<p>${esc(p.summary)}</p>` : ''}</div>
-      <div class="page-head-actions"><div class="menu"><button type="button" class="icon-btn" aria-haspopup="menu" aria-expanded="false" aria-label="프로젝트 메뉴">${App.icon('more')}</button>
+      <div class="page-head-actions">${p.status === 'done' ? `<button type="button" class="btn btn-ghost" data-act="reopen">${App.icon('restore', 16)}다시 진행하기</button>` : `<button type="button" class="btn" data-act="done">${App.icon('check', 16)}프로젝트 완료</button>`}
+        <div class="menu"><button type="button" class="icon-btn" aria-haspopup="menu" aria-expanded="false" aria-label="프로젝트 메뉴">${App.icon('more')}</button>
         <div class="menu-list"><button type="button" data-act="edit">${App.icon('edit', 16)}수정</button><button type="button" class="is-danger" data-act="remove">${App.icon('trash', 16)}휴지통으로 옮기기</button></div></div></div>
     </header>`;
   }
@@ -77,20 +85,31 @@
       <div class="pj-gh-acts"><a class="btn ${primary ? 'btn-primary' : ''}" href="#/vault/p/${encodeURIComponent(p.id)}/github">${App.icon('github', 16)}GitHub로 경험 카드 만들기</a><button type="button" class="btn btn-ghost" data-act="connect">${App.icon('plus', 16)}레포 추가</button></div></section>`;
   }
 
-  /* ---------- 경험 카드 · 채팅 ---------- */
+  /* ---------- 경험 카드 ---------- */
   const chatBtn = (p, primary, cls = '') => `<button type="button" class="btn ${primary ? 'btn-primary' : ''} ${cls}" data-chat data-chat-project="${esc(p.id)}">${App.icon('chat', 16)}AI 채팅으로 만들기</button>`;
+  const manualBtn = () => `<button type="button" class="btn btn-ghost" data-act="manual">${App.icon('edit', 16)}직접 만들기</button>`;
+  const makeBtns = (p, primary) => `<div class="pj-make">${chatBtn(p, primary)}${manualBtn()}</div>`;
+  // 직접 만들기: 제목만 받아 빈 카드를 만들고 카드 화면에서 나머지를 쓴다 (AI 없이)
+  App.ui.openManualCard = function (projectId) {
+    App.ui.modal({
+      title: '경험 카드 직접 만들기', confirmText: '만들기',
+      body: `<div class="field"><label class="label" for="mc-title">제목</label><input class="input" id="mc-title" maxlength="60" placeholder="예: 검색 API 응답 속도 개선" /><p class="field-hint">만든 뒤 카드에서 상황·과제·행동·결과와 역량을 직접 써요.</p><p class="field-error" id="mc-title-e" role="alert" hidden></p></div>`,
+      onOpen(r) { r.querySelector('#mc-title').focus(); },
+      onConfirm(r) {
+        const i = r.querySelector('#mc-title'); const v = i.value.trim();
+        if (!v) { const x = r.querySelector('#mc-title-e'); x.innerHTML = App.icon('warning', 15) + '<span>제목을 적어 주세요.</span>'; x.hidden = false; i.setAttribute('aria-invalid', 'true'); i.focus(); return false; }
+        const e = S.createManual(projectId, v); if (!e) return true;
+        setTimeout(() => { App.navigate('#/card/' + e.id); App.ui.toast('경험 카드를 만들었어요'); setTimeout(() => { const t = document.getElementById('cd-situation'); if (t) t.focus(); }, 0); }, 0);
+        return true;
+      },
+    });
+  };
   function cardsHTML(p, cards, primary) {
     const linked = (p.repos || []).length;
-    return `<section class="section"><div class="pj-sec-head"><h2 class="section-title">경험 카드 ${cards.length ? `<span class="count">${cards.length}</span>` : ''}</h2>${cards.length ? chatBtn(p, primary) : ''}</div>
+    return `<section class="section"><div class="pj-sec-head"><h2 class="section-title">경험 카드 ${cards.length ? `<span class="count">${cards.length}</span>` : ''}</h2>${cards.length ? makeBtns(p, primary) : ''}</div>
       ${cards.length ? `<div class="grid">${cards.map((e) => App.ui.expCard(e)).join('')}</div>`
-        : `<div class="empty pj-empty"><div class="empty-title">아직 경험 카드가 없어요</div><p>${linked ? '연결한 GitHub에서 여러 장을 한 번에 만들거나, AI와 이야기하며 한 장씩 만들 수 있어요.' : 'AI와 이야기하면 첫 카드가 만들어져요. GitHub를 연결하면 여러 장을 한 번에 만들 수도 있어요.'}</p>${chatBtn(p, primary)}</div>`}</section>`;
+        : `<div class="empty pj-empty"><div class="empty-title">아직 경험 카드가 없어요</div><p>${linked ? '연결한 GitHub에서 여러 장을 한 번에 만들거나, AI와 이야기하며 한 장씩 만들 수 있어요.' : 'AI와 이야기하면 첫 카드가 만들어져요. GitHub를 연결하면 여러 장을 한 번에 만들 수도 있어요.'} AI 없이 직접 써도 돼요.</p>${makeBtns(p, primary)}</div>`}</section>`;
   }
-  function chatsHTML(p) {
-    const chats = S.chatsOf(p.id); if (!chats.length) return '';
-    return `<section class="section"><h2 class="section-title">채팅 <span class="count">${chats.length}</span>${chats.length > 3 ? '<a class="more" href="#/chat">더 보기</a>' : ''}</h2>
-      <div class="list">${chats.slice(0, 3).map((c) => `<a class="list-row" href="#/chat/${encodeURIComponent(c.id)}">${App.icon('chat')}<span class="list-row-main"><span class="list-row-title">${esc(c.title)}</span></span><span class="list-row-actions">${App.ui.date(c.updatedAt)}</span></a>`).join('')}</div></section>`;
-  }
-
   function missingHTML(id) {
     const t = S.trash().find((x) => x.type === 'project' && x.projectId === id);
     return `<div class="page"><div class="empty"><div class="empty-title">${t ? '휴지통에 있는 프로젝트예요' : '프로젝트를 찾을 수 없어요'}</div>${t ? `<p>「${esc(t.title)}」</p><button type="button" class="btn btn-primary" data-restore="${esc(t.id)}">복원하기</button>` : '<a class="btn" href="#/vault">경험 위키로</a>'}</div></div>`;
@@ -102,14 +121,17 @@
     render(params) {
       const p = S.getProject(params.id); if (!p) return missingHTML(params.id);
       const cards = S.cardsOf(p.id); const ghFirst = (p.repos || []).length > 0 && !cards.length; // 주 버튼은 하나만
-      return `<div class="page">${headHTML(p)}${githubHTML(p, ghFirst)}${cardsHTML(p, cards, !ghFirst)}${chatsHTML(p)}</div>`;
+      return `<div class="page">${headHTML(p)}${githubHTML(p, ghFirst)}${cardsHTML(p, cards, !ghFirst)}</div>`;
     },
     mount(root, params) {
       const id = params.id;
       const acts = {
+        done: () => App.ui.setProjectDone(id, true),
+        reopen: () => App.ui.setProjectDone(id, false),
         edit: () => App.ui.openProjectModal(S.getProject(id), () => { App.rerender(); App.ui.toast('저장했어요'); }),
         remove: () => remove(S.getProject(id)),
         connect: () => App.repoFlow.connect(id, () => App.rerender()),
+        manual: () => App.ui.openManualCard(id),
         unlink: (b) => {
           const r = Object.assign({}, S.getProject(id).repos[Number(b.dataset.i)]); const who = me();
           S.unlinkRepo(id, r.owner, r.name); App.rerender();

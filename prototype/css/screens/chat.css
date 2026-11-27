@@ -1,10 +1,22 @@
-/* ===== AI 채팅: 왼쪽 프로젝트별 채팅 목록 + 오른쪽 채팅방 ===== */
-.chat-app { display: grid; grid-template-columns: 284px minmax(0, 1fr); height: calc(100vh - var(--topbar-h)); height: calc(100dvh - var(--topbar-h)); }
+/* ===== AI 채팅: 왼쪽 대화방 목록, 가운데 대화, 오른쪽 그 프로젝트의 경험 카드 ===== */
+.chat-app { display: grid; grid-template-columns: var(--tree-w, 284px) minmax(0, 1fr); height: calc(100vh - var(--topbar-h)); height: calc(100dvh - var(--topbar-h)); }
 .chat-tree, .chat-room { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .chat-tree { border-right: 1px solid var(--border); }
 .chat-room { position: relative; }
 
-/* ---------- 프로젝트 › 채팅 ---------- */
+.chat-app.has-card { grid-template-columns: var(--tree-w, 252px) minmax(0, 1fr) var(--card-w, 360px); }
+.chat-app { position: relative; overflow: clip; }
+/* 목록 너비 조절: 목록 오른쪽 테두리를 끌거나, 포커스한 뒤 ←→ (두 번 누르면 처음 너비) */
+.chat-resize { position: absolute; top: 0; bottom: 0; left: calc(var(--tree-w, 284px) - 4px); z-index: 5; width: 9px; cursor: col-resize; touch-action: none; }
+.chat-app.has-card > .chat-resize.is-tree { left: calc(var(--tree-w, 252px) - 4px); }
+.chat-resize.is-card { left: auto; right: calc(var(--card-w, 360px) - 5px); }
+.chat-resize::after { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 3px; border-radius: 2px; background: transparent; transition: background .12s; }
+.chat-resize:hover::after, .chat-resize.is-drag::after, .chat-resize:focus-visible::after { background: var(--primary); }
+.chat-resize:focus-visible { outline: none; }
+.chat-app.is-resizing { cursor: col-resize; user-select: none; }
+.chat-app.is-resizing iframe, .chat-app.is-resizing .chat-room { pointer-events: none; }
+
+/* ---------- 프로젝트 › 대화방 ---------- */
 .chat-tree-head { flex: none; display: flex; gap: 8px; padding: 16px 16px 12px; }
 .chat-tree-head .btn { flex: 1; padding-left: 8px; padding-right: 8px; }
 .chat-tree-list { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 10px 24px; }
@@ -55,24 +67,93 @@
 .chat-jump { position: absolute; left: 50%; bottom: 128px; transform: translateX(-50%); box-shadow: var(--shadow); }
 .chat-empty { margin: auto; }
 
-/* ---------- 제안 → 경험 카드 ---------- */
-.chat-prop { border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 16px 20px; }
-.chat-prop-head { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-.chat-prop-head h2 { font-size: 16px; overflow-wrap: anywhere; }
-.chat-prop .banner { margin-top: 12px; }
-.chat-prop-rows { display: flex; flex-direction: column; gap: 12px; margin: 14px 0 16px; }
-.chat-prop-row { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 12px; align-items: start; }
-.chat-prop-row > :first-child { font-size: var(--fs-sm); line-height: 1.8; color: var(--text-3); }
-.chat-prop-row p { overflow-wrap: anywhere; }
-.chat-prop-row .textarea { min-height: 80px; }
-.chat-kws { display: flex; flex-wrap: wrap; gap: 5px; }
-.chat-prop-foot { display: flex; justify-content: flex-end; gap: 8px; }
-.chat-done { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--radius); }
-.chat-done > svg { color: var(--text-3); }
-.chat-done-main { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
-.chat-done-main > a { flex-basis: 100%; font-weight: 600; overflow-wrap: anywhere; }
-.chat-done-main > a:hover, .chat-made a:hover { text-decoration: underline; text-underline-offset: 3px; }
-.chat-done .btn { flex: none; }
+/* ---------- 이 프로젝트의 경험 카드: 고르면 펼쳐지고, AI 가 바꾸면 그 카드와 칸이 보인다 ---------- */
+.chat-card { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-left: 1px solid var(--border); background: var(--surface-2); }
+.chat-card-top { flex: none; display: flex; align-items: center; gap: 8px; min-height: 57px; padding: 8px 20px; border-bottom: 1px solid var(--border); }
+.chat-card-top h2 { flex: 1; min-width: 0; font-size: var(--fs-md); }
+.chat-card-top .btn { margin-right: -10px; }
+.chat-card-st { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-sm); color: var(--text-2); }
+.chat-card-st .spinner { width: 14px; height: 14px; }
+.chat-card-x { display: none; }
+.chat-card-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 8px; padding: 20px; }
+.chat-card-title { font-size: var(--fs-lg); line-height: 1.5; overflow-wrap: anywhere; }
+.chat-card-title.is-empty { color: var(--text-3); font-weight: 500; }
+.chat-fs { display: flex; flex-direction: column; }
+.chat-f { padding: 12px 0; border-top: 1px solid var(--border-strong); }
+.chat-fs > .chat-f:first-child { margin-top: 8px; border-top-color: var(--primary); }
+.chat-f dt { font-size: var(--fs-sm); font-weight: 600; color: var(--text-3); }
+.chat-f dd { margin-top: 4px; line-height: 1.7; overflow-wrap: anywhere; }
+.chat-f dd > p + .chat-blank { margin-top: 6px; }
+.chat-blank { display: block; padding: 6px 12px; border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-3); font-size: var(--fs-sm); }
+.chat-kws { display: flex; flex-wrap: wrap; }
+.chat-card-foot { margin-top: 8px; }
+/* 새로 담은 글자에 형광펜이 그어진다 (바뀐 직후 한 번) */
+.chat-card :is(mark, ins).is-in { background: linear-gradient(var(--hl), var(--hl)) no-repeat 0 0 / 100% 100%; -webkit-box-decoration-break: slice; box-decoration-break: slice; }
+.cc-detail.is-flash :is(mark, ins).is-in { animation: chat-ink .8s ease-out .45s backwards; }
+@keyframes chat-ink { from { background-size: 0 100%; } }
+
+.cc-n { margin-left: 8px; font-size: var(--fs-sm); font-weight: 500; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.cc-hint { font-size: var(--fs-sm); color: var(--text-3); }
+.cc-empty { display: flex; flex-direction: column; gap: 4px; padding: 20px 4px; color: var(--text-2); }
+.cc-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+/* 카드 하나: 테두리 카드. 그림자 없음 */
+.cc-tile { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px 14px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); text-align: left; color: var(--text); transition: border-color .12s; will-change: transform; }
+.cc-tile:hover { border-color: var(--field-border); }
+.cc-tile:hover .cc-tile-title { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+.cc-tile:focus-visible { border-color: var(--primary); }
+.cc-tile-title { font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.cc-tile-line { font-size: var(--fs-sm); line-height: 1.6; color: var(--text-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cc-tile-kws { display: flex; flex-wrap: wrap; gap: 2px 12px; }
+.cc-tile-kws .kw { font-size: var(--fs-xs); }
+.cc-tile.is-new { border-color: var(--primary); }
+/* 펼친 카드: 목록의 제자리에서. 고른 카드라 제목에 형광펜 */
+.cc-detail-head { width: calc(100% + 16px); margin: -8px -8px 0; display: flex; align-items: flex-start; gap: 8px; padding: 8px; border: 0; border-radius: var(--radius-sm); background: none; text-align: left; color: var(--text); }
+.cc-detail-head:hover { background: var(--surface-2); }
+.cc-detail-head:focus-visible { outline-offset: -2px; }
+.cc-detail-head .chat-card-title { flex: 1; min-width: 0; font-weight: 700; }
+.cc-fold { flex: none; display: inline-grid; place-items: center; width: 24px; height: 28px; color: var(--text-3); }
+.cc-detail { display: flex; flex-direction: column; gap: 8px; padding: 16px 16px 14px; border: 1px solid var(--primary); border-radius: var(--radius); background: var(--surface); will-change: transform, clip-path; }
+.cc-detail .chat-f { margin: 0 -8px; padding: 12px 8px; }
+.cc-detail .chat-fs > .chat-f:first-child { margin-top: 4px; border-top-color: var(--border-strong); }
+.cc-detail .chat-f dt { display: flex; align-items: center; gap: 8px; }
+.cc-detail .chat-blank { background: var(--surface-2); }
+/* 바뀐 칸: 연한 형광펜이 한 번 깔렸다가 걷힌다 */
+.cc-detail.is-flash .chat-f.is-changed { animation: cc-flash 2.6s ease-out .35s backwards; }
+@keyframes cc-flash { 0% { background: var(--hl-soft); } 55% { background: var(--hl-soft); } 100% { background: transparent; } }
+
+/* 대화 안: 카드를 바꾸기 전에 묻는 답 (바뀔 칸만 앞뒤로) */
+.cf { display: flex; flex-direction: column; gap: 12px; max-width: 64ch; padding: 14px 16px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); }
+.cf-rows { display: flex; flex-direction: column; gap: 10px; margin: 0; }
+.cf-row dt { font-size: var(--fs-sm); font-weight: 600; color: var(--text-3); }
+.cf-row dd { margin: 2px 0 0; line-height: 1.7; overflow-wrap: anywhere; }
+.cf-row :is(mark, ins).is-in { background: var(--hl); text-decoration: none; }
+.cf-foot { display: flex; flex-wrap: wrap; gap: 8px; }
+.cf-st { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--text-3); }
+.cf.is-closed { background: none; border-style: dashed; }
+.cf.is-closed .cf-rows { color: var(--text-2); }
+
+/* 대화 안: 이 답에서 바꾼 카드 */
+.chat-touch { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; max-width: 100%; min-height: 36px; padding: 6px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); font-size: var(--fs-sm); color: var(--text); text-align: left; }
+.chat-touch > svg { flex: none; color: var(--text-3); }
+.chat-touch:hover { border-color: var(--field-border); }
+.chat-touch:hover .chat-touch-title { text-decoration: underline; text-underline-offset: 3px; }
+.chat-touch-title { min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-touch-f { flex: none; color: var(--text-3); }
+.chat-touch.is-gone { border-style: dashed; color: var(--text-3); }
+@media (prefers-reduced-motion: reduce) {
+  .cc-detail.is-flash :is(mark, ins).is-in, .cc-detail.is-flash .chat-f.is-changed { animation: none; }
+}
+.chat-made a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.chat-head-card { display: none; }
+
+@media (max-width: 1240px) {
+  .chat-app.has-card { grid-template-columns: var(--tree-w, 252px) minmax(0, 1fr); }
+  .chat-head-card { display: inline-flex; }
+  .chat-resize.is-card { display: none; }
+  .chat-card { position: absolute; right: 0; top: 0; bottom: 0; z-index: 12; width: min(380px, 100%); box-shadow: var(--shadow-lg); visibility: hidden; transform: translateX(16px); opacity: 0; transition: transform .18s, opacity .18s; }
+  .is-card-open > .chat-card { visibility: visible; transform: none; opacity: 1; }
+  .chat-card-x { display: inline-grid; margin-right: -8px; }
+}
 
 /* ---------- 채팅 안의 GitHub ---------- */
 .chat-gh-repo { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
@@ -82,12 +163,20 @@
 
 /* ---------- 입력 ---------- */
 .chat-foot { flex: none; border-top: 1px solid var(--border); }
+.chat-foot:empty { display: none; }
 .chat-form { max-width: 760px; margin: 0 auto; padding: 8px 28px 20px; }
 .chat-form:not(:has(.chat-quick)) { padding-top: 16px; }
-.chat-quick { display: flex; flex-wrap: wrap; gap: 0 4px; margin: 0 -10px 4px; }
+.chat-quick { display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; margin: 0 -10px 4px; }
+/* 경험 카드 권한 토글: 입력창 위 오른쪽 */
+.chat-perm { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; min-height: var(--control-sm, 32px); padding: 0 10px; font-size: var(--fs-sm); font-weight: 500; color: var(--text-2); cursor: pointer; }
+.chat-perm:hover { color: var(--text); }
 .chat-input { position: relative; }
 .chat-input .textarea { min-height: 48px; max-height: 140px; resize: none; padding: 11px 56px 11px 14px; overflow-y: hidden; }
 .chat-send { position: absolute; right: 6px; bottom: 6px; color: var(--primary); }
+
+/* 새 채팅 안내 */
+.chat-guide { display: flex; flex-direction: column; gap: 6px; max-width: 64ch; color: var(--text-2); }
+.chat-guide h2 { margin-bottom: 2px; font-size: var(--fs-lg); color: var(--text); }
 
 /* 새 채팅: 프로젝트 고르기 */
 .chat-pick { max-width: 520px; margin: 0 auto; padding: 40px 28px; display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
@@ -95,7 +184,10 @@
 .chat-pick .list { align-self: stretch; }
 
 @media (max-width: 900px) {
-  .chat-app { grid-template-columns: minmax(0, 1fr); height: calc(100dvh - var(--topbar-h) - 61px - env(safe-area-inset-bottom)); }
+  .chat-app, .chat-app.has-card { grid-template-columns: minmax(0, 1fr); }
+  .chat-resize { display: none; }
+  .chat-app:not(.is-room) > .chat-card { display: none; }
+  .chat-app { height: calc(100dvh - var(--topbar-h) - 61px - env(safe-area-inset-bottom)); }
   .chat-app:not(.is-room) > .chat-room, .chat-app.is-room > .chat-tree { display: none; }
   .chat-app.is-room { height: 100dvh; }
   .shell:has(.chat-app.is-room) :is(.topbar, .mobile-nav) { display: none; }
@@ -118,13 +210,9 @@
   .chat-head-main { flex-direction: column; align-items: flex-start; gap: 2px; }
   .chat-head-main .proj-chip { max-width: 100%; font-size: var(--fs-xs); }
   .chat-head h1 { max-width: 100%; }
-  .chat-head-card { width: 44px; padding: 0; border-color: transparent; }
-  .chat-head-card span { display: none; }
-  .chat-m.is-ai { flex-direction: column; gap: 8px; }
-  .chat-prop { padding: 16px; }
-  .chat-prop-row { grid-template-columns: minmax(0, 1fr); gap: 2px; }
-  .chat-prop-foot .btn { flex: 1; }
+    .chat-m.is-ai { flex-direction: column; gap: 8px; }
   .chat-gh-btns { flex: 1 1 100%; }
   .chat-gh-btns .btn { flex: 1; }
   .chat-quick .btn { padding-left: 8px; padding-right: 8px; }
+  .cf-foot .btn { flex: 1 1 auto; }
 }

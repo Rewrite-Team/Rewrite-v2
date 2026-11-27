@@ -1,4 +1,4 @@
-/* 설정: 프로필 · GitHub 계정 · 계정. 프로필은 바꾸는 즉시 저장 */
+/* 설정: 프로필 · GitHub 계정 · 계정. 프로필은 저장 버튼으로 */
 (function (App) {
   const esc = (s) => App.ui.esc(s); const S = App.store; const I = App.icon;
   const JOBS = ['백엔드 개발자', '프론트엔드 개발자', '서비스 기획자', 'PM/PO', '데이터 분석가', 'UX/UI 디자이너', '마케터'];
@@ -16,8 +16,8 @@
     const u = S.state.user; const me = App.auth.current() || {};
     return `<div class="page page-narrow set"><header class="page-head"><h1>설정</h1></header>
       <section class="section"><h2 class="section-title">프로필</h2><div class="set-rows">
-        ${row('이름', `<div class="set-field" data-field="name"><input class="input" id="set-name" data-user="name" maxlength="20" autocomplete="name" value="${esc(u.name)}" /></div>`, 'set-name')}
-        ${row('목표 직무', `<div class="set-field"><input class="input" id="set-job" data-user="targetJob" list="set-jobs" maxlength="30" placeholder="예: 백엔드 개발자" value="${esc(u.targetJob)}" /><datalist id="set-jobs">${JOBS.map((j) => `<option value="${esc(j)}"></option>`).join('')}</datalist></div>`, 'set-job')}
+        ${row('이름', `<div class="set-field" data-field="name" data-wr><input class="input" id="set-name" data-user="name" maxlength="20" autocomplete="name" value="${esc(u.name)}" />${App.ui.wrFoot()}</div>`, 'set-name')}
+        ${row('목표 직무', `<div class="set-field" data-wr><input class="input" id="set-job" data-user="targetJob" list="set-jobs" maxlength="30" placeholder="예: 백엔드 개발자" value="${esc(u.targetJob)}" /><datalist id="set-jobs">${JOBS.map((j) => `<option value="${esc(j)}"></option>`).join('')}</datalist>${App.ui.wrFoot()}</div>`, 'set-job')}
       </div></section>
       <section class="section"><h2 class="section-title">GitHub 계정</h2><div class="set-rows" data-github>${githubHTML()}</div></section>
       <section class="section"><h2 class="section-title">계정</h2><div class="set-rows">
@@ -30,6 +30,7 @@
     title: '설정',
     render: view,
     mount(root) {
+      const mine = meId();
       const drawGithub = () => { const el = root.querySelector('[data-github]'); if (el) el.innerHTML = githubHTML(); };
       // 모달 안의 입력칸 아래 오류. msg 가 비면 지운다
       function fieldError(field, msg) {
@@ -85,19 +86,19 @@
         else if (act === 'gh-off') { const old = S.github(); S.setGithub(null); drawGithub(); App.ui.toast('GitHub 연결을 해제했어요', { action: '되돌리기', onAction: ((me) => () => { if (meId() !== me || S.github()) return; S.setGithub(old); drawGithub(); App.ui.toast('되돌렸어요'); })(meId()) }); }
         else if (act === 'leave') leave();
       }
-      function onChange(ev) {
-        const key = ev.target.getAttribute('data-user'); if (!key) return;
-        const v = ev.target.value.trim(); const field = ev.target.parentElement;
+      function saveUser(i) {
+        const key = i.getAttribute('data-user'); const v = i.value.trim(); const field = i.parentElement;
         if (!v && key === 'name') { fieldError(field, '이름을 적어 주세요.'); return; }
-        fieldError(field, ''); ev.target.value = v; if (v === (S.state.user[key] || '')) return;
+        fieldError(field, ''); i.value = v; if (v === (S.state.user[key] || '')) { App.ui.wrSync(i); return; }
         S.updateUser({ [key]: v });
         if (key === 'name') { document.querySelectorAll('.account-name').forEach((x) => { x.textContent = v; }); document.querySelectorAll('.account .avatar').forEach((x) => { x.textContent = v.slice(0, 1); }); }
-        App.ui.toast('저장했어요');
+        App.ui.wrSaved(i);
       }
-      function onKey(ev) { if (ev.key === 'Enter' && !ev.isComposing && ev.target.matches('[data-user]')) ev.target.blur(); }
+      const onSave = (ev) => saveUser(ev.target);
+      const onInput = (ev) => { if (ev.target.matches('[data-user][aria-invalid]')) fieldError(ev.target.parentElement, ''); };
 
-      root.addEventListener('click', onClick); root.addEventListener('change', onChange); root.addEventListener('keydown', onKey);
-      return () => { root.removeEventListener('click', onClick); root.removeEventListener('change', onChange); root.removeEventListener('keydown', onKey); };
+      root.addEventListener('click', onClick); root.addEventListener('wr-save', onSave); root.addEventListener('input', onInput);
+      return () => { root.removeEventListener('click', onClick); root.removeEventListener('wr-save', onSave); root.removeEventListener('input', onInput); if (meId() === mine) root.querySelectorAll('[data-user]').forEach((i) => { const v = i.value.trim(); if (v !== i.defaultValue && (v || i.dataset.user !== 'name')) S.updateUser({ [i.dataset.user]: v }); }); };
     },
   };
 })(window.App);

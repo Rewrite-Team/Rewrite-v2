@@ -249,6 +249,12 @@ ins { text-decoration: none; background: var(--hl); padding: .06em .18em; border
 .switch input:checked + span::after { transform: translateX(16px); }
 .switch input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 2px; }
 
+/* 직접 쓰는 칸의 저장·취소 */
+.wr-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 8px; min-height: var(--control-sm); margin-top: 8px; }
+.wr-foot .btn { transition: none; }
+.wr-foot .btn[disabled] { opacity: 1; color: var(--text-3); background: var(--surface-2); border-color: var(--border); }
+.wr-foot > :first-child:not(.wr-state):not(button) { margin-right: auto; }
+
 /* 고르는 줄: 고르면 제목에 형광펜이 그어진다 */
 .choice {
   display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 13px 16px; border: 1px solid var(--border-strong); border-radius: var(--radius);
@@ -426,11 +432,8 @@ a.list-row:focus-visible, button.list-row:focus-visible, .list-row:focus-visible
 .fullscreen { min-height: 100vh; min-height: 100dvh; display: flex; align-items: flex-start; justify-content: center; padding: 64px 16px; }
 .fullscreen:has(> .auth) { padding: 0; align-items: stretch; }
 .auth { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: 100vh; min-height: 100dvh; }
-.auth-brand { display: flex; flex-direction: column; justify-content: space-between; gap: 40px; padding: 32px 56px 56px; background: var(--surface-2); }
+.auth-brand { position: relative; display: flex; flex-direction: column; padding: 24px 56px 0; background: var(--primary-hover); color: var(--surface); overflow: hidden; }
 .auth-brand .brand { padding: 0; margin: 0; align-self: flex-start; }
-.auth-demo { margin: auto 0; max-width: 30em; font-size: 26px; font-weight: 600; line-height: 1.75; letter-spacing: -0.02em; }
-.auth-demo del { display: block; font-weight: 400; font-size: 20px; margin-bottom: 8px; }
-.auth-lead { max-width: 44ch; color: var(--text-2); }
 .auth-form { display: flex; flex-direction: column; justify-content: center; width: 100%; max-width: 408px; margin: 0 auto; padding: 48px 24px; }
 .auth-form > .brand { display: none; }
 .auth-form h1 { font-size: var(--fs-xl); letter-spacing: -0.025em; margin-bottom: 24px; }
@@ -496,6 +499,7 @@ a.list-row:focus-visible, button.list-row:focus-visible, .list-row:focus-visible
 @media (max-width: 600px) {
   :root { --gutter: 16px; --fs-xl: 22px; }
   .hide-mobile { display: none !important; }
+  .wr-foot > p { flex-basis: 100%; }
   .tabs { gap: 20px; }
   .list-row { padding-left: 0; padding-right: 0; }
   .modal-backdrop { padding: 0; place-items: end stretch; }

@@ -32,18 +32,22 @@
 .rf-draft .choice-title { -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 .rf-draft-kws { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 8px; }
 .rf-draft-more { margin-top: -4px; font-size: var(--fs-sm); }
-.rf-draft-more > summary { padding: 8px 16px 8px 46px; color: var(--text-2); cursor: pointer; list-style: none; }
+.rf-draft-more > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; padding: 8px 16px 10px 42px; color: var(--text-2); cursor: pointer; list-style: none; }
+.rf-draft-more > summary > svg { transition: transform .12s; }
+.rf-draft-more[open] > summary > svg { transform: rotate(90deg); }
+.rf-draft-more > summary > .meta { margin-left: 8px; font-weight: 400; }
 .rf-draft-more > summary::-webkit-details-marker { display: none; }
-.rf-draft-more > summary:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+.rf-draft-more > summary:hover { color: var(--text); }
 .rf-draft-more > summary:focus-visible { outline-offset: -2px; border-radius: var(--radius); }
 .rf-draft-more[open] > summary { color: var(--text); font-weight: 600; }
 .rf-star > div { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px; padding: 4px 16px 4px 46px; line-height: 1.65; }
 .rf-star dt { color: var(--text-3); }
 .rf-star dd { overflow-wrap: anywhere; }
-.rf-draft-more .meta { padding: 6px 16px 14px 46px; }
+.rf-ev { margin-top: 8px; padding: 14px 16px 18px 46px; border-top: 1px solid var(--border); }
+.rf-ev > div { min-width: 0; }
 
 @media (max-width: 900px) {
-  .rf-draft-more > summary { min-height: 44px; display: flex; align-items: center; }
+  .rf-draft-more > summary { min-height: 44px; }
 }
 @media (max-width: 600px) {
   .rf-seg { display: flex; }
@@ -52,5 +56,8 @@
   .rf-repo > .choice-main { flex: 1 1 0; }
   .rf-repo-meta { flex-basis: 100%; max-width: none; padding-left: 30px; margin-top: -8px; }
   .rf-star > div { padding-left: 16px; }
-  .rf-draft-more .meta { padding-left: 16px; }
+  .rf-draft-more > summary { padding-left: 12px; }
+  .rf-ev { padding-left: 16px; }
 }
+
+.rf-busy:focus-visible { outline: none; }

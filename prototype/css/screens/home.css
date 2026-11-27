@@ -15,3 +15,31 @@
   .home-chat > .list-row-title { flex: none; max-width: 100%; }
   .home-chat > .proj-chip { max-width: 100%; }
 }
+
+/* ---------- 내 역량: 레이더 (한 계열이라 잉크색 하나) ---------- */
+.sk { display: flex; flex-direction: column; gap: 12px; padding: 20px; }
+.sk-fig { position: relative; width: 100%; max-width: 600px; margin: 0 auto; }
+.sk-fig svg { display: block; width: 100%; height: auto; overflow: visible; }
+.sk-ring { fill: none; stroke: var(--border); stroke-width: 1; stroke-dasharray: 3 4; }
+.sk-ring.is-out { stroke: var(--border-strong); stroke-dasharray: none; }
+.sk-spoke { stroke: var(--border); stroke-width: 1; }
+.sk-area { fill: var(--primary); fill-opacity: .12; stroke: var(--primary); stroke-width: 2; stroke-linejoin: round; }
+.sk-dot { fill: var(--primary); stroke: var(--surface); stroke-width: 2; transition: r .12s; }
+.sk-dot.is-on { r: 7; }
+.sk-label { position: absolute; display: flex; flex-direction: column; line-height: 1.35; padding: 2px 4px; border-radius: var(--radius-sm); color: var(--text); }
+.sk-label:is(.is-top, .is-bottom) { align-items: center; text-align: center; }
+.sk-label.is-top { transform: translate(-50%, -100%); }
+.sk-label.is-bottom { transform: translate(-50%, 0); }
+.sk-label.is-start { align-items: flex-start; transform: translate(0, -50%); }
+.sk-label.is-end { align-items: flex-end; text-align: right; transform: translate(-100%, -50%); }
+.sk-label:hover .sk-name, .sk-label:focus-visible .sk-name { text-decoration: underline; text-underline-offset: 3px; }
+.sk-name { font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; }
+.sk-n { font-size: var(--fs-sm); font-weight: 700; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.sk-n.is-zero { font-weight: 500; color: var(--text-3); }
+.sk-tip { position: absolute; z-index: 3; max-width: 240px; display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); box-shadow: var(--shadow); font-size: var(--fs-sm); color: var(--text-2); pointer-events: none; }
+.sk-tip b { color: var(--text); }
+.sk-note { font-size: var(--fs-sm); color: var(--text-3); }
+@media (max-width: 600px) {
+  .sk { padding: 12px 4px; }
+  .sk-name, .sk-n { font-size: 11px; }
+}

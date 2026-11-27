@@ -8,6 +8,9 @@
 .vt-proj-name { min-width: 0; overflow-wrap: anywhere; }
 .vt-proj:hover .vt-proj-name { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
 .vt-proj-meta { margin-top: 2px; }
+.vt-proj .list-row-actions { gap: 20px; }
+.vt-state { width: 124px; display: flex; justify-content: flex-end; }
+.vt-done { display: inline-flex; align-items: center; gap: 4px; padding: 0 11px; color: var(--text-2); }
 .vt-repo { max-width: 100%; }
 .vt-repo > span:first-of-type { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -22,4 +25,7 @@
   .vt-filter > .input-icon { grid-column: 1 / -1; }
   .vt-proj { align-items: flex-start; }
   .vt-proj > svg { margin-top: 3px; }
+  .vt-proj .list-row-actions { flex-direction: column; align-items: flex-end; gap: 4px; }
+  .vt-state { width: auto; }
+  .vt-done { padding: 0; }
 }

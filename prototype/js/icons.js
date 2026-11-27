@@ -6,6 +6,7 @@ window.App = window.App || {};
   const PATHS = {
     home: '<path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/>',
     chat: '<path d="M5 5h14a1 1 0 0 1 1 1v9.5a1 1 0 0 1-1 1h-7L7.5 20v-3.5H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/><path d="M8 9.2h8M8 12.5h5"/>',
+    timeline: '<path d="M3.5 6.5h17M7 6.5v5.5a2.5 2.5 0 0 0 2.5 2.5H15M12 14.5v1.5a2.5 2.5 0 0 0 2.5 2.5h4"/><circle cx="7" cy="6.5" r="1.6"/><circle cx="16.5" cy="14.5" r="1.6"/><circle cx="20" cy="18.5" r="1.4"/>',
     graph: '<circle cx="6" cy="17" r="2.5"/><circle cx="12" cy="6" r="2.5"/><circle cx="18.5" cy="15.5" r="2.5"/><path d="m7.2 14.8 3.6-6.6M13.4 8.1l3.7 5.2M8.5 16.8l7.5-1"/>',
     wiki: '<path d="M12 6.5C10.3 5.4 7.6 5 4 5v13c3.6 0 6.3.4 8 1.5 1.7-1.1 4.4-1.5 8-1.5V5c-3.6 0-6.3.4-8 1.5z"/><path d="M12 6.5v13"/>',
     resume: '<path d="M6 3.5h12a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-15a1 1 0 0 1 1-1z"/><circle cx="9.5" cy="8.5" r="1.6"/><path d="M13.5 8.5H16M8 13h8M8 16.5h5"/>',
@@ -23,6 +24,7 @@ window.App = window.App || {};
     close: '<path d="m6 6 12 12M18 6 6 18"/>',
     check: '<path d="m5 12.5 4.5 4.5L19 7"/>',
     'chevron-down': '<path d="m6 9.5 6 6 6-6"/>',
+    'chevron-up': '<path d="m6 14.5 6-6 6 6"/>',
     'chevron-right': '<path d="m9.5 6 6 6-6 6"/>',
     'chevron-left': '<path d="m14.5 6-6 6 6 6"/>',
     'arrow-up': '<path d="M12 19V5M6 11l6-6 6 6"/>',

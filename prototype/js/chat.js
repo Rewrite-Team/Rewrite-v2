@@ -1,10 +1,11 @@
-/* AI 채팅의 AI (목업): App.chat — 대화를 듣고 꼬리질문을 하거나, 경험 카드로 정리한 제안을 만들거나, GitHub 에서 이야깃거리를 찾는다.
-   결과는 항상 경험 카드다: 같은 프로젝트에 같은 이야기를 하는 카드가 있으면 그 카드를 고치고, 없으면 새 카드를 만든다.
+/* AI 채팅의 AI (목업): App.chat — 대화방은 프로젝트의 것이고, 카드를 고르는 건 AI 의 일이다.
+   말을 들으면 그 프로젝트에서 가장 맞는 카드(없으면 새 카드)의 알맞은 칸에 바로 담고(respond), 그 카드의 빈칸을 이어서 묻는다.
+   어느 카드에 담았는지는 답에 적고(touch), 오른쪽 카드 목록이 그 카드로 옮겨 가 바뀐 칸을 보여 준다.
    회고(retrospect)는 사용자가 카드에서 직접 쓰는 칸이라 여기서 다루지 않는다. */
 (function (App) {
   const S = App.store;
   const STAGES = ['situation', 'task', 'action', 'result'];
-  const LABEL = { situation: '상황', task: '과제', action: '행동', result: '결과', title: '제목', role: '역할', summary: '한 줄 요약' };
+  const LABEL = { situation: '상황', task: '과제', action: '행동', result: '결과', title: '제목', role: '역할', summary: '한 줄 요약', resumeLine: '이력서 한 줄' };
   const MAX_KW = 3;
   const STOP = new Set(['그리고', '그래서', '했어요', '있어요', '없어요', '같은', '하는', '하고', '해서', '에서', '으로', '이번', '최근', '정말', '그냥', '프로젝트', '경험', '문제', '처음', '다시', '먼저', '위해']);
 
@@ -28,86 +29,78 @@
     if (stage) return stage;
     if (/(결과|덕분에|줄었|늘었|단축|수상|통과|합격|0건)/.test(a) || (/\d/.test(a) && /(→|%|배|만에)/.test(a))) return 'result';
     if (/(맡았|맡아|담당|역할|해야 했|목표)/.test(a)) return 'task';
-    if (/(제안|바꿨|바꾸|추가|만들었|만들어|설명|정리했|적용|고쳤|나눠|나눴|찾아|확인했|도입|작성)/.test(a)) return 'action';
+    if (/(제안|바꿨|바꾸|추가|만들었|만들어|설명|정리했|적용|고쳤|나눠|나눴|찾아|확인했|도입|작성|구현|개발했|수정했|변경했|자동화)/.test(a)) return 'action';
     return 'situation';
   }
 
-  // ---------- 대화에서 아직 반영하지 않은 말 모으기 ----------
-  // 말로 고친 제안(fixed)은 이야기를 담은 게 아니라서 경계로 세지 않는다
-  function lastApplied(chat) { let i = -1; chat.msgs.forEach((m, k) => { if (m.kind === 'proposal' && m.proposal.status === 'applied' && !m.proposal.fixed) i = k; }); return i; }
-  // → { fields:{ situation:[...], ... }, text, answers }
-  function collect(chat) {
-    const out = { fields: {}, text: '', answers: 0 };
-    let stage = null;
-    chat.msgs.slice(lastApplied(chat) + 1).forEach((m) => {
-      if (m.who === 'ai') { if (m.kind !== 'proposal') stage = m.stage || null; return; }
-      if (m.command) return;
-      const f = inferField(m.text, stage);
-      (out.fields[f] = out.fields[f] || []).push(m.text);
-      out.text += (out.text ? ' ' : '') + m.text; out.answers++;
-    });
+  // ---------- 아직 카드에 담지 않은 말 ----------
+  const waiting = (chat) => chat.msgs.filter((m) => m.who === 'me' && !m.done && !m.command && !m.hold);
+  // 이 말이 들어갈 칸: 분명하면 그 칸, 아니면 바로 앞에서 이 카드에 대해 물어본 칸
+  function fieldOf(chat, m, card) {
+    let asked = null; for (const x of chat.msgs) { if (x === m) break; if (x.who === 'ai') asked = (x.card || null) === (card ? card.id : null) ? x.stage || null : null; }
+    const guess = inferField(m.text, null);
+    if (!asked) return guess === 'situation' && card && !missingOf(card).length ? 'action' : guess; // 다 채운 카드에 더하는 말은 행동으로
+    if (guess === 'result' || guess === 'situation' || asked === 'result') return guess === 'result' ? 'result' : asked;
+    if (asked === 'task') return /(기로 했|맡|담당|역할|책임|해야|목표)/.test(m.text) ? 'task' : guess;
+    return asked === 'action' ? 'action' : guess;
+  }
+  // → { fields:{ situation:[...], ... }, text, msgs }
+  function collect(chat, card) {
+    const out = { fields: {}, text: '', msgs: waiting(chat) };
+    out.msgs.forEach((m) => { const t = m.text.replace(SWITCH_LEAD, '').trim() || m.text; const f = fieldOf(chat, m, card); (out.fields[f] = out.fields[f] || []).push(t); out.text += (out.text ? ' ' : '') + t; });
     return out;
   }
 
-  // 같은 프로젝트에서 같은 이야기를 하는 카드
-  function match(projectId, text) {
-    const tt = new Set(tokens(text)); let best = null; let bs = 0;
-    S.cardsOf(projectId).forEach((e) => {
-      const hit = new Set(tokens(e.title).filter((w) => tt.has(w))).size; if (hit < 2) return; // 낱말 하나 겹친 정도로는 같은 이야기라고 보지 않는다
-      const title = hit * 3;
-      const body = new Set(tokens([e.summary, e.star.situation, e.star.action].join(' ')));
-      const s = title + [...tt].filter((w) => body.has(w)).length;
-      if (s > bs) { bs = s; best = e; }
-    });
-    return bs >= 6 ? best : null;
+  // ---------- 다른 카드 이야기인가 ----------
+  // 제목 낱말이 겹치면 크게, 내용 낱말이 겹치면 조금 센다. 프로젝트 이름은 세지 않는다
+  function score(e, text) {
+    const p = S.getProject(e.projectId); const skip = new Set(tokens(p ? p.title : '')); const tt = new Set(tokens(text).filter((w) => !skip.has(w)));
+    const hit = new Set(tokens(e.title).filter((w) => tt.has(w))).size; // close: 제목이 꽤 겹친다
+    const body = new Set(tokens([e.summary, e.resumeLine, e.star.situation, e.star.task, e.star.action, e.star.result].join(' ')));
+    return { hit, close: hit >= 3 || (hit === 2 && hit / new Set(tokens(e.title)).size >= 0.4), total: hit * 3 + [...tt].filter((w) => body.has(w)).length };
   }
-
-  // 이 채팅에서 만든 카드가 있는데 전혀 다른 이야기를 꺼냈는가 (겹치는 낱말이 없고, 이어 말하는 표현도 아닐 때)
-  function newStory(chat, text) {
-    const card = chat.cardId && S.get(chat.cardId); if (!card || lastApplied(chat) < 0 || text.length < 18) return false;
+  // 같은 프로젝트에서 이 말과 가장 닮은 카드
+  function match(projectId, text, exceptId) {
+    let best = null; let bs = 0;
+    S.cardsOf(projectId).forEach((e) => {
+      if (e.id === exceptId) return; const x = score(e, text);
+      if (x.close && x.total > bs) { bs = x.total; best = e; }
+    });
+    return best && { card: best, total: bs };
+  }
+  // 이 카드와 겹치는 낱말이 하나도 없는 새 이야기인가. 다른 이야기라고 말했거나, 빈칸을 묻던 중이 아닐 때만 본다
+  const SWITCH = /^(다른|또 다른|새로운)\s?(이야기|얘기|경험)|^(이건|이번엔|이번에는)\s?(다른|별개)|(다른|별개의?)\s?(이야기|얘기|경험)(인데|예요|이에요|입니다|할게요|할래요|하고 싶)/;
+  function newStory(card, text) {
+    if (SWITCH.test(text.trim())) return true;
+    if (missingOf(card).length || text.length < 18) return false;
     if (/^(아\s|그리고|그래서|그때|그 ?뒤|그 ?후|이후|덕분에|결과|추가로|참고로|또|근데|그런데)/.test(text.trim())) return false;
     const body = new Set(tokens([card.title, card.summary, card.star.situation, card.star.task, card.star.action, card.star.result].join(' ')));
     return !tokens(text).some((w) => body.has(w) || [...body].some((b) => b.length >= 2 && w.length >= 2 && b.slice(0, 2) === w.slice(0, 2)));
   }
+  // 이 말을 담을 카드 → 카드 | null(새 카드)
+  // 1) "다른 이야기인데…"는 새 카드 2) 펼쳐 둔 카드(없으면 방금 AI 가 물어본 카드)가 있으면 그 카드, 단 다른 카드가 훨씬 닮았으면 그 카드
+  // 3) 펼쳐 둔 카드와 겹치는 게 없는 새 이야기면 새 카드 4) 아무것도 없으면 가장 닮은 카드, 그것도 없으면 새 카드
+  function route(chat, text) {
+    if (SWITCH.test(text.trim())) return null;
+    const mine = (id) => { const e = id && S.get(id); return e && e.projectId === chat.projectId ? e : null; };
+    const lastAi = chat.msgs.slice().reverse().find((m) => m.who === 'ai'); // 바로 앞의 AI 말이 어느 카드의 빈칸을 묻던 중일 때만
+    const cur = mine(chat.focus) || (lastAi && lastAi.card && lastAi.stage ? mine(lastAi.card) : null);
+    const m = match(chat.projectId, text, cur && cur.id);
+    if (!cur) return m ? m.card : null;
+    if (m && m.total > score(cur, text).total + 2) return m.card;
+    return newStory(cur, text) ? null : cur;
+  }
 
-  // ---------- 정리 제안 ----------
-  // 새 카드 제목: 첫 문장을 이름꼴로. 길면 마지막 절이나 사용자가 정한 채팅 이름 (제안에서 바로 고칠 수 있다)
+  // ---------- 카드에 담기 ----------
+  // 새 카드 제목: 첫 문장을 이름꼴로. 길면 마지막 절
   const unlead = (t) => String(t || '').replace(/^((그래서|그때|제가|저는|저희는|우리는)\s+)+/, '');
-  function draftTitle(chat, seed) {
+  function draftTitle(seed) {
     const first = unlead(polish(String(seed).split(/(?<=[.!?])\s+/)[0])).replace(/[.!?]$/, '');
     const name = App.ai.resumeLine({ summary: first, title: first });
     if (name.length <= 34) return name;
     const tail = name.split(/(?<=(?:어서|아서|해서|하고|면서|지만))\s+/).pop(); // 길면 마지막 절
     if (tail.length >= 8 && tail.length <= 34) return tail;
-    return chat.title && !/…$|^새 채팅$/.test(chat.title) && chat.title !== GH_TITLE ? chat.title : shorten(name, 30);
-  }
-  // target: 카드 id | 'new' | undefined(AI 가 고름)
-  function buildProposal(chat, target) {
-    const c = collect(chat);
-    const card = target === 'new' ? null : target ? S.get(target) : match(chat.projectId, c.text) || (!newStory(chat, c.text) && chat.cardId && S.get(chat.cardId)) || null;
-    const changes = STAGES.filter((f) => c.fields[f]).map((f) => { const add = c.fields[f].map(polish).join(' '); return { field: f, add, raw: add }; });
-    const found = App.ai.extractKeywords(c.text);
-    const keywords = App.keywords.clean([...(card ? card.keywords : []), ...found]).slice(0, MAX_KW);
-    if (!keywords.length) keywords.push('실행력');
-    const seed = (c.fields.action || c.fields.situation || c.fields.result || [''])[0];
-    const pr = { mode: card ? 'update' : 'new', cardId: card ? card.id : null, title: card ? card.title : draftTitle(chat, seed), changes, keywords, status: 'pending' };
-    pr.resumeLine = lineOf(pr); return pr;
-  }
-  // 이 제안을 반영하면 카드의 「이력서 한 줄」이 될 문장. 사용자가 직접 고친 줄이 있는 카드이거나 말로 한 칸만 고치는 제안이면 ''
-  function lineOf(pr) {
-    const card = pr.mode === 'update' ? S.get(pr.cardId) : null;
-    if (pr.fixed || (pr.mode === 'update' && (!card || card.resumeLineEdited))) return '';
-    if (pr.lineEdited && pr.resumeLine) return pr.resumeLine;
-    const would = { title: pr.title, summary: card ? card.summary : '', star: Object.assign({ situation: '', task: '', action: '', result: '' }, card && card.star) };
-    const added = {};
-    pr.changes.forEach((ch) => { if (!(ch.field in would.star) || !ch.add) return; added[ch.field] = ch.add; would.star[ch.field] = [would.star[ch.field], ch.add].filter(Boolean).join(' '); });
-    if (!would.summary) would.summary = shorten(unlead(would.star.action || would.star.situation || would.star.result), 80);
-    let line = (card && card.resumeLine) || App.ai.resumeLine(would);
-    // 이번에 들은 결과에 수치가 있으면 뒤에 붙인다
-    let res = /\d/.test(added.result || '') ? shorten(String(added.result).split(/(?<=[.!?])\s+/).find((x) => /\d/.test(x)).replace(/^(그 결과|결과로|결과적으로|덕분에)\s+/, ''), 48).replace(/[.!?]$/, '') : '';
-    if (res) res = App.ai.resumeLine({ summary: res, title: res });
-    if (res && !line.includes(res) && line.length + res.length <= 100) line = `${line.replace(/[.,]$/, '')}, ${res}`;
-    return line;
+    return shorten(name, 30);
   }
   function shorten(t, max) { const x = App.ai.brief(t, max); return /…$/.test(x) ? x.slice(0, -1).replace(/\s+\S*$/, '') : x; }
   // 카드가 지금 어디에 있는가: 'alive' | 'trash' | 'gone'
@@ -115,70 +108,66 @@
     if (!id) return 'gone'; if (S.get(id)) return 'alive';
     return S.trash().some((t) => (t.data.experiences || []).some((e) => e.id === id)) ? 'trash' : 'gone';
   }
-  // 반영 · 되돌리기: 제안에서 사용자가 고친 이력서 한 줄은 카드에서도 직접 고친 줄로 남는다
-  function apply(chatId, msgId) {
-    const c = S.getChat(chatId); const m = c && c.msgs.find((x) => x.id === msgId); if (!m || !m.proposal) return null;
-    const pr = m.proposal; pr.resumeLine = lineOf(pr);
-    const e = S.applyProposal(chatId, msgId);
-    if (e && pr.lineEdited && pr.resumeLine) { e.resumeLineEdited = true; S.touch(); }
-    return e;
+  // 담은 뒤의 카드에서 제목·요약·이력서 한 줄을 정한다. 사용자가 직접 정한 제목과 줄은 건드리지 않는다
+  function settle(added, retitle) {
+    return (e) => {
+      if (e.auto && !e.titled && retitle) e.title = draftTitle(e.star.action || e.star.situation || e.star.result || e.star.task);
+      if (e.auto || !e.summary) e.summary = shorten(unlead(e.star.action || e.star.situation || e.star.result || e.star.task), 80);
+      if (e.resumeLineEdited) return;
+      let line = (!e.auto && e.resumeLine) || App.ai.resumeLine(e);
+      // 결과에 수치가 있으면 뒤에 붙인다 (이미 다듬어진 카드에는 이번에 들은 결과만)
+      const from = e.auto ? e.star.result : added.result || '';
+      let res = /\d/.test(from) ? shorten(String(from).split(/(?<=[.!?])\s+/).find((x) => /\d/.test(x)).replace(/^(그 결과|결과로|결과적으로|덕분에)\s+/, ''), 48).replace(/[.!?]$/, '') : '';
+      if (res) res = App.ai.resumeLine({ summary: res, title: res });
+      if (res && !line.includes(res) && line.length + res.length <= 100) line = `${line.replace(/[.,]$/, '')}, ${res}`;
+      e.resumeLine = line;
+    };
   }
-  function undo(chatId, msgId) {
-    const c = S.getChat(chatId); const m = c && c.msgs.find((x) => x.id === msgId); const pr = m && m.proposal; const e = pr && S.get(pr.cardId);
-    if (!e || !S.canUndo(pr)) return false;
-    if (!pr.snap && e.resumeLineEdited) { pr.resumeLine = e.resumeLine; pr.lineEdited = true; } // 새 카드: 다시 반영할 때 그대로 쓴다
-    else if (pr.lineEdited && e.resumeLine === pr.resumeLine) e.resumeLineEdited = false;
-    return S.undoProposal(chatId, msgId);
+  // 담지 않은 말을 모두 카드 하나에 담는다 (card 가 없으면 새 카드) → { card, created, fields, before } | null
+  function feed(chat, card) {
+    const c = collect(chat, card); if (!c.msgs.length) return null;
+    const changes = STAGES.filter((f) => c.fields[f]).map((f) => ({ field: f, add: c.fields[f].map(polish).join(' ') }));
+    const keywords = App.keywords.clean([...(card ? card.keywords : []), ...App.ai.extractKeywords(c.text)]).slice(0, MAX_KW);
+    const added = {}; changes.forEach((ch) => { added[ch.field] = ch.add; });
+    const seed = (c.fields.action || c.fields.situation || c.fields.result || c.fields.task)[0];
+    const r = S.feed(chat.id, { cardId: card ? card.id : null, changes, keywords, title: card ? '' : draftTitle(seed), patch: settle(added, true) }); if (!r) return null;
+    c.msgs.forEach((m) => S.updateMsg(chat.id, m.id, { done: true, card: r.card.id }));
+    return Object.assign(r, { fields: changes.map((ch) => ch.field) });
   }
-  function proposalMsg(chat, target) {
-    const pr = buildProposal(chat, target);
-    const text = pr.mode === 'update' ? `「${pr.title}」 카드를 이렇게 고칠게요.` : '새 경험 카드로 정리해 봤어요.';
-    return { who: 'ai', kind: 'proposal', text, proposal: pr };
-  }
-  // 제안의 대상 카드를 바꾼다 (기존 카드 ↔ 새 카드). 사용자가 고친 문장은 그대로 둔다
-  function retarget(chat, msgId, target) {
-    const m = chat.msgs.find((x) => x.id === msgId); if (!m) return;
-    const old = m.proposal; const next = proposalMsg(chat, target || 'new'); next.proposal.target = old.target = target || 'new';
-    S.updateMsg(chat.id, msgId, { text: next.text, proposal: carry(old, next.proposal) });
-  }
-  // 앞 제안에서 사용자가 고친 제목·문장을 새 제안이 이어받는다
-  function carry(old, next) {
-    if (!old) return next;
-    if (old.target) next.target = old.target;
-    if (old.lineEdited) { next.lineEdited = true; next.resumeLine = old.resumeLine; }
-    if (old.titleEdited) { next.titleEdited = old.titleEdited; if (next.mode === 'new') next.title = old.titleEdited; }
-    next.changes.forEach((ch) => {
-      const o = old.changes.find((x) => x.field === ch.field);
-      if (!o || o.add === o.raw || !String(ch.raw).startsWith(o.raw)) return;
-      ch.add = `${o.add} ${ch.raw.slice(o.raw.length)}`.trim();
-    });
-    next.resumeLine = lineOf(next);
-    return next;
+  // 담은 뒤에 할 말: 그 카드의 다음 빈칸. 어느 카드의 어느 칸에 담았는지는 touch 로 답 위에 붙는다 (같은 말을 두 번 하지 않는다)
+  function told(chat, r, focus) {
+    const moved = !r.created && focus && focus !== r.card.id; // 펼쳐 둔 카드와 다른 카드에 담았다
+    const where = r.created ? (S.cardsOf(chat.projectId).length > 1 ? '있던 카드와 다른 이야기라 새 경험 카드를 만들었어요.' : '새 경험 카드를 만들었어요.') : moved ? '펼쳐 둔 카드보다 이 카드에 더 맞는 이야기라 여기에 담았어요.' : '';
+    const touch = { card: r.card.id, created: r.created, fields: r.fields };
+    const miss = missingOf(r.card);
+    if (!miss.length) return { who: 'ai', card: r.card.id, touch, text: `${where ? where + ' ' : ''}${r.before && !missingOf(r.before).length ? '' : '네 칸이 모두 채워졌어요. '}더 있었던 일이 있으면 이어서 적어 주세요.` };
+    const q = ask(chat, miss[0]); return Object.assign(q, { card: r.card.id, touch, text: where ? `${where}\n${q.text}` : q.text });
   }
 
-  // "제목을 …로 바꿔 줘", "역량은 리더십으로" 처럼 말로 고치기 (카드가 정해진 대화에서)
+  // 펼쳐 둔 카드 (이 프로젝트의 것만)
+  const focusCard = (chat) => { const e = chat.focus && S.get(chat.focus); return e && e.projectId === chat.projectId ? e : null; };
+  // "제목을 …로 바꿔 줘", "역량에 리더십 추가해 줘", "결과 지워 줘" 처럼 말로 고치기
   function command(chat, text) {
-    const card = chat.cardId && S.get(chat.cardId); if (!card) return null;
-    const base = { mode: 'update', cardId: card.id, title: card.title, changes: [], keywords: card.keywords.slice(), status: 'pending', fixed: true };
+    text = text.trim();
     // 명령형("…로 바꿔 줘")으로 끝날 때만. 이야기 속의 "바꿔서", "해결했어요" 는 명령이 아니다
     const ORDER = '(?:바꿔|고쳐|변경해|수정해|해)\\s?(?:줘|줘요|주세요|줄래요?|주실래요?)[.!?~]*$';
-    const t = text.match(new RegExp('^(제목|역할|요약)(?:을|를|은|는)?\\s*["\'「“]?(.+?)["\'」”]?\\s*(?:으로|로)\\s*' + ORDER));
+    const FIELD = { 제목: 'title', 역할: 'role', 요약: 'summary', '이력서 한 줄': 'resumeLine', 상황: 'situation', 과제: 'task', 행동: 'action', 결과: 'result' };
+    const card = focusCard(chat); const mk = (o) => S.feed(chat.id, Object.assign({ cardId: card.id }, o));
+    const isCmd = new RegExp('^(제목|역할|요약|이력서 한 줄|상황|과제|행동|결과|역량|키워드)').test(text) && new RegExp(ORDER).test(text) || /(지워|비워)\s?(줘|줘요|주세요|줄래요?)[.!?~]*$/.test(text) && /^(상황|과제|행동|결과)/.test(text);
+    if (isCmd && !card) return { who: 'ai', text: '어느 카드를 고칠까요? 오른쪽에서 카드를 먼저 골라 주세요.' };
+    if (!card) return null;
+    const done = (name, fields) => ({ who: 'ai', card: card.id, touch: { card: card.id, created: false, fields }, text: `${josa(name, '을', '를')} 바꿨어요.` });
+    const t = text.match(new RegExp('^(제목|역할|요약|이력서 한 줄|상황|과제|행동|결과)(?:을|를|은|는)?\\s*["\'「“]?(.+?)["\'」”]?\\s*(?:으로|로)\\s*' + ORDER));
     if (t) {
-      const field = { 제목: 'title', 역할: 'role', 요약: 'summary' }[t[1]];
-      base.changes.push({ field, before: card[field] || '', after: t[2] });
-      return { who: 'ai', kind: 'proposal', text: `${t[1]}${t[1] === '제목' || t[1] === '역할' ? '을' : '를'} 이렇게 바꿀게요.`, proposal: base };
+      const f = FIELD[t[1]];
+      if (f === 'resumeLine') mk({ patch: (e) => { if (!e.resumeLineEdited) e.aiLine = e.resumeLine; e.resumeLine = t[2]; e.resumeLineEdited = true; } });
+      else { const after = STAGES.includes(f) ? sentence(t[2]) : t[2]; mk({ changes: [{ field: f, after }], patch: STAGES.includes(f) ? settle({ [f]: after }) : (e) => { if (f === 'title') e.titled = true; } }); }
+      return done(t[1], [f]);
     }
+    const x = text.match(/^(상황|과제|행동|결과)(?:을|를|은|는)?\s*(?:내용을?\s*)?(?:지워|비워)\s?(?:줘|줘요|주세요|줄래요?)[.!?~]*$/);
+    if (x) { mk({ changes: [{ field: FIELD[x[1]], after: '' }], patch: settle({}) }); return { who: 'ai', card: card.id, stage: FIELD[x[1]], touch: { card: card.id, created: false, fields: [FIELD[x[1]]] }, text: `${josa(x[1], '을', '를')} 비웠어요.` }; }
     const k = /(역량|키워드)/.test(text) && /(바꿔|고쳐|변경해|수정해|넣어|추가해|해)\s?(줘|주세요|줄래)/.test(text) && App.keywords.names().filter((n) => text.includes(n) || text.includes(n.replace(/\s/g, '')));
-    if (k && k.length) {
-      base.keywords = /(추가|넣어)/.test(text) ? App.keywords.clean([...k, ...card.keywords]).slice(0, MAX_KW) : k.slice(0, MAX_KW);
-      return { who: 'ai', kind: 'proposal', text: '역량을 이렇게 바꿀게요.', proposal: base };
-    }
-    const r = text.match(new RegExp('^(상황|과제|행동|결과)(?:을|를|은|는)?\\s*["\'「“]?(.+?)["\'」”]?\\s*(?:으로|로)\\s*' + ORDER));
-    if (r) {
-      const field = { 상황: 'situation', 과제: 'task', 행동: 'action', 결과: 'result' }[r[1]];
-      base.changes.push({ field, before: card.star[field], after: sentence(r[2]) });
-      return { who: 'ai', kind: 'proposal', text: `${r[1]}${r[1] === '상황' || r[1] === '행동' ? '을' : '를'} 이렇게 바꿀게요.`, proposal: base };
-    }
+    if (k && k.length) { mk({ keywords: (/(추가|넣어)/.test(text) ? App.keywords.clean([...k, ...card.keywords]) : k).slice(0, MAX_KW) }); return done('역량', ['keywords']); }
     return null;
   }
   // 이야기가 아니라 부탁·인사인 말 → 카드에 담지 않고 되묻는다
@@ -206,43 +195,81 @@
   // ---------- 질문 ----------
   const josa = (w, a, b) => { const c = String(w).charCodeAt(String(w).length - 1) - 0xac00; return w + (c >= 0 && c <= 11171 && c % 28 === 0 ? b : a); };
   const missingOf = (card) => STAGES.filter((f) => !card.star[f]);
-  function opening({ projectId, cardId, keyword }) {
-    const card = cardId && S.get(cardId);
-    if (card) {
-      const miss = missingOf(card)[0]; const q = miss && window.SEED.followups[miss][0];
-      if (card.source === 'github') {
-        const read = ['situation', 'action'].filter((f) => card.star[f]).map((f) => `${LABEL[f]}: ${card.star[f]}`).join('\n');
-        return { who: 'ai', stage: miss || 'action', text: `「${card.title}」 작업을 GitHub에서 이렇게 읽었어요.\n\n${read}\n\n${miss ? `${josa(LABEL[miss], '은', '는')} 코드만 봐서는 알 수 없었어요. ${q}` : '왜 이 방법을 골랐는지 들려주세요.'}` };
-      }
-      return miss
-        ? { who: 'ai', stage: miss, text: `「${card.title}」 카드의 ${josa(LABEL[miss], '이', '가')} 비어 있어요. ${q}` }
-        : { who: 'ai', text: `「${card.title}」 카드에서 어떤 부분을 고치거나 더할까요? 편하게 말해 주세요.` };
-    }
-    if (keyword) return { who: 'ai', text: `「${keyword}」 역량을 보여 줄 수 있는 일이 있었나요? ${App.keywords.get(keyword).desc}이면 돼요.` };
-    const n = S.chatsOf(projectId).length;
-    return { who: 'ai', text: window.SEED.openers[n % window.SEED.openers.length] };
+  // 카드를 펼쳐 두고 새 채팅을 열 때의 안내
+  function opening(card) {
+    const miss = missingOf(card)[0]; const q = miss && window.SEED.followups[miss][0];
+    if (!miss) return { stage: null, text: '네 칸이 모두 채워진 카드예요. 더 있었던 일이 있으면 적어 주세요.' };
+    return { stage: miss, text: `${josa(LABEL[miss], '은', '는')} 아직 비어 있어요. ${q}` };
   }
   function ask(chat, stage, alt) {
-    const F = window.SEED.followups; const asked = new Set(chat.msgs.filter((m) => m.who === 'ai').map((m) => m.text));
+    const F = window.SEED.followups; const asked = chat.msgs.filter((m) => m.who === 'ai').map((m) => m.text).join('\n');
     const pool = alt ? F.alt : F[stage];
-    return { who: 'ai', stage: alt ? null : stage, text: pool.find((t) => !asked.has(t)) || pool[0] };
+    return { who: 'ai', stage: alt ? null : stage, text: pool.find((t) => !asked.includes(t)) || pool[0] };
   }
-  // 사용자가 말한 뒤 AI 가 할 말
-  function reply(chat) {
+  // 「이 카드 지워 줘」: 펼쳐 둔 카드를 휴지통으로
+  const DEL = /^(이|지금|펼친|고른|펼쳐 둔|이번)?\s?(경험\s?)?카드(를|을|는)?\s*(통째로\s*)?(지워|삭제해|없애|버려|휴지통(?:으로|에)\s*(?:옮겨|넣어|보내))\s?(줘|줘요|주세요|줄래요?|주실래요?)[.!?~]*$/;
+  const wantsDelete = (t) => DEL.test(String(t || '').trim());
+  // 사용자의 마지막 말을 듣고 카드에 담은 뒤, AI 가 할 말을 돌려준다. opt.ask: 지우기는 하지 않고 허락을 구하는 말을 돌려준다
+  function reply(chat, opt = {}) {
+    const me = chat.msgs[chat.msgs.length - 1]; const text = me.text.trim(); const focus = focusCard(chat) ? chat.focus : null;
+    const skip = (m) => { S.updateMsg(chat.id, me.id, { command: true }); return m; };
+    if (wantsDelete(text)) {
+      const card = focusCard(chat); if (!card) return skip({ who: 'ai', text: '어느 카드를 지울까요? 오른쪽에서 카드를 먼저 골라 주세요.' });
+      if (opt.ask) return skip(proposal({ op: 'delete', cardId: card.id, before: JSON.parse(JSON.stringify(card)), after: null, fields: [], ids: [], cmd: '' }));
+      const t = S.remove(card.id); return skip({ who: 'ai', kind: 'deleted', trash: t ? t.id : '', text: `「${card.title}」 카드를 휴지통으로 옮겼어요. 대화방은 그대로 남아요.` });
+    }
+    const cmd = command(chat, text); if (cmd) return skip(cmd);
+    if (wantsGithub(text)) return skip({ who: 'ai', kind: 'link', link: 'github', text: 'GitHub에서 찾은 작업은 이 프로젝트의 경험 카드로 만들어져요.' });
+    const st = smallTalk(text); if (st) return skip(st);
+    if (wantsSummary(text)) return skip({ who: 'ai', text: S.cardsOf(chat.projectId).length ? '말씀하신 내용은 오른쪽 경험 카드에 바로 담고 있어요.' : '아직 담을 이야기가 없어요. 있었던 일을 한 줄만 들려주세요.' });
+    if (/(모르겠|기억이 안|기억 안|글쎄|^(딱히|별로|특별히)?\s*(없어요?|없습니다|없었어요|없음|딱히요?|별로요?)[\s.!~]*$)/.test(text) && text.length < 20) return skip(Object.assign(ask(chat, null, true), { card: focus }));
+    if (SWITCH.test(text) && text.replace(SWITCH_LEAD, '').trim().length < 6) { S.setFocus(chat.id, null); return skip({ who: 'ai', text: '좋아요. 어떤 일이었는지 들려주세요. 새 경험 카드로 담을게요.' }); }
+    const r = feed(chat, route(chat, text)); if (!r) return { who: 'ai', text: '아직 담을 이야기가 없어요. 있었던 일을 한 줄만 들려주세요.' };
+    return told(chat, r, focus);
+  }
+  /* ---------- 허락 받기 (설정: 매번 묻기) ----------
+     카드를 만들거나 고치거나 지우기 전에, 무엇을 바꿀지 보여 주고 허락을 받는다.
+     바꿀 내용은 상태의 복사본에서 미리 해 보고(S.dry) 그 앞뒤 모습을 메시지에 담는다. 허락하면 그대로 반영하고, 그사이 카드가 바뀌었으면 반영하지 않는다.
+     msg.pending = { op:'create'|'update'|'delete', cardId, before, after, fields, ids:[카드에 담길 내 말], cmd:명령이었던 내 말 id, next:허락한 뒤 AI 가 할 말, status:'wait'|'ok'|'no'|'fail' } */
+  function proposal(p) {
+    const title = (p.after || p.before).title;
+    const names = (p.fields || []).map((f) => LABEL[f] || (f === 'keywords' ? '역량' : '')).filter(Boolean);
+    const text = p.op === 'create' ? `새 경험 카드 「${title}」${josa(title, '을', '를').slice(-1)} 만들까요?`
+      : p.op === 'delete' ? `「${title}」 카드를 휴지통으로 옮길까요? ${S.TRASH_DAYS}일 안에는 되돌릴 수 있어요.`
+      : `「${title}」 카드의 ${names.length ? josa(names.join('·'), '을', '를') : '내용을'} 이렇게 바꿀까요?`;
+    return { who: 'ai', kind: 'confirm', card: p.op === 'create' ? null : p.cardId, text, pending: Object.assign({ status: 'wait' }, p) };
+  }
+  function respond(chat) {
+    if (S.cardPerm() !== 'ask') return reply(chat);
     const me = chat.msgs[chat.msgs.length - 1];
-    const cmd = command(chat, me.text); if (cmd) { S.updateMsg(chat.id, me.id, { command: true }); return cmd; }
-    if (wantsGithub(me.text)) { S.updateMsg(chat.id, me.id, { command: true }); return githubMsg(chat.projectId); }
-    const st = smallTalk(me.text); if (st) { S.updateMsg(chat.id, me.id, { command: true }); return st; }
-    if (wantsSummary(me.text)) { S.updateMsg(chat.id, me.id, { command: true }); return collect(chat).answers ? proposalMsg(chat) : { who: 'ai', text: '아직 담을 이야기가 없어요. 있었던 일을 한 줄만 들려주세요.' }; }
-    if (/(모르겠|기억이 안|기억 안|글쎄|^(딱히|별로|특별히)?\s*(없어요?|없습니다|없었어요|없음|딱히요?|별로요?)[\s.!~]*$)/.test(me.text.trim()) && me.text.length < 20) { S.updateMsg(chat.id, me.id, { command: true }); return ask(chat, null, true); }
-    const c = collect(chat);
-    if (chat.cardId && S.get(chat.cardId) && !newStory(chat, c.text)) return proposalMsg(chat); // 이미 카드가 있는 대화는 바로 그 카드를 고친다
-    const missing = STAGES.find((f) => !c.fields[f]);
-    if (!missing || c.answers >= 5) return proposalMsg(chat);
-    return ask(chat, missing);
+    if (wantsDelete(me.text)) return reply(chat, { ask: true });
+    const rev0 = chat.last && chat.last.rev; const done0 = new Set(chat.msgs.filter((m) => m.done).map((m) => m.id));
+    const r = S.dry(() => {
+      const c = S.getChat(chat.id); const msg = reply(c, { ask: true }); const l = c.last;
+      if (!l || l.rev === rev0) return null; // 카드를 바꾸지 않는 답
+      return { msg, cardId: l.cardId, before: l.before, after: S.get(l.cardId), ids: c.msgs.filter((m) => m.who === 'me' && m.done && !done0.has(m.id)).map((m) => m.id) };
+    });
+    if (!r) return reply(chat);
+    const cmd = r.ids.includes(me.id) ? '' : me.id;
+    r.ids.concat(cmd ? [cmd] : []).forEach((id) => S.updateMsg(chat.id, id, { hold: true })); // 허락을 받을 때까지 다른 카드에 담지 않는다
+    if (r.before) S.setFocus(chat.id, r.cardId);
+    const t = r.msg.touch || {}; const next = { text: r.msg.text, stage: r.msg.stage || null, card: r.cardId, touch: { card: r.cardId, created: !r.before, fields: t.fields || [] } };
+    return proposal({ op: r.before ? 'update' : 'create', cardId: r.cardId, before: r.before, after: r.after, fields: t.fields || [], ids: r.ids, cmd, next });
   }
-  // 정리할 거리가 있고, 아직 정리 제안이 걸려 있지 않은가
-  function canSummarize(chat) { return collect(chat).answers > 0 && !chat.msgs.some((m) => m.kind === 'proposal' && m.proposal.status === 'pending'); }
+  // 허락하거나(yes) 거절한다 → { msg: AI 가 이어서 할 말, changed?, removed? } | null
+  function decide(chatId, msgId, yes) {
+    const c = S.getChat(chatId); const m = c && c.msgs.find((x) => x.id === msgId); const p = m && m.pending; if (!p || p.status !== 'wait') return null;
+    const release = (patch) => { p.ids.forEach((id) => S.updateMsg(chatId, id, Object.assign({ hold: false }, patch))); if (p.cmd) S.updateMsg(chatId, p.cmd, { hold: false, command: true }); };
+    const close = (status) => S.updateMsg(chatId, msgId, { pending: Object.assign({}, p, { status }) });
+    if (!yes) { release({ command: true }); close('no'); return { msg: { who: 'ai', text: p.op === 'delete' ? '카드를 지우지 않았어요.' : '카드는 그대로 두었어요. 다르게 담고 싶으면 다시 말씀해 주세요.' } }; }
+    const r = S.applyProposal(chatId, p);
+    if (r.error) { release({ command: true }); close('fail'); return { msg: { who: 'ai', text: r.error === 'changed' ? '그사이 카드가 바뀌어서 반영하지 않았어요. 다시 말씀해 주시면 지금 카드에 맞춰 담을게요.' : '카드나 프로젝트가 휴지통에 있어서 반영하지 못했어요.' } }; }
+    close('ok');
+    if (r.removed) return { removed: true, msg: { who: 'ai', kind: 'deleted', trash: r.trash ? r.trash.id : '', text: `「${r.removed.title}」 카드를 휴지통으로 옮겼어요. 대화방은 그대로 남아요.` } };
+    release({ done: true, card: r.card.id });
+    return { changed: true, msg: Object.assign({ who: 'ai' }, p.next) };
+  }
+  const SWITCH_LEAD = /^(다른|또 다른|새로운)\s?(이야기|얘기|경험)(인데요?|예요|이에요|입니다|할게요|할래요)?[,.\s]*/;
 
-  App.chat = { opening, reply, proposalMsg, retarget, carry, lineOf, apply, undo, cardState, missingOf, githubMsg, wantsGithub, GH_TITLE, canSummarize, collect, LABEL, STAGES, MAX_KW, _internals: { polish, inferField, match } };
+  App.chat = { opening, respond, decide, wantsDelete, cardState, missingOf, githubMsg, wantsGithub, GH_TITLE, LABEL, STAGES, _internals: { polish, inferField, match, newStory, route } };
 })(window.App);

@@ -248,22 +248,21 @@
               : `<textarea class="textarea" data-ov-jd rows="10" aria-label="공고 내용" placeholder="주요 업무, 자격 요건, 우대 사항을 붙여 넣어 주세요.">${esc(a.jdText)}</textarea><div class="row ap-jd-foot"><button type="button" class="btn" data-ov="jd-save">저장</button>${a.jdText ? '<button type="button" class="btn btn-ghost" data-ov="jd-cancel">취소</button>' : ''}</div>`}</section>
         </div>
         <div class="split-side ap-side">${todoHtml(a)}
-          <section><h2 class="section-title"><label for="ap-memo">메모</label><span class="count" role="status" data-ov-saved></span></h2>
-            <textarea class="textarea" id="ap-memo" rows="5" placeholder="면접 일정, 회사 조사">${esc(a.memo)}</textarea></section></div>
+          <section data-wr><h2 class="section-title"><label for="ap-memo">메모</label></h2>
+            <textarea class="textarea" id="ap-memo" rows="5" placeholder="면접 일정, 회사 조사">${esc(a.memo)}</textarea>${App.ui.wrFoot()}</section></div>
       </div>`;
     },
     mount(el, app, ctx) {
-      const id = app.id; const ui = {}; let timer = null;
+      const id = app.id; const ui = {};
       const cur = () => App.store.getApp(id);
       const draw = () => {
         flush(); const typed = ['[data-ov-jd]', '[name=url]'].map((q) => [q, (el.querySelector(q) || {}).value]);
         el.innerHTML = App.applyTabs.overview.render(cur(), ui);
         typed.forEach(([q, v]) => { const t = el.querySelector(q); if (t && v != null) t.value = v; }); // 쓰던 글은 남긴다
       };
-      // 메모: 쉬면 저장
       const flush = () => {
-        clearTimeout(timer); timer = null; const ta = el.querySelector('#ap-memo'); const a = cur(); if (!ta || !a || (a.memo || '') === ta.value) return;
-        App.store.updateApp(id, { memo: ta.value }); el.querySelector('[data-ov-saved]').textContent = '저장됨';
+        const ta = el.querySelector('#ap-memo'); const a = cur(); if (!ta || !a || (a.memo || '') === ta.value) return;
+        App.store.updateApp(id, { memo: ta.value }); App.ui.wrSaved(ta);
       };
       const saveJd = () => { const ta = el.querySelector('[data-ov-jd]'); const a = cur(); if (ta && a && (a.jdText || '') !== ta.value.trim()) App.store.updateApp(id, { jdText: ta.value.trim() }); };
       el.addEventListener('click', (ev) => {
@@ -273,8 +272,7 @@
         else if (k === 'jd-save') { const t = el.querySelector('[data-ov-jd]'); if (!t.value.trim() && !cur().jdText) { t.focus(); return; } saveJd(); ui.jd = false; draw(); App.ui.toast('공고 내용을 저장했어요'); }
       });
       el.addEventListener('submit', (ev) => { ev.preventDefault(); if (saveUrl(ev.target, id)) { draw(); ctx.refreshHead(); } });
-      el.addEventListener('input', (ev) => { if (ev.target.id !== 'ap-memo') return; el.querySelector('[data-ov-saved]').textContent = ''; clearTimeout(timer); timer = setTimeout(flush, 600); });
-      el.addEventListener('focusout', (ev) => { if (ev.target.id === 'ap-memo') flush(); });
+      el.addEventListener('wr-save', flush);
       const leave = () => { flush(); if (cur()) saveJd(); };
       window.addEventListener('beforeunload', leave);
       // 공고 내용을 쓰다가 다른 탭으로 가도 쓴 글은 남긴다

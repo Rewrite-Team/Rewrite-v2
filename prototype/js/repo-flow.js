@@ -12,7 +12,7 @@
   const PAGE = 8;
 
   /* ---------------- ① 레포 고르기 ---------------- */
-  // opts: { onPick(repo|null), projectId(이 프로젝트에 연결하는 중) }
+  // opts: { onPick(repo|null), projectId(이 프로젝트에 연결하는 중), keepAccount(계정 바꾸기를 숨긴다: AI 채팅) }
   function mountPicker(el, opts = {}) {
     const st = { q: '', all: false, busy: '', error: '', input: '', picked: '', changing: false };
     let run = 0;
@@ -27,13 +27,13 @@
     function accountHTML() {
       const off = st.busy ? 'disabled' : '';
       const foot = [st.busy ? '' : '<button type="button" class="btn btn-ghost btn-sm" data-rf="sample">예시 계정으로 해 보기</button>',
-        st.busy || st.changing ? `<button type="button" class="btn btn-ghost btn-sm" data-rf="cancel">${st.busy ? '그만두기' : '이전 계정으로'}</button>` : ''].join('');
+        st.changing && !st.busy ? '<button type="button" class="btn btn-ghost btn-sm" data-rf="cancel">이전 계정으로</button>' : ''].join('');
       return `<form class="rf-account" data-rf-form novalidate>
         <div class="field"><label class="label" for="rf-url">GitHub 주소</label>
           <div class="rf-inline"><input class="input" id="rf-url" value="${esc(st.input)}" placeholder="github.com/내아이디" autocapitalize="off" autocomplete="off" spellcheck="false" ${off} aria-describedby="rf-url-d" ${st.error ? 'aria-invalid="true"' : ''} />
             <button class="btn" type="submit" ${off}>불러오기</button></div>
           ${st.error ? `<p class="field-error" id="rf-url-d" role="alert">${App.icon('warning', 15)}<span>${esc(st.error)}</span></p>` : '<p class="field-hint" id="rf-url-d">내 레포와 소속 조직의 공개 레포를 한 번에 불러와요.</p>'}</div>
-        ${st.busy ? `<p class="rf-busy" role="status"><span class="spinner"></span><span data-rf-busy>${esc(st.busy)}</span></p>` : ''}
+        ${st.busy ? `<p class="rf-busy" role="status" tabindex="-1"><span class="spinner"></span><span data-rf-busy>${esc(st.busy)}</span></p>` : ''}
         <div class="rf-account-foot">${foot}</div>
       </form>`;
     }
@@ -47,7 +47,7 @@
     function listHTML() {
       const q = st.q.trim().toLowerCase();
       const list = repos().filter((r) => !q || keyOf(r) === st.picked || [r.name, r.description, r.language, r.owner, r.ownerName].join(' ').toLowerCase().includes(q));
-      if (!list.length) return `<p class="rf-none">${q ? '찾는 레포가 없어요.' : '공개 레포가 없어요. 다른 계정을 불러오거나 직접 만들어 주세요.'}</p>`;
+      if (!list.length) return `<p class="rf-none">${q ? '찾는 레포가 없어요.' : opts.keepAccount ? '공개 레포가 없어요. GitHub 계정은 설정에서 바꿀 수 있어요.' : '공개 레포가 없어요. 다른 계정을 불러오거나 직접 만들어 주세요.'}</p>`;
       const shown = st.all || q ? list : list.filter((r, i) => i < PAGE || keyOf(r) === st.picked);
       return shown.map(rowHTML).join('') + (list.length > shown.length ? `<button type="button" class="btn btn-ghost btn-sm rf-more" data-rf="all">${list.length - shown.length}개 더 보기</button>` : '');
     }
@@ -55,14 +55,14 @@
     function paint() {
       const g = S.github();
       if (!g || st.changing || st.busy) { el.innerHTML = accountHTML(); return; }
-      el.innerHTML = `<div class="rf-bar"><span class="rf-who">${App.icon('github', 16)}<b>${esc(g.login)}</b>${g.source === 'sample' ? '<span class="tag">예시</span>' : ''}</span><button type="button" class="btn btn-ghost btn-sm" data-rf="change">계정 바꾸기</button></div>
+      el.innerHTML = `<div class="rf-bar"><span class="rf-who">${App.icon('github', 16)}<b>${esc(g.login)}</b>${g.source === 'sample' ? '<span class="tag">예시</span>' : ''}</span>${opts.keepAccount ? '' : '<button type="button" class="btn btn-ghost btn-sm" data-rf="change">계정 바꾸기</button>'}</div>
         ${(g.warnings || []).map((w) => `<p class="banner banner-warn rf-warn">${App.icon('warning')}<span>${esc(w)}</span></p>`).join('')}
         <div class="input-icon rf-search">${App.icon('search', 16)}<input class="input" type="search" data-rf-q value="${esc(st.q)}" placeholder="레포 검색" aria-label="레포 검색" /></div>
         <div class="rf-list" data-rf-list role="radiogroup" aria-label="GitHub 레포">${listHTML()}</div>`;
     }
     async function load(input) {
       const id = ++run; const me = (App.auth.current() || {}).id;
-      st.input = input; st.error = ''; st.busy = App.github.ACCOUNT_STEPS[0]; paint(); focus('[data-rf=cancel]');
+      st.input = input; st.error = ''; st.busy = App.github.ACCOUNT_STEPS[0]; paint(); focus('.rf-busy');
       const live = () => id === run && (App.auth.current() || {}).id === me && el.isConnected;
       try {
         const a = await App.github.fetchAccount(input, { onProgress: (p) => { if (!live()) return; st.busy = p.text || st.busy; const b = el.querySelector('[data-rf-busy]'); if (b) b.textContent = st.busy; } });
@@ -80,7 +80,7 @@
       const b = ev.target.closest('[data-rf]'); if (!b) return; const a = b.getAttribute('data-rf');
       if (a === 'sample') load(App.github.sampleAccount().login);
       else if (a === 'change') { Object.assign(st, { changing: true, error: '', input: '' }); pick(''); paint(); focus('#rf-url'); }
-      else if (a === 'cancel') { run++; if (st.busy) st.busy = ''; else st.changing = false; st.error = ''; paint(); focus('#rf-url, [data-rf-q]'); }
+      else if (a === 'cancel') { st.changing = false; st.error = ''; paint(); focus('#rf-url, [data-rf-q]'); }
       else if (a === 'all') { st.all = true; drawList(); focus(`.rf-repo:nth-child(n+${PAGE + 1}) input:not(:disabled)`); }
     });
     el.addEventListener('input', (ev) => { if (ev.target.matches('[data-rf-q]')) { st.q = ev.target.value; drawList(); } });
@@ -90,7 +90,7 @@
   }
 
   /* ---------------- ② 새 프로젝트 ---------------- */
-  function openNewProject(done) {
+  function openNewProject(done, opts = {}) {
     let mode = 'github'; let repo = null;
     const manualHTML = `<div class="rf-manual">
         <div class="field"><label class="label" for="rf-title">프로젝트 이름</label><input class="input" id="rf-title" maxlength="40" placeholder="예: 교내 해커톤, 카페 아르바이트" /><p class="field-hint">팀 과제, 동아리, 아르바이트도 프로젝트예요.</p></div>
@@ -104,7 +104,7 @@
         const draw = () => {
           repo = null; const p = pane.cloneNode(false); root.querySelector('[data-rf-pane]').replaceWith(p);
           root.querySelectorAll('[data-mode]').forEach((b) => { b.classList.toggle('is-on', b.dataset.mode === mode); b.setAttribute('aria-pressed', String(b.dataset.mode === mode)); });
-          if (mode === 'github') { ok.disabled = true; mountPicker(p, { onPick: (r) => { repo = r; ok.disabled = !r; } }); }
+          if (mode === 'github') { ok.disabled = true; mountPicker(p, { keepAccount: opts.keepAccount, onPick: (r) => { repo = r; ok.disabled = !r; } }); }
           else { p.innerHTML = manualHTML; const t = p.querySelector('#rf-title'); ok.disabled = true; t.oninput = () => { ok.disabled = !t.value.trim(); }; t.focus(); }
         };
         root.querySelectorAll('[data-mode]').forEach((b) => { b.onclick = () => { if (mode === b.dataset.mode) return; mode = b.dataset.mode; draw(); }; });
@@ -123,11 +123,11 @@
   }
 
   /* ---------------- ③ 연결 ---------------- */
-  function connect(projectId, done) {
+  function connect(projectId, done, opts = {}) {
     const p = S.getProject(projectId); if (!p) return; let repo = null;
     App.ui.modal({
       title: `「${p.title}」에 GitHub 연결`, confirmText: '연결하기', size: 'lg', body: '<div data-rf-pane class="rf-pane"></div>',
-      onOpen(root) { const ok = root.querySelector('[data-m=ok]'); ok.disabled = true; mountPicker(root.querySelector('[data-rf-pane]'), { projectId, onPick: (r) => { repo = r; ok.disabled = !r; } }); },
+      onOpen(root) { const ok = root.querySelector('[data-m=ok]'); ok.disabled = true; mountPicker(root.querySelector('[data-rf-pane]'), { projectId, keepAccount: opts.keepAccount, onPick: (r) => { repo = r; ok.disabled = !r; } }); },
       onConfirm() {
         if (!repo) return false;
         S.linkRepo(projectId, { owner: repo.owner, name: repo.name, url: repo.url, branch: repo.branch || 'main' });
@@ -166,14 +166,13 @@
   // picked: 고른 초안 key 의 Set. 체크박스는 [data-draft=<key>]
   function draftsHTML(drafts, picked, opts = {}) {
     return drafts.map((d) => {
-      const ev = Object.assign({ commits: [], prs: [], files: [] }, d.evidence); const on = picked.has(d.key);
-      const src = [[ev.commits, '커밋', '개'], [ev.prs, 'PR', '개'], [ev.files, '코드', '곳']].filter(([l]) => l.length).map(([l, n, u]) => `<span>${n} ${l.length}${u}</span>`).join('');
+      const ev = App.ui.evidence(d.evidence); const on = picked.has(d.key);
       return `<div class="rf-draft"><label class="choice ${on ? 'is-on' : ''}"><input type="checkbox" data-draft="${esc(d.key)}" ${on ? 'checked' : ''} ${opts.disabled ? 'disabled' : ''} />
           <span class="choice-main"><span class="choice-title">${esc(d.title)}</span><span class="choice-sub">${esc(App.ai.resumeLine(d))}</span>
             <span class="rf-draft-kws">${d.keywords.map((k) => App.ui.keywordChip(k)).join('')}${d.trashed ? '<span class="tag">휴지통에 있는 카드</span>' : ''}</span></span></label>
-        <details class="rf-draft-more"><summary>내용과 근거 보기</summary>
-          <dl class="rf-star">${STAR.map(([k, l]) => `<div><dt>${l}</dt><dd>${d.star[k] ? esc(d.star[k]) : '<span class="subtle">비어 있어요. AI 채팅으로 채울 수 있어요.</span>'}</dd></div>`).join('')}</dl>
-          ${src ? `<p class="meta">${src}</p>` : ''}</details></div>`;
+        <details class="rf-draft-more"><summary>${App.icon('chevron-right', 16)}자세히 보기${ev ? `<span class="meta">${ev.counts}</span>` : ''}</summary>
+          <dl class="rf-star">${STAR.map(([k, l]) => `<div><dt>${l}</dt><dd>${d.star[k] ? esc(d.star[k]) : '<span class="subtle">비어 있어요. AI 채팅에서 채울 수 있어요.</span>'}</dd></div>`).join('')}</dl>
+          ${ev ? `<div class="cd-ev-body rf-ev">${ev.body}</div>` : ''}</details></div>`;
     }).join('');
   }
   // trashed 같은 표시용 값은 카드에 남기지 않는다

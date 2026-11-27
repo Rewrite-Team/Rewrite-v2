@@ -28,7 +28,7 @@
         <button type="button" class="iv-main" data-iv="toggle" aria-expanded="${open}" aria-controls="iv-body-${id}"><span class="iv-q">${esc(q.text)}</span>${q.expId ? App.applyUtil.cardRef(q.expId) : ''}${I('chevron-down', 18)}</button></div>
       ${open ? `<div class="iv-body" id="iv-body-${id}">
         <div class="field">${none ? '' : `<label class="label" for="iv-card-${id}">답변에 쓸 경험 카드</label>${cardSelect(q)}`}${none ? `<button type="button" class="btn btn-sm" data-chat data-chat-kw="${esc((q.keywords || [])[0] || '')}">${I('chat', 16)}AI 채팅으로 경험 카드 만들기</button>` : ''}${q.expId ? brief(q.expId) : ''}</div>
-        <div class="field"><label class="label" for="iv-note-${id}">답변 메모</label><textarea class="textarea" id="iv-note-${id}" data-iv-note="${id}" rows="3" placeholder="꼭 말할 숫자, 마무리 한마디">${esc(q.note)}</textarea></div>
+        <div class="field" data-wr><label class="label" for="iv-note-${id}">답변 메모</label><textarea class="textarea" id="iv-note-${id}" data-iv-note="${id}" rows="3" placeholder="꼭 말할 숫자, 마무리 한마디">${esc(q.note)}</textarea>${App.ui.wrFoot()}</div>
         <div class="row iv-foot"><button type="button" class="btn btn-sm btn-ghost" data-iv="edit">${I('edit', 16)}질문 고치기</button><button type="button" class="btn btn-sm btn-ghost" data-iv="del">${I('trash', 16)}질문 지우기</button></div></div>` : ''}</li>`;
   }
   function render(app) {
@@ -48,7 +48,7 @@
       const cur = () => App.store.getApp(appId);
       const find = (id) => { const a = cur(); return a && a.interview.find((q) => q.id === id); };
       const put = (id, patch) => App.store.updateAppItem(appId, 'interview', id, patch);
-      const saveNotes = () => el.querySelectorAll('[data-iv-note]').forEach((ta) => { const q = find(ta.dataset.ivNote); if (q && (q.note || '') !== ta.value) put(q.id, { note: ta.value }); });
+      const saveNotes = () => el.querySelectorAll('[data-iv-note]').forEach((ta) => { const q = find(ta.dataset.ivNote); if (q && (q.note || '') !== ta.value) { put(q.id, { note: ta.value }); App.ui.wrSaved(ta); } });
       const draw = () => { if (!alive || !cur()) return; saveNotes(); el.innerHTML = render(cur()); };
       const all = () => { draw(); ctx.refreshHead(); };
       const focusOn = (id, sel) => { const t = el.querySelector(`[data-iv-item="${CSS.escape(id)}"] ${sel}`); if (t) t.focus({ preventScroll: true }); };
@@ -104,8 +104,7 @@
         if (t.dataset.ivCheck) { put(t.dataset.ivCheck, { checked: t.checked }); all(); focusOn(t.dataset.ivCheck, '[data-iv-check]'); }
         else if (t.dataset.ivCard) { put(t.dataset.ivCard, { expId: t.value || null }); draw(); focusOn(t.dataset.ivCard, 'select'); }
       };
-      const onBlur = (ev) => { if (ev.target.matches('[data-iv-note]')) saveNotes(); };
-      el.addEventListener('click', onClick); el.addEventListener('change', onChange); el.addEventListener('focusout', onBlur);
+      el.addEventListener('click', onClick); el.addEventListener('change', onChange); el.addEventListener('wr-save', saveNotes);
       window.addEventListener('beforeunload', saveNotes);
       return () => { saveNotes(); alive = false; ui.loading = false; window.removeEventListener('beforeunload', saveNotes); };
     },

@@ -15,3 +15,10 @@
   .set-ctrl:has(> :nth-child(3)) { flex-wrap: wrap; }
   .set-ctrl:has(> :nth-child(3)) > .set-value { flex-basis: 100%; }
 }
+
+/* 저장·취소는 칸 옆에 */
+.set-field[data-wr] { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; max-width: none; }
+.set-field[data-wr] > .input { flex: 0 1 360px; min-width: 0; }
+.set-field[data-wr] > .wr-foot { margin: 0; flex-direction: row-reverse; }
+.set-field[data-wr] > .field-error { flex-basis: 100%; margin-top: 0; }
+@media (max-width: 600px) { .set-field[data-wr] > .input { flex-basis: 100%; } .set-field[data-wr] > .wr-foot { margin-left: auto; } }

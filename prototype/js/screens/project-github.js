@@ -35,8 +35,7 @@
   const repoLabel = (x) => `${x.repo ? x.repo.name : ''}${x.total > 1 ? ` (${x.index + 1}/${x.total})` : ''}`;
   function runHTML(run) {
     return `<div class="pg-run" aria-busy="true"><p class="meta"><span>${App.icon('github', 15)}<span data-pg-repo>${esc(repoLabel(run.prog))}</span></span></p>
-      <div data-pg-steps data-step="${run.prog.step}">${App.repoFlow.stepsHTML(run.prog)}</div><span class="sr-only" role="status" data-pg-say>${esc(run.prog.text || '분석하는 중')}</span>
-      <button type="button" class="btn" data-act="stop">그만두기</button></div>`;
+      <div data-pg-steps data-step="${run.prog.step}">${App.repoFlow.stepsHTML(run.prog)}</div><span class="sr-only" role="status" data-pg-say>${esc(run.prog.text || '분석하는 중')}</span></div>`;
   }
   // 단계가 그대로면 글자만 바꾼다 (돌아가는 표시가 끊기지 않게)
   function paintSteps(run) {
@@ -107,7 +106,6 @@
       view = { key: keyOf(id), root, pid: id }; const mine = view;
       const back = () => App.navigate('#/vault/p/' + encodeURIComponent(id));
       const acts = {
-        stop() { runs.delete(keyOf(id)); back(); },
         again() { start(S.getProject(id)); paint(); window.scrollTo(0, 0); },
         connect() { App.repoFlow.connect(id, () => App.rerender()); },
         save() {

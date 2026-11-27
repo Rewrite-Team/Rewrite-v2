@@ -5,3 +5,57 @@
 .auth-form :is(.field-hint, .field-error):empty { display: none; }
 .auth-form .au-demo { margin-top: 8px; }
 .au-note { display: block; margin-top: 24px; }
+
+/* ===== 왼쪽: 잉크 책상 위의 이력서 한 장 =====
+   말한 문장(.au-say) → 빨간 줄 → 이력서 문장(.au-line) → 형광펜. 단계는 .au-slot 의 is-* 로 */
+.auth { height: 100vh; height: 100dvh; min-height: 560px; }
+.auth-brand, .auth-form { min-height: 0; }
+.auth-form { overflow-y: auto; }
+.au-pitch { flex: none; margin: clamp(24px, 6vh, 72px) 0 clamp(24px, 5vh, 48px); }
+.au-pitch h2 { font-size: 34px; line-height: 1.35; letter-spacing: -0.03em; text-wrap: balance; }
+.au-pitch p { max-width: 44ch; margin-top: 12px; color: color-mix(in srgb, var(--surface) 80%, var(--primary)); }
+.au-replay { position: absolute; right: 24px; top: 24px; border-color: transparent; background: none; color: color-mix(in srgb, var(--surface) 80%, var(--primary)); font-weight: 500; }
+.au-replay:hover, .au-replay:active { border-color: transparent; background: var(--primary); color: var(--surface); }
+.auth-brand :focus-visible { outline-color: var(--hl); }
+
+.au-paper { flex: 1 0 auto; width: 100%; max-width: clamp(560px, 40vw, 720px); padding: 36px 40px 60px; border-radius: 3px 3px 0 0; background: var(--surface); color: var(--text); box-shadow: var(--shadow-lg); animation: au-rise .7s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes au-rise { from { transform: translateY(64px); opacity: 0; } }
+.au-p-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding-bottom: 16px; border-bottom: 2px solid var(--text); }
+.au-p-head strong { display: block; font-size: 24px; line-height: 1.3; letter-spacing: -0.03em; }
+.au-p-head span { font-size: var(--fs-sm); color: var(--text-2); }
+.au-p-head .au-bars { width: 120px; margin: 0 0 4px; align-items: flex-end; }
+.au-p-title { margin: 22px 0 12px; font-size: var(--fs-sm); font-weight: 700; color: var(--primary-ink); }
+.au-bars { display: flex; flex-direction: column; gap: 9px; }
+.au-bars i { height: 8px; border-radius: 2px; background: var(--surface-3); }
+
+.au-slots { display: flex; flex-direction: column; gap: 18px; min-height: 248px; }
+.au-slot { opacity: 0; transform: translateY(6px); transition: opacity .35s, transform .35s; }
+.au-slot.is-in { opacity: 1; transform: none; }
+.au-slot-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.au-slot-head b { font-weight: 700; }
+.au-slot-head span { font-size: var(--fs-xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.au-say { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .45s cubic-bezier(.3, 0, .2, 1), opacity .3s; }
+.au-say > div { min-height: 0; overflow: hidden; }
+.au-say p { width: fit-content; min-height: 36px; margin: 5px 0 6px; padding: 4px 13px; border-radius: 12px 12px 12px 3px; background: var(--primary-soft); line-height: 28px; }
+.au-slot:not(.is-typing, .is-struck, .is-done) .au-say p { visibility: hidden; }
+.au-said { background: linear-gradient(var(--danger), var(--danger)) no-repeat 0 54% / 0 1.5px; transition: background-size .45s ease-in-out, color .45s; }
+.is-typing .au-said::after { content: ""; display: inline-block; width: 2px; height: 1.05em; margin-left: 2px; vertical-align: -.16em; background: var(--primary); }
+.is-struck .au-said { background-size: 100% 1.5px; color: var(--text-3); }
+.is-in:not(.is-done) .au-say { grid-template-rows: 1fr; }
+.is-done .au-say { opacity: 0; }
+.au-line { position: relative; padding-left: 14px; font-size: var(--fs-md); font-weight: 500; line-height: 1.75; }
+.au-line::before { content: ""; position: absolute; left: 2px; top: .75em; width: 4px; height: 4px; border-radius: 50%; background: var(--text-3); opacity: 0; transition: opacity .3s; }
+.is-line .au-line::before { opacity: 1; }
+.au-w { display: inline-block; opacity: 0; transform: translateY(5px); transition: opacity .28s, transform .28s; transition-delay: calc(var(--i) * 55ms); }
+.is-line .au-w { opacity: 1; transform: none; }
+.au-mark { background: linear-gradient(var(--hl), var(--hl)) no-repeat 0 0 / 0 100%; transition: background-size .5s ease-out; }
+.is-marked .au-mark { background-size: 100% 100%; }
+.au-mark { font-weight: 700; }
+.au-paper.is-reset, .au-paper.is-reset * { transition: none !important; }
+
+@media (max-width: 1100px) {
+  .auth-brand { padding-left: 32px; padding-right: 32px; }
+  .au-pitch h2 { font-size: 28px; }
+  .au-paper { padding: 28px 28px 48px; }
+}
+@media (max-width: 900px) { .auth { height: auto; } .auth-form { overflow: visible; } }

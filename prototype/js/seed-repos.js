@@ -618,11 +618,21 @@ module.exports = function verifySlack(req, res, next) {
   // 레포 분석으로 만든 카드
   const card = (id, projectId, role, s, rule, at) => {
     const d = clone(s.drafts.find((x) => x.key.endsWith(':' + rule)));
-    return Object.assign(d, { id, projectId, role, retrospect: '', source: 'github', chatIds: [], createdAt: at, updatedAt: at });
+    return Object.assign(d, { id, projectId, role, retrospect: '', source: 'github', createdAt: at, updatedAt: at });
   };
   SEED.experiences.push(
     card('g1', 'p1', '백엔드', moyeobom, 'spring_cache', '2026-11-18'),
     card('g2', 'p1', '백엔드', moyeobom, 'pessimistic_lock', '2026-11-18'),
     card('g3', 'p3', '백엔드 + 팀장', classroom, 'jpa_index', '2026-11-14'),
   );
+  // 레포 분석은 프로젝트마다 대화방 하나에 남는다: 만든 카드 목록을 보여 주는 GitHub 메시지 하나
+  [...new Set(['g1', 'g2', 'g3'].map((id) => SEED.experiences.find((x) => x.id === id).projectId))].forEach((projectId) => {
+    const made = SEED.experiences.filter((e) => e.projectId === projectId && /^g\d+$/.test(e.id));
+    const at = `${made[0].createdAt} 21:00`;
+    SEED.chats.push({
+      id: 'c_gh_' + projectId, projectId, title: 'GitHub에서 찾은 경험', focus: made[made.length - 1].id, createdAt: at, updatedAt: at,
+      msgs: [{ id: 'm_gh_' + projectId + '_1', who: 'ai', at, kind: 'github', text: `경험 카드 ${made.length}장을 만들었어요.`,
+        gh: { status: 'done', step: 0, picked: [], drafts: [], madeIds: made.map((e) => e.id), error: '' } }],
+    });
+  });
 })(window.SEED);

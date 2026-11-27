@@ -114,12 +114,11 @@
     if (writing.has(keyOf(q.id))) return `<section class="ae-sec"><h3 class="section-title">자소서</h3><div class="ae-wait" role="status"><span class="sr-only">고른 카드로 자소서를 쓰고 있어요</span>${[96, 100, 88, 94, 60].map((w) => `<span class="skeleton" style="width:${w}%"></span>`).join('')}</div></section>`;
     if (!written(q) && !st.manual) return '';
     const text = String(q.answer || '');
-    return `<section class="ae-sec"><h3 class="section-title"><label for="ae-text">자소서</label><span class="count" data-ae-saved role="status"></span></h3>
+    return `<section class="ae-sec" data-wr><h3 class="section-title"><label for="ae-text">자소서</label></h3>
       <div data-ae-slots>${slotBanner(q, text)}</div>
       <div class="ae-editor"><div class="ae-mirror" aria-hidden="true" data-ae-mirror>${mirror(q, text)}</div><textarea id="ae-text" data-q="${esc(q.id)}" class="textarea" spellcheck="false" aria-describedby="ae-count" placeholder="자소서를 써 주세요.">${esc(text)}</textarea></div>
-      <div class="ae-draft-foot"><span id="ae-count" data-ae-count>${countHtml(q, text)}</span>
-        <span class="row spacer">${q.prevAnswer ? `<button type="button" class="btn btn-sm btn-ghost" data-ae="undo">${I('restore', 16)}이전 글로 되돌리기</button>` : ''}<button type="button" class="btn btn-sm" data-ae="copy">${I('copy', 16)}복사</button></span></div></section>
-      ${q.note ? `<section class="ae-sec"><h3 class="section-title"><label for="ae-note">메모</label></h3><textarea id="ae-note" data-q="${esc(q.id)}" class="textarea ae-note" rows="2">${esc(q.note)}</textarea></section>` : ''}`;
+      ${App.ui.wrFoot(`<span id="ae-count" data-ae-count>${countHtml(q, text)}</span>${q.prevAnswer ? `<button type="button" class="btn btn-sm btn-ghost" data-ae="undo">${I('restore', 16)}이전 글로 되돌리기</button>` : ''}<button type="button" class="btn btn-sm" data-ae="copy">${I('copy', 16)}복사</button>`)}</section>
+      ${q.note ? `<section class="ae-sec" data-wr><h3 class="section-title"><label for="ae-note">메모</label></h3><textarea id="ae-note" data-q="${esc(q.id)}" class="textarea ae-note" rows="2">${esc(q.note)}</textarea>${App.ui.wrFoot()}</section>` : ''}`;
   }
 
   function detailHtml(app, ui) {
@@ -136,7 +135,7 @@
   App.applyTabs.essay = {
     label: '자소서', render,
     mount(el, app0, ctx) {
-      const appId = app0.id; const ui = uiOf(appId); let alive = true; let timer = null; let dirty = false;
+      const appId = app0.id; const ui = uiOf(appId); let alive = true; let dirty = false;
       const cur = () => App.store.getApp(appId);
       const now = () => { const a = cur(); return a && current(a, ui); };
       const byId = (id) => { const a = cur(); return a && a.essays.find((x) => x.id === id); };
@@ -148,16 +147,16 @@
       const drawDraft = () => { const q = now(); if (q) $('[data-ae-draft]').innerHTML = draftHtml(q, qui(ui, q)); };
       const drawPicked = () => { const q = now(); const box = $('[data-ae-picked]'); if (q && box) box.innerHTML = pickedHtml(q); };
 
-      /* 본문 저장: 쉬면 저장 */
+      /* 본문 저장: 저장 버튼, 또는 다른 동작을 하거나 떠날 때 */
       function flush() {
-        clearTimeout(timer); timer = null; const ta = $('#ae-text'); const q = ta && byId(ta.dataset.q); if (!dirty) return; dirty = false;
+        const ta = $('#ae-text'); const q = ta && byId(ta.dataset.q); if (!dirty) return; dirty = false;
         if (!q || (q.answer || '') === ta.value) return;
-        const had = written(q); put(q.id, { answer: ta.value }); $('[data-ae-saved]').textContent = '저장됨';
+        const had = written(q); put(q.id, { answer: ta.value }); App.ui.wrSaved(ta);
         drawNav(); if (had !== written(q)) ctx.refreshHead();
       }
       function leave() {
         flush(); const note = $('#ae-note'); const q = note && byId(note.dataset.q);
-        if (q && note.value !== (q.note || '')) put(q.id, { note: note.value });
+        if (q && note.value !== (q.note || '')) { put(q.id, { note: note.value }); App.ui.wrSaved(note); }
       }
       function select(id, inside) {
         leave(); ui.sel = id; ui.inside = inside; const a = cur(); if (!$('.ae')) return;
@@ -279,12 +278,11 @@
         const q = now(); if (!q) return; const t = ev.target;
         if (t.matches('[data-ae-find]')) { qui(ui, q).find = t.value; $('[data-ae-others]').innerHTML = otherList(cur(), q, t.value); return; }
         if (t.id !== 'ae-text') return;
-        $('[data-ae-mirror]').innerHTML = mirror(q, t.value); $('[data-ae-count]').innerHTML = countHtml(q, t.value); $('[data-ae-saved]').textContent = '';
+        $('[data-ae-mirror]').innerHTML = mirror(q, t.value); $('[data-ae-count]').innerHTML = countHtml(q, t.value);
         const n = slots(q, t.value).length; const bn = $('[data-ae-slots]'); if (bn.dataset.n !== String(n)) { bn.dataset.n = n; bn.innerHTML = slotBanner(q, t.value); }
-        dirty = true; clearTimeout(timer); timer = setTimeout(flush, 500);
+        dirty = true;
       };
-      const onBlur = (ev) => { if (ev.target.id === 'ae-text') flush(); else if (ev.target.id === 'ae-note') leave(); };
-      el.addEventListener('click', onClick); el.addEventListener('change', onChange); el.addEventListener('input', onInput); el.addEventListener('focusout', onBlur);
+      el.addEventListener('click', onClick); el.addEventListener('change', onChange); el.addEventListener('input', onInput); el.addEventListener('wr-save', leave);
       window.addEventListener('beforeunload', leave);
       return () => { leave(); alive = false; window.removeEventListener('beforeunload', leave); };
     },

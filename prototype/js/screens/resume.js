@@ -255,7 +255,7 @@
     const editing = r.kind === 'card' && ui.draft && ui.draft.expId === r.key; const id = `rs-b-${esc(e.id)}-${esc(r.key)}`;
     const title = r.kind === 'card' ? r.c.title : r.text;
     const body = r.kind !== 'card' ? '' : editing ? `<div class="rs-edit"><textarea class="textarea" data-draft rows="2" aria-label="이력서 한 줄" aria-describedby="${id}-h">${esc(ui.draft.text)}</textarea>
-        <div class="rs-edit-foot"><span class="field-hint" id="${id}-h">경험 카드의 이력서 한 줄도 함께 바뀌어요</span><button type="button" class="btn btn-ghost btn-sm" data-act="draft-cancel">취소</button><button type="button" class="btn btn-sm" data-act="draft-save">완료</button></div></div>`
+        <div class="rs-edit-foot"><span class="field-hint" id="${id}-h">경험 카드의 이력서 한 줄도 함께 바뀌어요</span><button type="button" class="btn btn-ghost btn-sm" data-act="draft-cancel">취소</button><button type="button" class="btn btn-sm" data-act="draft-save">저장</button></div></div>`
       : r.text ? `<button type="button" class="rs-line-text" data-act="edit" ${a} data-fk="t.${esc(r.key)}" aria-label="이력서 한 줄 고치기: ${esc(r.text)}">${esc(r.text)}${I('edit', 14)}</button>`
         : `<button type="button" class="link rs-line-new" data-act="edit" ${a} data-fk="t.${esc(r.key)}">이력서 한 줄 쓰기</button>`;
     return `<li class="rs-line ${r.on ? 'is-in' : ''}"><input type="checkbox" id="${id}" data-act="line" ${a} data-fk="c.${esc(r.key)}" ${r.on ? 'checked' : ''} ${r.text ? '' : 'disabled'}>

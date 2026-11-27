@@ -2,10 +2,12 @@
 
 **콘셉트: 흰 종이, 블루블랙 잉크, 형광펜 하나.** 경험을 다시 쓰는 일은 교정 작업이다. 화면은 종이와 잉크로 조용히 두고, 노란 형광펜만 눈에 띈다.
 
+대표 장면은 로그인 왼쪽이다. 잉크색 책상 위 이력서에 말한 문장이 적히고, 빨간 줄이 그어지고, 이력서 문장과 형광펜으로 바뀐다(`.au-paper`). 한 번만 움직이고 멈추며, 건너뛰기와 다시 보기가 있고, 움직임 줄이기를 켜면 완성된 모습만 보인다. 저절로 움직이는 장면은 여기뿐이다. 그 밖의 움직임은 사용자의 행동에 대한 답일 때만 쓴다: AI 채팅 오른쪽에서 카드를 고르면 그 카드가 제자리에서 펼쳐지고(FLIP), AI가 카드를 바꾸면 그 카드가 펼쳐지며 바뀐 칸이 보인다. 바뀐 직후 한 번만 움직이고, 움직임 줄이기를 켜면 움직이지 않는다.
+
 ## 1. 형광펜 규칙 (가장 중요)
 노란색(`--hl`)의 뜻은 둘뿐이다. **① 내가 고른 것 ② AI가 더한 것.** 이 밖에는 쓰지 않는다.
 - 고른 것: 현재 메뉴, `.choice`의 제목, `.exp-card.is-on`의 제목, `.kw.is-match` / `.is-on`
-- AI가 더한 것: `.mark`(`<mark>`), `.ai-dot`. 고치기 전후는 `<del>` `<ins>` (빨간 취소선 → 형광펜)
+- AI가 더한 것: `.mark`(`<mark>`), `.ai-dot`. AI 채팅 오른쪽 카드 목록에서는 AI가 방금 바꾼 카드의 새 글자에 그어지고, 바뀐 칸에 연한 형광펜(`--hl-soft`)이 한 번 깔렸다가 걷힌다(`.cc-detail.is-flash`). 바뀌었다는 글자 표시는 따로 붙이지 않는다. 고치기 전후는 `<del>` `<ins>` (빨간 취소선 → 형광펜)
 - 버튼·배너·상태 태그·제목 장식에는 쓰지 않는다. 노란색만으로 뜻을 전하지 말고 굵기·체크·테두리를 함께 쓴다.
 
 ## 2. 토큰
@@ -70,13 +72,13 @@
 <label class="switch"><input type="checkbox" aria-label="이력서에 포함"><span></span></label>
 
 <span class="chip"><span>Spring Boot</span><button class="chip-x" aria-label="Spring Boot 지우기">${I('close',14)}</button></span>
-<span class="tag tag-ongoing">진행중</span> <!-- 끝난 프로젝트는 기간으로 알 수 있어 표시하지 않는다. tag-done tag-warn tag-danger --> <span class="dot" data-status="preparing"></span> <!-- applied passed failed -->
+<span class="tag tag-ongoing">진행중</span> <!-- 목록에서는 진행중만 태그로, 완료는 오른쪽에 조용히. tag-done tag-warn tag-danger --> <span class="dot" data-status="preparing"></span> <!-- applied passed failed -->
 <div class="banner banner-warn" role="status">${I('warning')}<span>저장하지 않은 문장이 있어요.</span><button class="btn btn-sm">저장</button></div>
 <ol class="steps"><li class="is-done">커밋 읽기</li><li class="is-now">STAR 초안 쓰기</li><li>역량 고르기</li></ol>
 <div class="empty"><div class="empty-title">아직 경험 카드가 없어요</div><p>AI와 이야기하면 첫 카드가 만들어져요.</p><button class="btn btn-primary">대화 시작하기</button></div>
 
 <!-- 로그인: 모바일에서는 auth-form 만 -->
-<div class="auth"><div class="auth-brand"><a class="brand">…</a><p class="auth-demo"><del>전</del>후 <ins>강조</ins></p><p class="auth-lead">설명</p></div>
+<div class="auth"><div class="auth-brand"><a class="brand">…</a><div class="au-pitch"><h2>한 줄 약속</h2><p>설명</p></div>.au-paper</div>
   <form class="auth-form"><a class="brand">…</a><h1>로그인</h1>.field… <button class="btn btn-primary btn-lg btn-block">로그인</button><p class="auth-alt">처음이신가요? <a class="link">회원가입</a></p></form></div>
 
 <!-- 사이드바 / 하단 메뉴: 글자는 꼭 .nav-label 로 감싼다 -->

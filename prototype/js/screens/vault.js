@@ -21,10 +21,11 @@
     const n = S.cardsOf(p.id).length; const repos = p.repos || []; const period = App.ui.projectPeriod(p);
     const meta = [period, p.role].filter(Boolean).map((t) => `<span>${esc(t)}</span>`)
       .concat(repos.length ? `<span class="vt-repo">${App.icon('github', 15)}<span>${esc(repos[0].name)}</span>${repos.length > 1 ? `<span>외 ${repos.length - 1}개</span>` : ''}</span>` : '');
-    return `<a class="list-row vt-proj" href="#/vault/p/${encodeURIComponent(p.id)}">${App.icon('folder')}
-      <span class="list-row-main"><span class="list-row-title"><span class="vt-proj-name">${esc(p.title)}</span>${App.ui.statusTag(p.status)}</span>
+    const href = `#/vault/p/${encodeURIComponent(p.id)}`;
+    return `<div class="list-row vt-proj" data-href="${href}">${App.icon('folder')}
+      <span class="list-row-main"><span class="list-row-title"><a class="vt-proj-name" href="${href}">${esc(p.title)}</a>${p.status === 'done' ? '' : App.ui.statusTag(p.status)}</span>
         ${meta.length ? `<span class="meta vt-proj-meta">${meta.join('')}</span>` : ''}</span>
-      <span class="list-row-actions">카드 ${n}장</span></a>`;
+      <span class="list-row-actions"><span class="vt-count">카드 ${n}장</span><span class="vt-state">${p.status === 'done' ? `<span class="vt-done">${App.icon('check', 16)}완료</span>` : `<button type="button" class="btn btn-sm" data-act="done" data-id="${esc(p.id)}" aria-label="${esc(p.title)} 프로젝트 완료">${App.icon('check', 16)}<span><span class="hide-mobile">프로젝트 </span>완료</span></button>`}</span></span></div>`;
   }
   function projectsView() {
     // 진행중 먼저(최근에 고친 순), 끝난 것은 최근에 끝난 순
@@ -88,6 +89,7 @@
       };
       root.onclick = (ev) => {
         const b = ev.target.closest('[data-act]'); if (!b) return;
+        if (b.dataset.act === 'done') App.ui.setProjectDone(b.dataset.id, true);
         if (b.dataset.act === 'new') App.repoFlow.openNewProject((p) => App.navigate('#/vault/p/' + encodeURIComponent(p.id)));
         if (b.dataset.act === 'clear') { Object.assign(st, { q: '', kw: '', project: '' }); q('#vt-q').value = ''; q('#vt-kw').value = ''; q('#vt-project').value = ''; refresh(); q('#vt-q').focus(); }
       };
