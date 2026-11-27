@@ -139,7 +139,6 @@
 .chat-touch:hover .chat-touch-title { text-decoration: underline; text-underline-offset: 3px; }
 .chat-touch-title { min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-touch-f { flex: none; color: var(--text-3); }
-.chat-touch.is-gone { border-style: dashed; color: var(--text-3); }
 @media (prefers-reduced-motion: reduce) {
   .cc-detail.is-flash :is(mark, ins).is-in, .cc-detail.is-flash .chat-f.is-changed { animation: none; }
 }

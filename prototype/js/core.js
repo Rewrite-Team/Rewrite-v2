@@ -15,10 +15,22 @@ window.App = window.App || {};
     if (!me) return blank(null);
     let s = null;
     try { const raw = localStorage.getItem(dataKey(me.id)); if (raw) s = JSON.parse(raw); } catch (e) { /* ignore */ }
-    if (!s && me.demo) { const d = clone(window.SEED); s = { user: Object.assign(d.user, { email: me.email }), projects: d.projects, experiences: d.experiences, chats: d.chats, github: d.github || null, applications: d.applications, resume: d.resume || EMPTY_RESUME(), trash: [] }; }
+    if (!s && me.demo) { const d = clone(window.SEED); s = { user: Object.assign(d.user, { email: me.email }), projects: d.projects, experiences: d.experiences, chats: d.chats, github: d.github || null, applications: d.applications, resume: d.resume || EMPTY_RESUME(), trash: d.trash || [] }; }
     if (!s) s = blank(me);
+    if (me.demo) addLaterSeed(s);
     s.trash = (s.trash || []).filter((t) => daysLeft(t) > 0); // 기간이 지난 휴지통 항목은 지운다
     return s;
+  }
+  // 예시 계정: 나중에 더한 예시 대화방(SEED.later)을 이미 저장된 데이터에도 한 번 넣는다. 지운 방은 다시 넣지 않는다 (seeded 에 남긴다)
+  function addLaterSeed(s) {
+    const later = window.SEED.later || []; s.seeded = s.seeded || [];
+    later.forEach((x) => {
+      if (s.seeded.includes(x.chat)) return; s.seeded.push(x.chat);
+      const c = window.SEED.chats.find((y) => y.id === x.chat);
+      if (!c || s.chats.some((y) => y.id === c.id) || !s.projects.some((p) => p.id === c.projectId)) return;
+      s.chats.push(clone(c));
+      (x.trash || []).forEach((id) => { const t = (window.SEED.trash || []).find((y) => y.id === id); if (t && !(s.trash || []).some((y) => y.id === id)) s.trash = (s.trash || []).concat(clone(t)); });
+    });
   }
   function EMPTY_RESUME() { return { profile: { name: '', headline: '', email: '', phone: '', github: '', blog: '', intro: '' }, skills: [], entries: [], versions: [] }; }
   const listeners = new Set();

@@ -138,7 +138,7 @@
   function told(chat, r, focus) {
     const moved = !r.created && focus && focus !== r.card.id; // 펼쳐 둔 카드와 다른 카드에 담았다
     const where = r.created ? (S.cardsOf(chat.projectId).length > 1 ? '있던 카드와 다른 이야기라 새 경험 카드를 만들었어요.' : '새 경험 카드를 만들었어요.') : moved ? '펼쳐 둔 카드보다 이 카드에 더 맞는 이야기라 여기에 담았어요.' : '';
-    const touch = { card: r.card.id, created: r.created, fields: r.fields };
+    const touch = { card: r.card.id, title: r.card.title, created: r.created, fields: r.fields };
     const miss = missingOf(r.card);
     if (!miss.length) return { who: 'ai', card: r.card.id, touch, text: `${where ? where + ' ' : ''}${r.before && !missingOf(r.before).length ? '' : '네 칸이 모두 채워졌어요. '}더 있었던 일이 있으면 이어서 적어 주세요.` };
     const q = ask(chat, miss[0]); return Object.assign(q, { card: r.card.id, touch, text: where ? `${where}\n${q.text}` : q.text });
@@ -156,7 +156,7 @@
     const isCmd = new RegExp('^(제목|역할|요약|이력서 한 줄|상황|과제|행동|결과|역량|키워드)').test(text) && new RegExp(ORDER).test(text) || /(지워|비워)\s?(줘|줘요|주세요|줄래요?)[.!?~]*$/.test(text) && /^(상황|과제|행동|결과)/.test(text);
     if (isCmd && !card) return { who: 'ai', text: '어느 카드를 고칠까요? 오른쪽에서 카드를 먼저 골라 주세요.' };
     if (!card) return null;
-    const done = (name, fields) => ({ who: 'ai', card: card.id, touch: { card: card.id, created: false, fields }, text: `${josa(name, '을', '를')} 바꿨어요.` });
+    const done = (name, fields) => ({ who: 'ai', card: card.id, touch: { card: card.id, title: card.title, created: false, fields }, text: `${josa(name, '을', '를')} 바꿨어요.` });
     const t = text.match(new RegExp('^(제목|역할|요약|이력서 한 줄|상황|과제|행동|결과)(?:을|를|은|는)?\\s*["\'「“]?(.+?)["\'」”]?\\s*(?:으로|로)\\s*' + ORDER));
     if (t) {
       const f = FIELD[t[1]];
@@ -165,7 +165,7 @@
       return done(t[1], [f]);
     }
     const x = text.match(/^(상황|과제|행동|결과)(?:을|를|은|는)?\s*(?:내용을?\s*)?(?:지워|비워)\s?(?:줘|줘요|주세요|줄래요?)[.!?~]*$/);
-    if (x) { mk({ changes: [{ field: FIELD[x[1]], after: '' }], patch: settle({}) }); return { who: 'ai', card: card.id, stage: FIELD[x[1]], touch: { card: card.id, created: false, fields: [FIELD[x[1]]] }, text: `${josa(x[1], '을', '를')} 비웠어요.` }; }
+    if (x) { mk({ changes: [{ field: FIELD[x[1]], after: '' }], patch: settle({}) }); return { who: 'ai', card: card.id, stage: FIELD[x[1]], touch: { card: card.id, title: card.title, created: false, fields: [FIELD[x[1]]] }, text: `${josa(x[1], '을', '를')} 비웠어요.` }; }
     const k = /(역량|키워드)/.test(text) && /(바꿔|고쳐|변경해|수정해|넣어|추가해|해)\s?(줘|주세요|줄래)/.test(text) && App.keywords.names().filter((n) => text.includes(n) || text.includes(n.replace(/\s/g, '')));
     if (k && k.length) { mk({ keywords: (/(추가|넣어)/.test(text) ? App.keywords.clean([...k, ...card.keywords]) : k).slice(0, MAX_KW) }); return done('역량', ['keywords']); }
     return null;
@@ -216,7 +216,7 @@
     if (wantsDelete(text)) {
       const card = focusCard(chat); if (!card) return skip({ who: 'ai', text: '어느 카드를 지울까요? 오른쪽에서 카드를 먼저 골라 주세요.' });
       if (opt.ask) return skip(proposal({ op: 'delete', cardId: card.id, before: JSON.parse(JSON.stringify(card)), after: null, fields: [], ids: [], cmd: '' }));
-      const t = S.remove(card.id); return skip({ who: 'ai', kind: 'deleted', trash: t ? t.id : '', text: `「${card.title}」 카드를 휴지통으로 옮겼어요. 대화방은 그대로 남아요.` });
+      const t = S.remove(card.id); return skip({ who: 'ai', trash: t ? t.id : '', text: `「${card.title}」 카드를 휴지통으로 옮겼어요. 대화방은 그대로 남아요.` });
     }
     const cmd = command(chat, text); if (cmd) return skip(cmd);
     if (wantsGithub(text)) return skip({ who: 'ai', kind: 'link', link: 'github', text: 'GitHub에서 찾은 작업은 이 프로젝트의 경험 카드로 만들어져요.' });
@@ -253,7 +253,7 @@
     const cmd = r.ids.includes(me.id) ? '' : me.id;
     r.ids.concat(cmd ? [cmd] : []).forEach((id) => S.updateMsg(chat.id, id, { hold: true })); // 허락을 받을 때까지 다른 카드에 담지 않는다
     if (r.before) S.setFocus(chat.id, r.cardId);
-    const t = r.msg.touch || {}; const next = { text: r.msg.text, stage: r.msg.stage || null, card: r.cardId, touch: { card: r.cardId, created: !r.before, fields: t.fields || [] } };
+    const t = r.msg.touch || {}; const next = { text: r.msg.text, stage: r.msg.stage || null, card: r.cardId, touch: { card: r.cardId, title: r.after.title, created: !r.before, fields: t.fields || [] } };
     return proposal({ op: r.before ? 'update' : 'create', cardId: r.cardId, before: r.before, after: r.after, fields: t.fields || [], ids: r.ids, cmd, next });
   }
   // 허락하거나(yes) 거절한다 → { msg: AI 가 이어서 할 말, changed?, removed? } | null
@@ -265,7 +265,7 @@
     const r = S.applyProposal(chatId, p);
     if (r.error) { release({ command: true }); close('fail'); return { msg: { who: 'ai', text: r.error === 'changed' ? '그사이 카드가 바뀌어서 반영하지 않았어요. 다시 말씀해 주시면 지금 카드에 맞춰 담을게요.' : '카드나 프로젝트가 휴지통에 있어서 반영하지 못했어요.' } }; }
     close('ok');
-    if (r.removed) return { removed: true, msg: { who: 'ai', kind: 'deleted', trash: r.trash ? r.trash.id : '', text: `「${r.removed.title}」 카드를 휴지통으로 옮겼어요. 대화방은 그대로 남아요.` } };
+    if (r.removed) return { removed: true, msg: { who: 'ai', trash: r.trash ? r.trash.id : '', text: `「${r.removed.title}」 카드를 휴지통으로 옮겼어요. 대화방은 그대로 남아요.` } };
     release({ done: true, card: r.card.id });
     return { changed: true, msg: Object.assign({ who: 'ai' }, p.next) };
   }

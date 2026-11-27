@@ -141,8 +141,8 @@
   }
   function madeHTML(ids) {
     return `<div class="list chat-made">${ids.map((id) => {
-      const e = S.get(id); const where = C.cardState(id);
-      if (!e) return `<div class="list-row">${I(where === 'trash' ? 'trash' : 'card')}<span class="list-row-main subtle row">${App.ui.goneCard(id)}</span></div>`;
+      const e = S.get(id);
+      if (!e) return `<div class="list-row">${I('card')}<span class="list-row-main"><span class="list-row-title">${esc(titleOf(id))}</span></span><button type="button" class="btn btn-sm" data-do="see" data-id="${id}">카드 보기</button></div>`;
       const miss = C.missingOf(e).map((f) => C.LABEL[f]);
       return `<div class="list-row">${I('card')}<span class="list-row-main"><a class="list-row-title" href="#/card/${id}">${esc(e.title)}</a><span class="list-row-sub">${App.ui.projChip(e.projectId)}${miss.length ? `<span>비어 있는 칸: ${miss.join(', ')}</span>` : ''}</span></span><button type="button" class="btn btn-sm" data-do="see" data-id="${id}">카드 보기</button></div>`;
     }).join('')}</div>`;
@@ -159,7 +159,7 @@
     if (st === 'connect') return `<div><button type="button" class="btn" data-do="gh-connect" data-id="${m.id}">${I('github', 16)}${hasRepos(p) ? 'GitHub에서 찾기' : 'GitHub 연결'}</button></div>`;
     if (st === 'stopped') return `<div>${hasRepos(p) ? retry : `<button type="button" class="btn" data-do="gh-connect" data-id="${m.id}">${I('github', 16)}GitHub 연결</button>`}</div>`;
     if (st === 'error') return `<div class="banner banner-danger">${I('warning')}<span>${esc(g.error)}</span>${retry}</div>`;
-    if (st === 'empty') return `${made.length ? madeHTML(made) : ''}<div>${retry.replace('다시 시도', '다시 찾기')}</div>`;
+    if (st === 'empty') return made.length ? madeHTML(made) : '';
     const note = g.error ? `<p class="subtle">${esc(g.error)}</p>` : '';
     if (st === 'ready') return `${note}<div class="chat-gh">${App.repoFlow.draftsHTML(leftDrafts(g), new Set(g.picked))}</div><div class="chat-gh-foot" data-gh-foot="${m.id}">${ghFootHTML(m)}</div>`;
     const left = leftDrafts(g).length;
@@ -221,7 +221,7 @@
     if (c.last && c.last.rev !== rev) u.fresh[chatId] = c.last.rev; else delete u.fresh[chatId];
     if (c.last && c.last.rev !== rev) delete u.made[chatId];
     S.addMsg(chatId, msg);
-    if (msg.kind === 'deleted' && view && view.chatId === chatId) { view.rerender(); return; } // 사이드바의 휴지통 수까지
+    if (msg.trash && view && view.chatId === chatId) { view.rerender(); return; } // 카드를 휴지통으로 옮긴 답: 사이드바의 휴지통 수까지
     refresh(chatId);
   }
 
@@ -229,14 +229,13 @@
   const aiHTML = (inner, id) => `<div class="chat-m is-ai" ${id ? `data-m-id="${id}"` : ''}><span class="ai-dot" aria-hidden="true">R</span><div class="chat-ai"><span class="sr-only">AI</span>${inner}</div></div>`;
   function msgHTML(chat, m) {
     if (m.who === 'me') return `<div class="chat-m is-me" data-m-id="${m.id}"><div class="chat-b"><span class="sr-only">나</span>${esc(m.text)}</div></div>`;
-    return aiHTML(`${m.touch ? touchHTML(m.touch) : ''}<p class="chat-t">${esc(m.kind === 'github' ? ghText(m) : m.text)}</p>${m.kind === 'link' ? linkHTML(chat, m) : m.kind === 'github' ? ghHTML(chat, m) : m.kind === 'confirm' ? confirmHTML(m) : m.kind === 'deleted' ? deletedHTML(m) : ''}`, m.id);
+    return aiHTML(`${m.touch ? touchHTML(m.touch) : ''}<p class="chat-t">${esc(m.kind === 'github' ? ghText(m) : m.text)}</p>${m.kind === 'link' ? linkHTML(chat, m) : m.kind === 'github' ? ghHTML(chat, m) : m.kind === 'confirm' ? confirmHTML(m) : ''}`, m.id);
   }
   // 허락을 구하는 답: 바뀔 칸만 앞뒤로 보여 주고(지운 글자는 취소선, 더한 글자는 형광펜), 허용·항상 허용·거절
   function confirmHTML(m) {
     const p = m.pending; const st = p.status; const wait = st === 'wait';
     let rows = '';
-    if (p.op === 'delete') rows = `<div class="cf-row"><dt>카드</dt><dd><del>${esc(p.before.title)}</del></dd></div>`;
-    else {
+    if (p.op !== 'delete') { // 지우기는 묻는 말에 카드 이름이 있어서 단추만
       const b = p.before || { title: '', star: {}, keywords: [], resumeLine: '' }; const a = p.after; const show = wait;
       const row = (label, html) => `<div class="cf-row"><dt>${label}</dt><dd>${html}</dd></div>`;
       if (b.title !== a.title) rows += row('제목', diffHTML(b.title, a.title, show));
@@ -245,21 +244,23 @@
       if ((b.resumeLine || '') !== (a.resumeLine || '')) rows += row('이력서 한 줄', diffHTML(b.resumeLine || '', a.resumeLine || '', show));
     }
     const yes = { create: '만들기', update: '반영하기', delete: '휴지통으로 옮기기' }[p.op];
-    const done = { ok: [p.op === 'delete' ? '휴지통으로 옮겼어요' : '허용했어요', 'check'], no: ['거절했어요', 'close'], fail: ['반영하지 못했어요', 'warning'] }[st];
+    const done = { ok: ['허용했어요', 'check'], no: ['거절했어요', 'close'], fail: ['반영하지 못했어요', 'warning'] }[st];
     const foot = wait ? `<div class="cf-foot"><button type="button" class="btn ${p.op === 'delete' ? 'btn-danger' : 'btn-primary'} btn-sm" data-do="cf-ok" data-id="${m.id}">${I(p.op === 'delete' ? 'trash' : 'check', 15)}${yes}</button><button type="button" class="btn btn-sm" data-do="cf-all" data-id="${m.id}" title="앞으로는 묻지 않고 바로 카드에 반영해요. 입력창 위의 「카드 바꾸기 전에 묻기」로 다시 켤 수 있어요">항상 허용</button><button type="button" class="btn btn-ghost btn-sm" data-do="cf-no" data-id="${m.id}">거절</button></div>`
       : `<p class="cf-st">${I(done[1], 15)}${done[0]}</p>`;
+    if (p.op === 'delete') return wait ? foot : ''; // 지운 뒤에는 이어지는 답이 결과를 말한다
     return `<div class="cf ${wait ? '' : 'is-closed'}" role="group" aria-label="바뀔 내용">${rows ? `<dl class="cf-rows">${rows}</dl>` : ''}${foot}</div>`;
   }
-  const deletedHTML = (m) => (!m.restored && m.trash && S.getTrash(m.trash) ? `<div><button type="button" class="btn btn-sm" data-do="undel" data-id="${m.id}">${I('restore', 15)}되돌리기</button></div>` : '');
   // 경험 카드 권한 토글: 켜면 AI가 카드를 만들고 고치고 지우기 전에 묻는다, 끄면 바로 반영한다
   const permHTML = () => `<label class="chat-perm" title="끄면 묻지 않고 바로 카드에 반영해요. 「되돌리기」로 마지막 변경을 취소할 수 있어요"><span class="switch"><input type="checkbox" role="switch" data-perm ${S.cardPerm() === 'ask' ? 'checked' : ''} /><span></span></span>카드 바꾸기 전에 묻기</label>`;
   // 이 답에서 바꾼 카드: 누르면 오른쪽에서 그 카드를 펼친다
+  // 카드가 휴지통에 있거나 지워졌어도 모습은 같다. 누르면 그때 알려 준다 (see)
+  const titleOf = (id, saved) => { const e = S.get(id) || App.ui.trashedCard(id); return e ? e.title : saved || '경험 카드'; };
   function touchHTML(t) {
-    const e = S.get(t.card); const names = (t.fields || []).map((f) => C.LABEL[f] || (f === 'keywords' ? '역량' : '')).filter(Boolean);
-    if (!e) return `<p class="chat-touch is-gone">${I('card', 16)}<span>${App.ui.trashedCard(t.card) ? `${esc(App.ui.trashedCard(t.card).title)} (휴지통)` : '지워진 카드'}</span></p>`;
-    return `<button type="button" class="chat-touch" data-do="see" data-id="${e.id}">${I('card', 16)}<span class="chat-touch-title">${esc(e.title)}</span>${names.length ? `<span class="chat-touch-f"><span class="sr-only">바뀐 칸: </span>${names.join(', ')}</span>` : ''}</button>`;
+    const names = (t.fields || []).map((f) => C.LABEL[f] || (f === 'keywords' ? '역량' : '')).filter(Boolean);
+    return `<button type="button" class="chat-touch" data-do="see" data-id="${esc(t.card)}">${I('card', 16)}<span class="chat-touch-title">${esc(titleOf(t.card, t.title))}</span>${names.length ? `<span class="chat-touch-f"><span class="sr-only">바뀐 칸: </span>${names.join(', ')}</span>` : ''}</button>`;
   }
-  const linkHTML = (chat, m) => `<div>${m.link === 'new' ? `<button type="button" class="btn" data-do="new-chat" data-id="${chat.projectId}">${I('plus', 16)}새 채팅</button>` : hasRepos(S.getProject(chat.projectId)) ? `<button type="button" class="btn" data-do="find-here">${I('github', 16)}GitHub에서 찾기</button>` : `<button type="button" class="btn" data-do="connect-here">${I('github', 16)}GitHub 연결</button>`}</div>`;
+  // GitHub로 이어 주는 단추 (link: 'github'). 레포를 연결했으면 찾기, 아니면 연결
+  const linkHTML = (chat) => `<div>${hasRepos(S.getProject(chat.projectId)) ? `<button type="button" class="btn" data-do="find-here">${I('github', 16)}GitHub에서 찾기</button>` : `<button type="button" class="btn" data-do="connect-here">${I('github', 16)}GitHub 연결</button>`}</div>`;
   function bodyHTML(chat) {
     return chat.msgs.map((m) => msgHTML(chat, m)).join('') + (U().typing[chat.id] ? aiHTML('<div class="chat-typing" role="status"><span class="sr-only">답을 쓰는 중</span><i></i><i></i><i></i></div>') : '');
   }
@@ -434,12 +435,13 @@
         'cf-ok': (id) => decideNow(id, true),
         'cf-all': (id) => { S.setCardPerm('auto'); decideNow(id, true); App.ui.toast('이제 묻지 않고 바로 카드에 반영할게요'); },
         'cf-no': (id) => decideNow(id, false),
-        undel: (id) => {
-          const m = msgOf(id); const r = m && S.restore(m.trash); if (!r) { App.ui.toast('휴지통에 없는 카드예요'); draw({ stay: true }); return; }
-          S.updateMsg(cur.chatId, id, { restored: true }); S.addMsg(cur.chatId, { who: 'ai', text: `카드를 되살렸어요.${r.withProject ? ` 「${r.withProject}」 프로젝트도 함께 되살렸어요.` : ''}` }); rerender();
-        },
         // 오른쪽에서 카드 펼치기 (id 가 비면 모든 카드)
         see: (id, b) => {
+          if (id && !S.get(id)) { // 휴지통에 있거나 지워진 카드
+            if (C.cardState(id) === 'trash') App.ui.toast('휴지통으로 옮긴 카드예요', { action: '휴지통 보기', onAction: () => App.navigate('#/trash') });
+            else App.ui.toast('지워진 카드예요');
+            return;
+          }
           if (cur.chatId) S.setFocus(cur.chatId, id || null); else cur.focus = id && S.get(id) ? id : null;
           if (!root.querySelector('.is-card-open') && isMobileCard()) { root.querySelector('.chat-app').classList.add('is-card-open'); u.panel = true; }
           const was = (root.querySelector('.cc-detail') || {}).dataset; const wasId = was ? was.flip : ''; const inPanel = !!(b && b.closest('[data-panel]'));

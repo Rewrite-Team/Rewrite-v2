@@ -602,6 +602,9 @@ module.exports = function verifySlack(req, res, next) {
     ],
   };
 
+  // AI 답변 종류 모아 보기(seed-replies.js)가 쓰는 레포 분석 초안
+  SEED.repoDrafts = { p1: clone(moyeobom.drafts), p3: clone(classroom.drafts) };
+
   /* ---------------- 프로젝트 · 카드에 연결 ---------------- */
   const link = (pid, s) => { const p = SEED.projects.find((x) => x.id === pid); if (p) p.repos = [clone(s.repo)]; };
   link('p1', moyeobom); link('p3', classroom);
