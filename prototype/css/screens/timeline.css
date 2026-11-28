@@ -1,7 +1,7 @@
 /* ===== 경험 타임라인 (.tl-*): 왼쪽에서 오른쪽으로 시간, 프로젝트는 가지, 카드는 잔가지 ===== */
 .tl { position: relative; display: flex; flex-direction: column; height: calc(100vh - var(--topbar-h)); height: calc(100dvh - var(--topbar-h)); min-height: 420px; }
 .tl-bar { flex: none; display: flex; align-items: center; gap: 12px; padding: 16px var(--gutter) 8px; }
-.tl-select { width: auto; max-width: 220px; }
+.tl-select { width: auto; max-width: 220px; padding-left: 16px; border-radius: var(--radius-pill); }
 .tl-count { font-size: var(--fs-sm); color: var(--text-2); }
 .tl-bar [data-replay] { margin-left: auto; }
 .tl-stage { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
@@ -11,35 +11,37 @@
 /* 눈금 */
 .tl-grid { stroke: var(--border); stroke-width: 1; }
 .tl-year { fill: var(--text-3); font-size: 12px; font-weight: 600; }
-.tl-now { stroke: var(--border-strong); stroke-width: 1; stroke-dasharray: 3 4; }
-.tl-now-t { fill: var(--text-2); font-size: 12px; font-weight: 600; }
+.tl-now { stroke: var(--primary-light); stroke-width: 1.5; stroke-dasharray: 3 4; }
+.tl-now-t { fill: var(--primary-ink); font-size: 12px; font-weight: 600; }
 
-/* 프로젝트 가지: 잉크 */
-.tl-lane { fill: none; stroke: var(--primary); stroke-width: 2.5; stroke-linecap: round; }
-.tl-tail { fill: none; stroke: var(--primary); stroke-width: 2.5; stroke-dasharray: 2 5; stroke-linecap: round; opacity: .6; }
-.tl-end { fill: var(--primary); }
-.tl-start { fill: var(--primary); stroke: var(--surface); stroke-width: 2; }
+/* 프로젝트 가지: 주황 */
+.tl-lane { fill: none; stroke: var(--primary-strong); stroke-width: 3.5; stroke-linecap: round; }
+.tl-tail { fill: none; stroke: var(--primary-strong); stroke-width: 3.5; stroke-dasharray: 2 6; stroke-linecap: round; opacity: .6; }
+.tl-end { fill: var(--primary-strong); }
+.tl-start { fill: var(--primary-strong); stroke: var(--surface); stroke-width: 2; }
 .tl-proj text { fill: var(--text); font-size: 13.5px; font-weight: 700; }
 .tl-proj:hover text, .tl-proj:focus-visible text { text-decoration: underline; }
 .tl-proj:focus-visible { outline: none; }
 .tl-proj:focus-visible .tl-start { stroke: var(--text); }
 
 /* 카드 잔가지 */
-.tl-twig { fill: none; stroke: var(--field-border); stroke-width: 1.5; }
-.tl-fork { fill: var(--primary); }
+.tl-twig { fill: none; stroke: var(--primary-light); stroke-width: 1.8; stroke-linecap: round; }
+.tl-fork { fill: var(--primary-strong); }
 .tl-hit { fill: transparent; }
-.tl-dot { fill: var(--surface); stroke: var(--primary); stroke-width: 2; }
+.tl-dot { fill: var(--surface); stroke: var(--primary-strong); stroke-width: 2; }
 .tl-name { fill: var(--text-2); font-size: 13px; font-weight: 500; }
 .tl-card a:hover .tl-name, .tl-card a:focus-visible .tl-name { fill: var(--text); text-decoration: underline; }
+.tl-card:not(.is-hit) a:hover .tl-hit, .tl-card:not(.is-hit) a:focus-visible .tl-hit { fill: var(--primary-soft); }
 .tl-card a:hover .tl-dot, .tl-card a:focus-visible .tl-dot { fill: var(--primary); }
 .tl-card a:focus-visible { outline: none; }
-.tl-card a:focus-visible .tl-hit { stroke: var(--primary); stroke-width: 1.5; }
-/* 역량을 골랐을 때: 그 역량이 담긴 카드는 형광펜(내가 고른 것), 나머지는 흐리게 */
+.tl-card a:focus-visible .tl-hit { stroke: var(--primary-strong); stroke-width: 1.5; }
+/* 역량을 골랐을 때: 그 역량이 담긴 카드는 연한 주황 알약과 굵은 글자, 나머지는 흐리게 */
 .tl-card { transition: opacity .15s; }
 .tl-card.is-dim { opacity: .28; }
-.tl-card.is-hit .tl-hit { fill: var(--hl); }
-.tl-card.is-hit .tl-name { fill: var(--text); font-weight: 600; }
-.tl-card.is-hit .tl-twig { stroke: var(--primary); }
+.tl-card.is-hit .tl-hit { fill: var(--primary-tint); }
+.tl-card.is-hit .tl-name { fill: var(--text); font-weight: 700; }
+.tl-card.is-hit .tl-twig { stroke: var(--primary-strong); stroke-width: 2.2; }
+.tl-card.is-hit .tl-dot { fill: var(--primary-strong); stroke: var(--primary-ink); }
 
 /* 들어올 때 한 번: 가지가 시간 순서대로 자란다 */
 .tl-svg.is-grow :is(.tl-lane, .tl-twig) { stroke-dasharray: 1; stroke-dashoffset: 1; animation: tl-draw var(--t, .3s) ease-out var(--d, 0s) forwards; }
@@ -49,9 +51,9 @@
 @keyframes tl-draw { to { stroke-dashoffset: 0; } }
 @keyframes tl-in { to { opacity: 1; } }
 
-.tl-tip { position: absolute; z-index: 5; max-width: 280px; display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); box-shadow: var(--shadow); font-size: var(--fs-sm); color: var(--text-2); pointer-events: none; }
+.tl-tip { position: absolute; z-index: 5; max-width: 280px; display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); font-size: var(--fs-sm); color: var(--text-2); pointer-events: none; }
 .tl-tip b { color: var(--text); }
-.tl-tip-kws { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 4px; }
+.tl-tip-kws { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 
 @media (prefers-reduced-motion: reduce) { .tl-svg.is-grow * { animation: none !important; opacity: 1 !important; stroke-dashoffset: 0 !important; } }
 @media (max-width: 900px) {
@@ -63,10 +65,10 @@
 .tl-fold { cursor: pointer; }
 .tl-fold rect { fill: transparent; }
 .tl-fold path { fill: none; stroke: var(--text-3); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.tl-fold:hover rect { fill: var(--surface-2); }
-.tl-fold:hover path { stroke: var(--text); }
+.tl-fold:hover rect { fill: var(--primary-soft); }
+.tl-fold:hover path { stroke: var(--primary-ink); }
 .tl-fold:focus-visible { outline: none; }
-.tl-fold:focus-visible rect { stroke: var(--primary); stroke-width: 1.5; }
-.tl-fork.is-hit { fill: var(--hl); stroke: var(--primary); stroke-width: 1.5; }
+.tl-fold:focus-visible rect { stroke: var(--primary-strong); stroke-width: 1.5; }
+.tl-fork.is-hit { fill: var(--primary-tint); stroke: var(--primary-ink); stroke-width: 2; }
 .tl-more { fill: var(--text-3); font-size: 12.5px; font-weight: 500; }
 .tl-svg.is-grow :is(.tl-fold, .tl-more, .tl-fork) { opacity: 0; animation: tl-in .3s ease-out var(--d, 0s) forwards; }

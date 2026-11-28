@@ -6,15 +6,18 @@
 .cd-kws { display: flex; flex-wrap: wrap; row-gap: 4px; margin-top: 10px; }
 
 /* 이력서 한 줄 */
+.cd-line.panel { padding: 22px 24px; border-radius: var(--radius-lg); background: var(--primary-soft); }
 .cd-line-top { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
 .cd-line-top label { font-weight: 700; font-size: var(--fs-lg); letter-spacing: -0.015em; }
 .cd-count { margin-left: auto; font-variant-numeric: tabular-nums; }
 .cd-line .textarea { min-height: 0; resize: none; overflow: hidden; font-weight: 600; }
 
 /* STAR */
-.cd-star { border-top: 1px solid var(--border); }
-.cd-star > div { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 4px 16px; padding: 18px 0; border-bottom: 1px solid var(--border); }
+.cd-star > div { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 4px 16px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.cd-star > div:first-child { padding-top: 0; }
+.cd-star > div:last-child { border-bottom: 0; padding-bottom: 0; }
 .cd-star dt { font-weight: 600; font-size: var(--fs-sm); line-height: 26px; color: var(--text-3); }
+.cd-star dt label { display: inline-block; padding: 0 12px; border-radius: var(--radius-pill); background: var(--primary-soft); color: var(--primary-deep); font-weight: 700; }
 .cd-star dd { max-width: 64ch; min-width: 0; }
 /* 직접 쓰는 칸이지만 읽을 때는 글처럼. 가리키면 테두리, 쓰는 동안만 저장 줄 */
 .cd-star-in.textarea { min-height: 0; resize: none; overflow: hidden; margin: -6px 0 0 -10px; width: calc(100% + 10px); padding: 5px 10px; line-height: 1.75; border-color: transparent; background: transparent; }
@@ -36,6 +39,11 @@
 .cd-sec .subtle { font-weight: 400; letter-spacing: 0; }
 .cd-used .list-row-sub { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
 
+/* 쓰인 곳 */
+.list.cd-used { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.cd-used > .list-row { padding: 12px 16px; }
+.cd-used > .list-row:last-child { border-bottom: 0; }
+
 /* 근거 */
 .cd-ev > summary { display: flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; list-style: none; border-radius: var(--radius-sm); }
 .cd-ev > summary::-webkit-details-marker { display: none; }
@@ -48,10 +56,10 @@
 .cd-ev-row b { flex: none; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; }
 .cd-ev-row span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .cd-ev-row time { flex: none; color: var(--text-3); }
-a.cd-ev-row:hover span { text-decoration: underline; text-underline-offset: 3px; }
-.cd-code { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+a.cd-ev-row:hover span { color: var(--primary-ink); text-decoration: underline; text-underline-offset: 3px; }
+.cd-code { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .cd-code + .cd-code { margin-top: 12px; }
-.cd-code-path { display: block; padding: 7px 12px; font-size: var(--fs-xs); color: var(--text-2); background: var(--surface-2); border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.cd-code-path { display: block; padding: 9px 14px; font-size: var(--fs-xs); color: var(--text-2); background: var(--surface-2); border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
 a.cd-code-path:hover { text-decoration: underline; }
 .cd-code pre { margin: 0; padding: 8px 0; overflow-x: auto; font: 12px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .cd-code pre:focus-visible { outline-offset: -2px; }
@@ -66,8 +74,8 @@ a.cd-code-path:hover { text-decoration: underline; }
   .cd-head .page-head-actions { width: 100%; }
   .cd-head .cd-fix { flex: 1; }
   .cd-head .menu { position: absolute; top: -8px; right: -8px; }
-  .cd-line.panel { padding: 16px; }
-  .cd-star > div { grid-template-columns: minmax(0, 1fr); padding: 16px 0; }
+  .cd-line.panel { padding: 18px 16px; }
+  .cd-star > div { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 18px 0; }
   .cd-ev > summary { flex-wrap: wrap; gap: 0 8px; }
   .cd-ev-row { flex-wrap: wrap; gap: 2px 8px; }
   .cd-ev-row span { flex-basis: 60%; }

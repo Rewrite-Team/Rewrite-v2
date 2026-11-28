@@ -1,5 +1,5 @@
 /* 경험 타임라인 (#/timeline, prototype/js/screens/timeline.js + css/screens/timeline.css)
-   왼쪽에서 오른쪽으로 시간. 프로젝트는 가지(잉크 선), 카드는 그 달에서 갈라져 나온 잔가지.
+   왼쪽에서 오른쪽으로 시간. 프로젝트는 가지(주황 선), 카드는 그 달에서 갈라져 나온 잔가지.
    화면: 경험 타임라인 · 경험 타임라인 / 역량으로 거르기 · 경험 타임라인 / 처음
    그림은 앱의 SVG 좌표(G, 달 폭 MW)를 그대로 따른다. 선과 점은 토큰 색, 이름은 텍스트 스타일 */
 {
@@ -43,15 +43,15 @@
     await makeSet(row, 'Timeline/Twig', ['Default', 'Hit', 'Dim'].map((k) => ({ props: { State: k }, build: async (c) => {
       auto(c, 'H', { h: 24, cross: 'center', opacity: k === 'Dim' ? 0.28 : 1 });
       const hold = figma.createFrame(); hold.name = 'elbow'; hold.fills = []; hold.clipsContent = false; hold.resize(10, 24); c.appendChild(hold);
-      const el = figma.createFrame(); el.name = 'twig'; el.fills = []; el.resize(10, 12.75); stroke(el, k === 'Hit' ? 'primary' : 'field-border', 1.5, ['left', 'bottom']); el.bottomLeftRadius = 9; hold.appendChild(el); el.x = 0; el.y = 0;
-      const pill = al('H', { name: 'card', gap: 6, pad: [0, 6, 0, 4], h: 24, cross: 'center', fill: k === 'Hit' ? 'hl' : null, radius: 'radius/tag' }); c.appendChild(pill);
-      const dot = figma.createEllipse(); dot.name = 'dot'; dot.resize(10, 10); dot.fills = [paint('surface')]; stroke(dot, 'primary', 2); pill.appendChild(dot);
+      const el = figma.createFrame(); el.name = 'twig'; el.fills = []; el.resize(10, 12.75); stroke(el, k === 'Hit' ? 'primary-strong' : 'primary-light', k === 'Hit' ? 2.2 : 1.8, ['left', 'bottom']); el.bottomLeftRadius = 9; hold.appendChild(el); el.x = 0; el.y = 0;
+      const pill = al('H', { name: 'card', gap: 6, pad: [0, 6, 0, 4], h: 24, cross: 'center', fill: k === 'Hit' ? 'primary-tint' : null, radius: 'radius/pill' }); c.appendChild(pill);
+      const dot = figma.createEllipse(); dot.name = 'dot'; dot.resize(10, 10); dot.fills = [paint(k === 'Hit' ? 'primary-strong' : 'surface')]; stroke(dot, k === 'Hit' ? 'primary-ink' : 'primary-strong', 2); pill.appendChild(dot);
       pill.appendChild(named(await text('카드 이름', k === 'Hit' ? 'Small/13.5 Semibold' : 'Small/13.5 Medium', k === 'Hit' ? 'text' : 'text-2'), 'tw-name'));
-    } })), { dir: 'H', desc: '타임라인의 카드 한 장. Hit: 고른 역량이 담긴 카드(형광펜), Dim: 고른 역량이 없는 카드', props: [{ name: 'Name', type: 'TEXT', default: '카드 이름', node: 'tw-name' }] });
+    } })), { dir: 'H', desc: '타임라인의 카드 한 장. Hit: 고른 역량이 담긴 카드(연한 주황 알약), Dim: 고른 역량이 없는 카드', props: [{ name: 'Name', type: 'TEXT', default: '카드 이름', node: 'tw-name' }] });
     // 프로젝트 이름과 접기 단추. 인스턴스를 (시작 x - 8, 가지 y - 28)에 놓는다
     await makeSet(row, 'Timeline/Project', ['Open', 'Folded'].map((k) => ({ props: { Fold: k }, build: async (c) => {
       auto(c, 'H', { gap: 3, cross: 'center' });
-      const b = al('H', { name: 'fold', w: 20, h: 22, main: 'center', cross: 'center', radius: 'radius/tag' }); c.appendChild(b);
+      const b = al('H', { name: 'fold', w: 20, h: 22, main: 'center', cross: 'center', radius: 8 }); c.appendChild(b);
       b.appendChild(icon(k === 'Open' ? 'chevron-down' : 'chevron-right', 14, 'text-3'));
       c.appendChild(named(await text('프로젝트', 'Small/13.5 Semibold', 'text'), 'tp-name'));
     } })), { dir: 'H', desc: '타임라인의 프로젝트 이름(누르면 프로젝트로)과 왼쪽 접기 단추. Folded: 카드를 접어 둔 모습', props: [{ name: 'Name', type: 'TEXT', default: '프로젝트', node: 'tp-name' }] });
@@ -84,8 +84,8 @@
       await place(axis, `${Math.floor(m / 12)}년`, 'Caption/12 Semibold', 'text-3', gx + 6, G.top - 28 - 12);
     }
     const nx = x(NOW);
-    const now = figma.createFrame(); now.name = '지금 선'; now.fills = []; now.resize(1, H - (G.top - 22)); stroke(now, 'border-strong', 1, ['left']); now.dashPattern = [3, 4]; axis.appendChild(now); now.x = nx; now.y = G.top - 22;
-    await place(axis, '지금', 'Caption/12 Semibold', 'text-2', nx - 20, G.top - 28 - 12, { w: 40, align: 'center' });
+    const now = figma.createFrame(); now.name = '지금 선'; now.fills = []; now.resize(1, H - (G.top - 22)); stroke(now, 'primary-light', 1.5, ['left']); now.dashPattern = [3, 4]; axis.appendChild(now); now.x = nx; now.y = G.top - 22;
+    await place(axis, '지금', 'Caption/12 Semibold', 'primary-ink', nx - 20, G.top - 28 - 12, { w: 40, align: 'center' });
 
     const cards = {}; let y = G.top;
     for (const p of PROJECTS) {
@@ -93,28 +93,28 @@
       const open = OPEN.has(p.name);
       const g = figma.createFrame(); g.name = p.name; g.fills = []; g.clipsContent = false; g.resize(width, 1); cv.appendChild(g); g.x = 0; g.y = 0;
       // 가지
-      rect(g, '가지', xs, ly - 1.25, Math.max(2.5, xe - xs), 2.5, 'primary', { radius: 1.25 });
+      rect(g, '가지', xs, ly - 1.75, Math.max(3.5, xe - xs), 3.5, 'primary-strong', { radius: 1.75 });
       if (p.ongoing) {
-        const tail = al('H', { name: '진행 중', gap: 5, cross: 'center', opacity: 0.6 }); g.appendChild(tail); tail.x = xe + 4; tail.y = ly - 1.25;
-        for (let i = 0; i < Math.floor(MW / 7); i++) { const d = figma.createRectangle(); d.name = 'dash'; d.resize(2, 2.5); d.cornerRadius = 1.25; d.fills = [paint('primary')]; tail.appendChild(d); }
-      } else dotAt(g, '끝', xe, ly, 3.5, 'primary');
+        const tail = al('H', { name: '진행 중', gap: 5, cross: 'center', opacity: 0.6 }); g.appendChild(tail); tail.x = xe + 4; tail.y = ly - 1.75;
+        for (let i = 0; i < Math.floor(MW / 7); i++) { const d = figma.createRectangle(); d.name = 'dash'; d.resize(2, 3.5); d.cornerRadius = 1.75; d.fills = [paint('primary-strong')]; tail.appendChild(d); }
+      } else dotAt(g, '끝', xe, ly, 4, 'primary-strong');
       const hits = kw ? p.cards.filter((c) => c[2].includes(kw)) : [];
       if (!open) {
-        for (const c of p.cards) { const hit = kw && c[2].includes(kw); dotAt(g, `갈래: ${c[1]}`, x(ym(c[0])), ly, hit ? 4.5 : 3, hit ? 'hl' : 'primary', hit ? { stroke: 'primary', sw: 1.5 } : {}); }
+        for (const c of p.cards) { const hit = kw && c[2].includes(kw); dotAt(g, `갈래: ${c[1]}`, x(ym(c[0])), ly, hit ? 4.5 : 3, hit ? 'primary-tint' : 'primary-strong', hit ? { stroke: 'primary-ink', sw: 2 } : {}); }
         await place(g, `카드 ${p.cards.length}장${hits.length ? `, 그중 「${kw}」 ${hits.length}장` : ''}`, 'Caption/12', 'text-3', xe + (p.ongoing ? MW : 0) + 12, ly - 8);
         y = ly + G.gap;
       } else {
         p.cards.forEach((c, k) => {
           const cy = ly + G.row * (k + 1); const cx = x(ym(c[0])); const hit = !kw || c[2].includes(kw);
           const state = kw ? (hit ? 'Hit' : 'Dim') : 'Default';
-          rect(g, '줄기', cx - 0.75, ly, 1.5, cy - 12 - ly, state === 'Hit' ? 'primary' : 'field-border', { opacity: state === 'Dim' ? 0.28 : 1 });
+          rect(g, '줄기', cx - 0.75, ly, 1.5, cy - 12 - ly, state === 'Hit' ? 'primary-strong' : 'primary-light', { opacity: state === 'Dim' ? 0.28 : 1 });
           const tw = inst('Timeline/Twig', { State: state, Name: short(c[1]) }); tw.name = c[1]; g.appendChild(tw); tw.x = cx - 0.75; tw.y = cy - 12;
           cards[c[1]] = { node: tw, card: c, project: p.name };
         });
-        for (const c of p.cards) dotAt(g, '갈래', x(ym(c[0])), ly, 2.5, 'primary');
+        for (const c of p.cards) dotAt(g, '갈래', x(ym(c[0])), ly, 2.5, 'primary-strong');
         y = ly + G.row * p.cards.length + G.gap;
       }
-      dotAt(g, '시작', xs, ly, 5, 'primary', { stroke: 'surface', sw: 2 });
+      dotAt(g, '시작', xs, ly, 5, 'primary-strong', { stroke: 'surface', sw: 2 });
       const head = inst('Timeline/Project', { Fold: open ? 'Open' : 'Folded', Name: p.name }); head.name = `${p.name} 이름`; g.appendChild(head); head.x = xs - 8; head.y = ly - 28;
     }
     return { canvas: cv, cards };
@@ -141,12 +141,12 @@
 
   SCREENS.push({ group: '경험 타임라인', title: '역량으로 거르기', build: async (frame) => {
     const { cards } = await timeline(frame, '리더십');
-    // 카드에 올렸을 때: 제목, 프로젝트, 달, 역량 (고른 역량은 형광펜)
+    // 카드에 올렸을 때: 제목, 프로젝트, 달, 역량 (고른 역량은 주황)
     const c = cards['일정이 밀렸을 때 기능 범위 조율'];
-    const tip = al('V', { name: '카드 툴팁', gap: 2, pad: [10, 12], fill: 'surface', stroke: 'border-strong', radius: 'radius/sm', maxW: 280 }); shadow(tip, 'Menu'); frame.appendChild(tip);
+    const tip = al('V', { name: '카드 툴팁', gap: 2, pad: [12, 14], fill: 'surface', stroke: 'border', radius: 'radius/md', maxW: 280 }); shadow(tip, 'Menu'); frame.appendChild(tip);
     await tput(tip, c.card[1], 'Small/13.5 Semibold', 'text'); await tput(tip, c.project, 'Small/13.5', 'text-2');
     const [yy, mm] = c.card[0].split('-').map(Number); await tput(tip, `${yy}년 ${mm}월`, 'Small/13.5', 'text-2');
-    const kws = al('H', { name: '역량', gap: 12, pad: [4, 0, 0, 0], wrap: true, cross: 'center' }); kws.counterAxisSpacing = 2; tip.appendChild(kws);
+    const kws = al('H', { name: '역량', gap: 6, pad: [6, 0, 0, 0], wrap: true, cross: 'center' }); kws.counterAxisSpacing = 6; tip.appendChild(kws);
     for (const k of c.card[2]) kws.appendChild(inst('Keyword', { State: k === '리더십' ? 'Selected' : 'Default', Label: k }));
     const dot = c.node.findOne((n) => n.name === 'dot');
     const b = boxIn(dot, frame) || { x: SIDEBAR_W + c.node.x + 6, y: 56 + 56 + c.node.y + 7, h: 10 }; // 계산할 수 없을 때: 왼쪽 메뉴 + 잔가지 자리, 상단바 · 도구 줄 아래

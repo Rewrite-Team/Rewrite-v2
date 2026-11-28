@@ -8,12 +8,12 @@ const W = 1920, H = 1080, SIDEBAR_W = 236; // 데스크톱 화면
 const NAV = [['홈', 'home', 'Home'], ['AI 채팅', 'chat', 'Chat'], ['경험 위키', 'wiki', 'Wiki'], ['경험 타임라인', 'timeline', 'Timeline']];
 async function buildShellComponents(parent) {
   const sec = al('V', { name: '화면 틀', gap: 16 }); parent.appendChild(sec);
-  await tput(sec, '화면 틀', 'Title/17', 'text');
+  await tput(sec, '화면 틀', 'Title/18', 'text');
   await tput(sec, '왼쪽 메뉴(236). 1차 범위라 마스터 이력서와 지원 기업은 메뉴에 없다. 화면에서 세로 채우기', 'Small/13.5', 'text-3');
   const row = al('H', { name: 'items', gap: 32 }); sec.appendChild(row);
   await makeSet(row, 'Shell/Sidebar', ['Home', 'Chat', 'Wiki', 'Timeline', 'Trash', 'None'].map((act) => ({ props: { Active: act }, build: async (c) => {
-    auto(c, 'V', { gap: 2, pad: [0, 12, 12, 12], w: SIDEBAR_W, h: H, fill: 'surface-2', stroke: 'border', sides: ['right'] });
-    const brand = al('H', { name: 'brand', pad: [0, 8], h: 56, w: 212, cross: 'center' }); c.appendChild(brand); brand.appendChild(inst('Logo', { On: 'Light' }));
+    auto(c, 'V', { gap: 2, pad: [0, 12, 12, 12], w: SIDEBAR_W, h: H, fill: 'surface', stroke: 'border', sides: ['right'] });
+    const brand = al('H', { name: 'brand', pad: [0, 8], h: 56, w: 212, cross: 'center' }); c.appendChild(brand); brand.appendChild(inst('Logo'));
     gap(c, 8);
     for (const [label, ic, key] of NAV) c.appendChild(inst('Nav item', { State: act === key ? 'Active' : 'Default', Label: label, Icon: ic }));
     const grow = figma.createFrame(); grow.name = 'spacer'; grow.fills = []; c.appendChild(grow); grow.layoutSizingHorizontal = 'FILL'; grow.layoutSizingVertical = 'FILL';
@@ -60,8 +60,8 @@ async function page(main, o = {}) {
     if (o.above && o.above.length) line('제목 위', o.above, 8, [0, 0, 8, 0]);
     if (o.titleExtra && o.titleExtra.length) {
       const r = al('H', { name: '제목 줄', gap: 10, cross: 'center' }); put(left, r, { fill: true });
-      await tput(r, o.title, 'Heading/24', 'text', { wrap: true, name: 'h1' }); o.titleExtra.forEach((n) => r.appendChild(n));
-    } else await tput(left, o.title, 'Heading/24', 'text', { wrap: true, name: 'h1' });
+      await tput(r, o.title, 'Heading/26', 'text', { wrap: true, name: 'h1' }); o.titleExtra.forEach((n) => r.appendChild(n));
+    } else await tput(left, o.title, 'Heading/26', 'text', { wrap: true, name: 'h1' });
     if (o.meta && o.meta.length) line('정보', o.meta, 14, [8, 0, 0, 0]);
     if (o.sub) { gap(left, 6); const t = await tput(left, o.sub, 'Body/15', 'text-2', { wrap: true, name: '설명' }); t.maxWidth = 600; } // 앱의 .page-head p (64ch)
     for (const n of o.below || []) { gap(left, 10); put(left, n, { fill: true }); }
@@ -73,12 +73,12 @@ async function page(main, o = {}) {
 // 제목이 있는 상단바 (경험 타임라인처럼 화면을 꽉 쓰는 곳)
 async function titleBar(main, title) {
   const bar = al('H', { name: '상단바', pad: [0, 40], h: 56, cross: 'center', fill: 'bg', stroke: 'border', sides: ['bottom'] }); put(main, bar, { fill: true });
-  bar.appendChild(await text(title, 'Title/17', 'text')); return bar;
+  bar.appendChild(await text(title, 'Title/18', 'text')); return bar;
 }
 // 섹션 제목 (+ 오른쪽 링크)
 async function sectionTitle(col, title, more, count) {
   const h = al('H', { name: title, gap: 8, cross: 'center', pad: [0, 0, 12, 0] }); put(col, h, { fill: true });
-  h.appendChild(await text(title, 'Title/17', 'text')); if (count) h.appendChild(await text(count, 'Small/13.5', 'text-3'));
+  h.appendChild(await text(title, 'Title/18', 'text')); if (count) h.appendChild(await text(count, 'Small/13.5', 'text-3'));
   if (more) { spacer(h); h.appendChild(await text(more, 'Small/13.5 Medium', 'text-2')); }
   return h;
 }
@@ -89,7 +89,7 @@ const btn = (label, variant = 'Secondary', size = 'Medium', ic) => inst('Button'
 const disable = (node) => { node.opacity = 0.45; return node; }; // 꺼진 버튼
 // 나란한 보기 고르기: segmented([{ label, icon }], 고른 순서)
 function segmented(items, on = 0) {
-  const s = al('H', { name: '보기 고르기', gap: 2, pad: 3, fill: 'surface-3', radius: 'radius/md' });
+  const s = al('H', { name: '보기 고르기', gap: 2, pad: 4, fill: 'surface-3', radius: 'radius/pill' });
   items.forEach((it, i) => s.appendChild(inst('Segment', Object.assign({ Selected: i === on ? 'On' : 'Off', Label: it.label || it }, it.icon ? { 'Show icon': true, Icon: it.icon } : {}))));
   return s;
 }
@@ -109,7 +109,7 @@ async function field(parent, o) {
 // 빈 화면: empty(parent, '제목', '설명', [버튼])
 async function empty(parent, title, desc, buttons = []) {
   const e = al('V', { name: '빈 화면', gap: 4, pad: [56, 20], cross: 'center' }); put(parent, e, { fill: true });
-  await tput(e, title, 'Title/17', 'text', { align: 'center' }); if (desc) await tput(e, desc, 'Body/15', 'text-2', { align: 'center' });
+  await tput(e, title, 'Title/18', 'text', { align: 'center' }); if (desc) await tput(e, desc, 'Body/15', 'text-2', { align: 'center' });
   if (buttons.length) { gap(e, 14); const r = al('H', { name: '단추', gap: 8 }); e.appendChild(r); buttons.forEach((b) => r.appendChild(b)); }
   return e;
 }
@@ -158,8 +158,8 @@ async function evidence(parent, o) {
   if (o.code && o.code.length) {
     const list = al('V', { name: '코드 블록', gap: 12 }); put(await group('코드'), list, { fill: true });
     for (const f of o.code) {
-      const blk = al('V', { name: f.path.split('/').pop(), stroke: 'border', radius: 'radius/sm', clip: true }); put(list, blk, { fill: true });
-      const ph = al('H', { name: '경로', pad: [7, 12], fill: 'surface-2', stroke: 'border', sides: ['bottom'] }); put(blk, ph, { fill: true });
+      const blk = al('V', { name: f.path.split('/').pop(), stroke: 'border', radius: 'radius/md', clip: true }); put(list, blk, { fill: true });
+      const ph = al('H', { name: '경로', pad: [9, 14], fill: 'surface-2', stroke: 'border', sides: ['bottom'] }); put(blk, ph, { fill: true });
       await tput(ph, f.path, 'Caption/12', 'text-2', { wrap: true });
       const pre = al('V', { name: '코드', pad: [8, 0] }); put(blk, pre, { fill: true });
       for (const [n, src] of f.lines) put(pre, named(inst('Evidence/Code line', { Highlight: (f.hl || []).includes(n) ? 'On' : 'Off', Number: String(n), Code: src || ' ' }), String(n)), { fill: true });
@@ -170,7 +170,7 @@ async function evidence(parent, o) {
 // 레포 분석에서 찾은 작업을 고르고 「자세히 보기」를 펼친 모습 (.rf-draft > details[open])
 //   d: { title, line, keywords: '역량    역량', star: [[칸, 글]] (글이 비면 Empty), evidence: evidence() 옵션 }
 async function openDraft(parent, d) {
-  const box = al('V', { name: `${d.title} (자세히 보기 펼침)`, fill: 'surface', stroke: 'primary', strokeW: 1.5, radius: 'radius/md', clip: true }); put(parent, box, { fill: true });
+  const box = al('V', { name: `${d.title} (자세히 보기 펼침)`, fill: 'surface', stroke: 'primary-strong', strokeW: 2, radius: 'radius/md', clip: true }); put(parent, box, { fill: true });
   const v = inst('Repo/Draft', { Selected: 'On', Title: d.title, 'Resume line': d.line, Keywords: d.keywords, 'Show more': false });
   put(box, v, { fill: true }); v.strokes = []; v.paddingBottom = 6; // 바깥 틀이 테두리를 그린다
   const det = al('V', { name: '자세히 보기' }); put(box, det, { fill: true });
@@ -192,7 +192,7 @@ async function modal(frame, o) {
   const dim = figma.createRectangle(); dim.name = '배경 어둡게'; dim.resize(frame.width, frame.height); dim.fills = [paint('text', 0.45)]; frame.appendChild(dim);
   const m = al('V', { name: o.title, w: o.width || 480, fill: 'surface', radius: 'radius/lg', clip: true }); shadow(m, 'Modal'); frame.appendChild(m);
   const head = al('H', { name: '머리', gap: 12, pad: [22, 24, 0, 24], cross: 'center' }); put(m, head, { fill: true });
-  await tput(head, o.title, 'Title/17', 'text', { wrap: true }); if (o.close) head.appendChild(inst('Icon button', { Size: 'Small', Icon: 'close' }));
+  await tput(head, o.title, 'Title/18', 'text', { wrap: true }); if (o.close) head.appendChild(inst('Icon button', { Size: 'Small', Icon: 'close' }));
   const body = al('V', { name: '내용', gap: 18, pad: [10, 24, 24, 24] }); put(m, body, { fill: true });
   if (o.body) await o.body(body);
   if (o.buttons && o.buttons.length) { const foot = al('H', { name: '단추', gap: 8, pad: [14, 24], main: 'end', stroke: 'border', sides: ['top'] }); put(m, foot, { fill: true }); o.buttons.forEach((b) => foot.appendChild(b)); }
@@ -203,7 +203,7 @@ async function modal(frame, o) {
 const modalText = (body, chars) => tput(body, chars, 'Body/15', 'text-2', { wrap: true });
 // 드롭다운 메뉴: menu(frame, [{ label, icon, danger } | '-'], [x, y], { w: 폭 (기본 232) })
 function menu(frame, items, at, o = {}) {
-  const m = al('V', { name: '메뉴', gap: 0, pad: 6, w: o.w || 232, fill: 'surface', stroke: 'border', radius: 'radius/md' }); shadow(m, 'Menu'); frame.appendChild(m);
+  const m = al('V', { name: '메뉴', gap: 0, pad: 8, w: o.w || 232, fill: 'surface', stroke: 'border', radius: 'radius/md' }); shadow(m, 'Menu'); frame.appendChild(m);
   for (const it of items) {
     if (it === '-') { const d = inst('Divider'); put(m, d, { fill: true }); d.name = 'hr'; continue; }
     const r = inst('Menu item', Object.assign({ Tone: it.danger ? 'Danger' : 'Default', Label: it.label }, it.icon ? { Icon: it.icon } : { 'Show icon': false })); put(m, r, { fill: true });
@@ -234,5 +234,9 @@ function toast(frame, label, action) {
   t.x = Math.round((frame.width - t.width) / 2); t.y = Math.min(frame.height, H) - t.height - 24; return t;
 }
 function tooltip(frame, label, at) { const t = inst('Tooltip', { Label: label }); frame.appendChild(t); t.x = at[0]; t.y = at[1]; return t; }
-// 형광펜 글자 (AI가 더한 것, 내가 고른 것)
-async function marked(chars, style = 'Body/15', color = 'text') { const b = al('H', { name: '형광펜', pad: [1, 3], fill: 'hl', radius: MARK_RADIUS }); b.appendChild(await text(chars, style, color)); return b; }
+// 강조 글자 (AI가 더한 것)
+async function marked(chars, style = 'Body/15', color = 'text') { const b = al('H', { name: '강조', pad: [1, 4], fill: 'primary-tint', radius: MARK_RADIUS }); b.appendChild(await text(chars, style, color)); return b; }
+// 둥근 면 하나로 묶은 목록 (.home .list, 위키의 프로젝트 목록, 설정과 휴지통의 묶음). pad: [세로, 가로]
+function listBox(parent, name, pad = [0, 0]) { const b = al('V', { name, pad, fill: 'surface', stroke: 'border', radius: 'radius/md', clip: true }); shadow(b, 'Card'); put(parent, b, { fill: true }); return b; }
+// 목록의 마지막 줄은 아래 선을 없앤다
+const lastRow = (box) => { const n = box.children[box.children.length - 1]; if (n) n.strokes = []; return box; };

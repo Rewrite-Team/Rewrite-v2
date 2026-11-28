@@ -98,7 +98,7 @@ async function pjHead(main, p) {
 
 // GitHub 패널 (.panel.pj-gh). primary: 레포는 있고 카드가 없을 때 「GitHub로 경험 카드 만들기」가 주 버튼
 async function pjGithub(col, p, primary) {
-  const panel = al('V', { name: 'GitHub', fill: 'surface-2', radius: 'radius/md', pad: 20 }); put(col, panel, { fill: true });
+  const panel = al('V', { name: 'GitHub', fill: 'surface-2', radius: 'radius/lg', pad: 20 }); put(col, panel, { fill: true });
   const rows = [];
   if (!p.repos.length) {
     const off = al('H', { name: '연결 전', gap: 12, cross: 'center' }); put(panel, off, { fill: true });
@@ -141,14 +141,14 @@ async function pjCards(col, p, primary) {
   const sec = al('V', { name: '경험 카드' }); put(col, sec, { fill: true });
   const h = al('H', { name: '섹션 머리', gap: 16, main: 'between', cross: 'center', pad: [0, 0, 12, 0] }); put(sec, h, { fill: true });
   const t = al('H', { name: '제목', gap: 8, cross: 'center' }); h.appendChild(t);
-  t.appendChild(await text('경험 카드', 'Title/17', 'text'));
+  t.appendChild(await text('경험 카드', 'Title/18', 'text'));
   if (p.cards.length) {
     t.appendChild(await text(String(p.cards.length), 'Small/13.5', 'text-3', { name: '개수' }));
     const b = al('H', { name: '만들기', gap: 8, cross: 'center' }); h.appendChild(b); pjMakeBtns(primary).forEach((x) => b.appendChild(x));
     pjGrid(sec, p.cards, p.title);
   } else {
     const desc = `${p.repos.length ? '연결한 GitHub에서 여러 장을 한 번에 만들거나, AI와 이야기하며 한 장씩 만들 수 있어요.' : 'AI와 이야기하면 첫 카드가 만들어져요. GitHub를 연결하면 여러 장을 한 번에 만들 수도 있어요.'} AI 없이 직접 써도 돼요.`;
-    const e = await empty(sec, '아직 경험 카드가 없어요', desc, pjMakeBtns(primary)); e.paddingTop = 28;
+    const e = await empty(sec, '아직 경험 카드가 없어요', desc, pjMakeBtns(primary)); e.paddingTop = e.paddingBottom = 40; e.fills = fills('primary-soft'); radius(e, 'radius/lg'); // .pj-empty: 연한 주황 면
   }
   return sec;
 }

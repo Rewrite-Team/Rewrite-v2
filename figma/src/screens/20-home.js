@@ -22,23 +22,23 @@
   /* ---------- 이 화면의 컴포넌트: 이어서 대화하기 한 줄 ---------- */
   EXTRA_COMPONENTS.push({ title: '홈', build: async (row) => {
     await makeOne(row, 'Home/Chat row', async (c) => {
-      auto(c, 'H', { gap: 12, pad: [11, 8], w: 760, cross: 'center', stroke: 'border', sides: ['bottom'] }); c.minHeight = 56;
+      auto(c, 'H', { gap: 12, pad: [13, 18], w: 760, cross: 'center', stroke: 'border', sides: ['bottom'] }); c.minHeight = 56;
       const t = named(await text('대화방 이름', 'Body/15 Semibold', 'text'), 'hc-title'); c.appendChild(t); t.layoutSizingHorizontal = 'FILL'; t.maxLines = 1; t.textTruncation = 'ENDING';
       const chip = al('H', { name: 'project', gap: 5, cross: 'center' }); c.appendChild(chip);
-      chip.appendChild(icon('folder', 15, 'primary')); chip.appendChild(named(await text('프로젝트', 'Small/13.5 Semibold', 'primary'), 'hc-project'));
+      chip.appendChild(icon('folder', 15, 'primary-ink')); chip.appendChild(named(await text('프로젝트', 'Small/13.5 Semibold', 'primary-ink'), 'hc-project'));
     }, { desc: '홈 › 이어서 대화하기의 한 줄: 대화방 이름과 프로젝트. 누르면 그 대화방으로', props: [{ name: 'Title', type: 'TEXT', default: '대화방 이름', node: 'hc-title' }, { name: 'Project', type: 'TEXT', default: '프로젝트', node: 'hc-project' }] });
   } });
 
   /* ---------- 블록 ---------- */
-  const cellRect = (level, name) => { const r = figma.createRectangle(); r.name = name; r.resize(CELL, CELL); r.cornerRadius = 2; r.fills = [paint(`record-${level}`)]; return r; };
+  const cellRect = (level, name) => { const r = figma.createRectangle(); r.name = name; r.resize(CELL, CELL); r.cornerRadius = 3; r.fills = [paint(`record-${level}`)]; return r; };
 
   // 꾸준히 기록하기 → 11월 27일 칸을 돌려준다 (툴팁 자리)
   async function recordBlock(col) {
     await sectionTitle(col, '꾸준히 기록하기');
-    const rc = al('V', { name: '꾸준히 기록하기', gap: 16, pad: 20, fill: 'surface-2', radius: 'radius/md' }); put(col, rc, { fill: true });
+    const rc = al('V', { name: '꾸준히 기록하기', gap: 18, pad: 24, fill: 'surface-2', radius: 'radius/lg' }); put(col, rc, { fill: true });
     const top = al('H', { name: '연속 기록', gap: 16, cross: 'center' }); put(rc, top, { fill: true });
     const st = al('H', { name: '연속', gap: 4, cross: 'baseline' }); top.appendChild(st);
-    st.appendChild(await text('20일', 'Title/17', 'text')); st.appendChild(await text('연속 기록하고 있어요', 'Body/15', 'text'));
+    st.appendChild(await text('20일', 'Title/18', 'primary-ink')); st.appendChild(await text('연속 기록하고 있어요', 'Body/15', 'text'));
     spacer(top); top.appendChild(await text('최근 1년 동안 61일 기록했어요', 'Small/13.5', 'text-3'));
 
     // 잔디: 왼쪽 요일 열 + (달 줄, 주마다 한 열)
@@ -79,16 +79,17 @@
   // 내 역량: 레이더 (그림은 SVG, 이름과 카드 수는 글자)
   async function skillsBlock(col) {
     await sectionTitle(col, '내 역량', '경험 타임라인');
-    const sk = al('V', { name: '내 역량', gap: 12, pad: 20, fill: 'surface-2', radius: 'radius/md', cross: 'center' }); put(col, sk, { fill: true });
+    const sk = al('V', { name: '내 역량', gap: 16, pad: 24, fill: 'surface-2', radius: 'radius/lg', cross: 'center' }); put(col, sk, { fill: true });
     const W0 = 600, H0 = 452, CX = 300, CY = 226, R = 150, N = SKILLS.length, TOPV = 8, RINGS = 4;
     const at = (i, v) => { const a = -Math.PI / 2 + (i * 2 * Math.PI) / N; return [CX + Math.cos(a) * R * v, CY + Math.sin(a) * R * v]; };
     const poly = (fn) => SKILLS.map((k, i) => at(i, fn(k)).map((x) => x.toFixed(1)).join(',')).join(' ');
     const C = COLORS;
     let s = `<svg width="${W0}" height="${H0}" viewBox="0 0 ${W0} ${H0}" xmlns="http://www.w3.org/2000/svg" fill="none">`;
-    for (let j = 1; j <= RINGS; j++) s += `<polygon points="${poly(() => j / RINGS)}" stroke="${j === RINGS ? C['border-strong'] : C.border}" stroke-width="1" ${j === RINGS ? '' : 'stroke-dasharray="3 4"'}/>`;
+    s += `<polygon points="${poly(() => 1)}" fill="${C.surface}"/>`;
+    for (let j = 1; j <= RINGS; j++) s += `<polygon points="${poly(() => j / RINGS)}" stroke="${C['border-strong']}" stroke-width="1" ${j === RINGS ? '' : 'stroke-dasharray="3 4"'}/>`;
     SKILLS.forEach((k, i) => { const [x, y] = at(i, 1); s += `<line x1="${CX}" y1="${CY}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${C.border}" stroke-width="1"/>`; });
-    s += `<polygon points="${poly((k) => k[1] / TOPV)}" fill="${C.primary}" fill-opacity="0.12" stroke="${C.primary}" stroke-width="2" stroke-linejoin="round"/>`;
-    SKILLS.forEach((k, i) => { const [x, y] = at(i, k[1] / TOPV); s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.5" fill="${C.primary}" stroke="${C.surface}" stroke-width="2"/>`; });
+    s += `<polygon points="${poly((k) => k[1] / TOPV)}" fill="${C.primary}" fill-opacity="0.2" stroke="${C['primary-strong']}" stroke-width="2.5" stroke-linejoin="round"/>`;
+    SKILLS.forEach((k, i) => { const [x, y] = at(i, k[1] / TOPV); s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.5" fill="${C['primary-strong']}" stroke="${C.surface}" stroke-width="2"/>`; });
     s += '</svg>';
     const fig = figma.createFrame(); fig.name = '레이더'; fig.fills = []; fig.clipsContent = false; fig.resize(W0, H0); sk.appendChild(fig);
     const chart = bindSvg(figma.createNodeFromSvg(s)); chart.name = '그림'; fig.appendChild(chart); chart.x = 0; chart.y = 0;
@@ -104,8 +105,9 @@
 
   async function chatsBlock(col) {
     await sectionTitle(col, '이어서 대화하기', '전체 보기');
-    const list = al('V', { name: '대화방', stroke: 'border', sides: ['top'] }); put(col, list, { fill: true });
+    const list = listBox(col, '대화방');
     for (const [t, p] of RECENT) { const r = inst('Home/Chat row', { Title: t, Project: p }); r.name = t; put(list, r, { fill: true }); }
+    lastRow(list);
   }
 
   // 홈 전체 → { screen, hover(11월 27일 칸) }
@@ -125,7 +127,7 @@
     const { screen, main } = shell(frame, 'Home', { trash: 0 });
     const col = await page(main, { narrow: true });
     const e = al('V', { name: '빈 화면', gap: 4, pad: [96, 20, 40, 20], cross: 'center' }); put(col, e, { fill: true });
-    await tput(e, '첫 프로젝트를 만들어 보세요', 'Heading/24', 'text', { align: 'center' });
+    await tput(e, '첫 프로젝트를 만들어 보세요', 'Heading/26', 'text', { align: 'center' });
     await tput(e, '팀 과제, 동아리, 아르바이트도 프로젝트예요.', 'Body/15', 'text-2', { align: 'center' });
     gap(e, 14); e.appendChild(btn('새 프로젝트', 'Primary', 'Large', 'plus'));
     fit(frame, screen);

@@ -4,6 +4,7 @@
 .pj-meta { margin-top: 8px; }
 
 /* GitHub */
+.pj-gh { border-radius: var(--radius-lg); }
 .pj-gh-off { display: flex; align-items: center; gap: 12px; color: var(--text-2); }
 .pj-gh-off p { flex: 1; min-width: 0; }
 .pj-repos { display: flex; flex-direction: column; gap: 4px; margin: -6px 0 12px; }
@@ -17,7 +18,7 @@ a.pj-repo-name:hover { text-decoration: underline; text-underline-offset: 3px; }
 /* 경험 카드 · 채팅 */
 .pj-sec-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 12px; }
 .pj-sec-head .section-title { margin: 0; }
-.pj-empty { padding-top: 28px; }
+.pj-empty { padding-top: 40px; padding-bottom: 40px; border-radius: var(--radius-lg); background: var(--primary-soft); }
 .pj-make { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 
 /* 수정 모달 */
@@ -35,16 +36,16 @@ a.pj-repo-name:hover { text-decoration: underline; text-underline-offset: 3px; }
 .pg-made > summary::-webkit-details-marker { display: none; }
 .pg-made > summary > svg { transition: transform .12s; }
 .pg-made[open] > summary > svg { transform: rotate(90deg); }
-.pg-made > summary:hover { color: var(--text); }
+.pg-made > summary:hover { color: var(--primary-ink); }
 .pg-made .list { margin-top: 4px; }
 .pg-bar {
   position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  margin-top: 24px; padding: 12px 0; background: var(--bg); border-top: 1px solid var(--border);
+  margin-top: 24px; padding: 14px 0; background: var(--bg); border-top: 1px solid var(--border);
 }
 .pg-all { display: inline-flex; align-items: center; gap: 10px; min-height: var(--control); cursor: pointer; white-space: nowrap; }
 
 @media (max-width: 900px) {
-  .pg-bar { bottom: calc(60px + env(safe-area-inset-bottom)); margin-left: calc(var(--gutter) * -1); margin-right: calc(var(--gutter) * -1); padding: 8px var(--gutter); }
+  .pg-bar { bottom: calc(60px + env(safe-area-inset-bottom)); margin-left: calc(var(--gutter) * -1); margin-right: calc(var(--gutter) * -1); padding: 10px var(--gutter); }
 }
 @media (max-width: 600px) {
   .pj-gh { padding: 16px; }

@@ -22,14 +22,15 @@
 .rf-repo .choice-sub { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
 .rf-repo-meta { flex: none; display: flex; gap: 12px; max-width: 45%; font-size: var(--fs-sm); color: var(--text-3); font-variant-numeric: tabular-nums; }
 .rf-more { margin-top: 8px; }
-.rf-none { padding: 32px 0; text-align: center; color: var(--text-2); }
+.rf-none { padding: 32px 16px; border-radius: var(--radius); background: var(--surface-2); text-align: center; color: var(--text-2); }
 
 /* STAR 초안 */
+/* 고른 초안: 카드 전체에 주황 테두리, 머리에 연한 주황 면 */
 .rf-draft + .rf-draft { margin-top: 12px; }
-.rf-draft { border: 1px solid var(--border-strong); border-radius: var(--radius); }
-.rf-draft:has(input:checked) { border-color: var(--primary); }
-.rf-draft .choice { border: 0; }
-.rf-draft .choice-title { -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.rf-draft { border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); transition: border-color .12s, box-shadow .12s; }
+.rf-draft:has(input:checked) { border-color: var(--primary-strong); box-shadow: 0 0 0 1px var(--primary-strong); }
+.rf-draft .choice { border: 0; border-radius: calc(var(--radius) - 1px); box-shadow: none; }
+.rf-draft:not(:has(input:checked)) .choice { background: var(--surface); }
 .rf-draft-kws { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 8px; }
 .rf-draft-more { margin-top: -4px; font-size: var(--fs-sm); }
 .rf-draft-more > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; padding: 8px 16px 10px 42px; color: var(--text-2); cursor: pointer; list-style: none; }

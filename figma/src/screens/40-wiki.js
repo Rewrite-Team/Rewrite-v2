@@ -66,12 +66,12 @@ function projectList(col, done) {
     const p = rows.find((r) => r[0] === done); p[1] = false; p[2] = `${p[2].replace('부터', '')} ~ 2026.11`; // 끝난 달이 비어 있으면 이번 달
     rows = rows.filter((r) => r[1]).concat([p], rows.filter((r) => !r[1] && r !== p));
   }
-  const list = al('V', { name: '프로젝트 목록', stroke: 'border', sides: ['top'] }); put(col, list, { fill: true });
+  const list = listBox(col, '프로젝트 목록');
   for (const [name, ongoing, period, role, repo, n] of rows) {
     const r = inst('Wiki/Project row', Object.assign({ State: ongoing ? 'Ongoing' : 'Done', Name: name, Period: period, Role: role, 'Show repo': !!repo, Cards: `카드 ${n}장` }, repo ? { Repo: repo } : {}));
     r.name = name; put(list, r, { fill: true });
   }
-  return list;
+  return lastRow(list);
 }
 async function projectsScreen(frame, o = {}) {
   const { screen, col } = await wikiPage(frame, { view: 0 });
@@ -85,6 +85,7 @@ function cardFilter(col, o = {}) {
   const q = inst('Input', { Content: o.q ? 'Value' : 'Placeholder', Text: o.q || '카드 검색', 'Show icon': true, Icon: 'search' }); q.name = '카드 검색'; put(row, q, { fill: true });
   const p = inst('Select', { Text: o.project || '모든 프로젝트' }); p.name = '프로젝트'; row.appendChild(p); p.resize(200, p.height);
   const k = inst('Select', { Text: o.kw || '모든 역량' }); k.name = '역량'; row.appendChild(k); k.resize(170, k.height);
+  for (const n of [q, p, k]) radius(n, 'radius/pill'); // .vt-filter: 알약 모양
   gap(col, 20);
   return row;
 }
@@ -102,7 +103,7 @@ function cardGrid(col, cards, make) {
   }
   return grid;
 }
-// 카드 한 장. match: 거른 역량 (그 역량에 형광펜)
+// 카드 한 장. match: 거른 역량 (그 역량은 주황)
 const wikiCard = ([title, project, period, github, kws, line], match) => indexCard({ project, period, github, title, line, keywords: kws.split(','), match });
 
 /* ---------- 새 프로젝트 모달 (G2) 과 레포 고르기 (G1) ---------- */

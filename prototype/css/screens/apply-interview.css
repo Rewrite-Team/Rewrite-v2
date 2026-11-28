@@ -1,9 +1,12 @@
 /* ===== 지원 기업: 면접 준비 탭 (.iv-*) ===== */
 .iv-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 16px; }
-.iv-item { border-bottom: 1px solid var(--border); }
+.iv .list { display: flex; flex-direction: column; gap: 10px; border: 0; }
+.iv-item { padding: 0 12px 0 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-sm); transition: border-color .12s; }
+.iv-item:hover, .iv-item:has(.iv-main[aria-expanded="true"]) { border-color: var(--primary-light); }
+.iv-item.is-done { background: var(--surface-2); box-shadow: none; }
 .iv-row { display: flex; align-items: flex-start; gap: 14px; padding-left: 4px; }
 .iv-row > input { margin-top: 19px; }
-.iv-main { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; padding: 16px 8px 16px 0; border: 0; background: none; text-align: left; }
+.iv-main { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; padding: 16px 8px 16px 0; border: 0; background: none; text-align: left; border-radius: var(--radius-sm); }
 .iv-main > svg { grid-column: 2; grid-row: 1; margin-top: 3px; color: var(--text-3); }
 .iv-main[aria-expanded="true"] > svg { transform: rotate(180deg); }
 .iv-main .ap-ref { grid-column: 1; color: var(--text-2); }
@@ -11,15 +14,16 @@
 .iv-main:hover .iv-q { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
 .iv-item.is-done .iv-q { color: var(--text-3); font-weight: 500; }
 .iv-body { padding: 4px 8px 20px 36px; }
-.iv-brief { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); color: var(--text-2); }
+.iv-brief { margin-top: 12px; padding: 14px 16px; border-radius: var(--radius-sm); background: var(--primary-soft); display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); color: var(--text-2); }
 .iv-brief > div { display: grid; grid-template-columns: 3em minmax(0, 1fr); }
-.iv-brief dt { color: var(--text-3); }
+.iv-brief dt { color: var(--primary-ink); font-weight: 700; }
 .iv-foot { margin: 10px 0 0 -10px; flex-wrap: wrap; }
 .iv-empty { justify-content: center; }
 .iv-sugg .ap-ref { margin-top: 4px; }
 @media (max-width: 600px) {
   .iv-bar .spacer { margin-left: 0; width: 100%; }
   .iv-bar .spacer .btn { flex: 1; }
+  .iv-item { padding: 0 8px 0 12px; }
   .iv-body { padding-left: 0; padding-right: 0; }
   .iv-row { gap: 10px; padding-left: 0; }
   .iv-row > input { width: 22px; height: 22px; margin-top: 17px; }

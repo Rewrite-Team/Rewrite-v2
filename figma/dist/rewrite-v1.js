@@ -1,7 +1,7 @@
 /* Rewrite v1 디자인 — 자동으로 만든 파일이에요. 고치려면 figma/src 를 고치고 `node figma/build.js` 를 다시 실행하세요.
    실행: Figma 데스크톱 앱에서 파일을 열고 Plugins → Scripter 에 이 파일 내용을 통째로 붙여 넣은 뒤 ▶.
    만드는 것: 「Rewrite v1」 페이지 하나에 기초(색, 글자), 컴포넌트, 화면. 다시 실행하면 그 페이지 안만 지우고 새로 그려요 (Starter 플랜의 페이지 3개 제한 안에서).
-   빌드: 2026-11-28 09:03 */
+   빌드: 2026-11-28 14:55 */
 
 const ICON_PATHS = {"home":"<path d=\"M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z\"/>","chat":"<path d=\"M5 5h14a1 1 0 0 1 1 1v9.5a1 1 0 0 1-1 1h-7L7.5 20v-3.5H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z\"/><path d=\"M8 9.2h8M8 12.5h5\"/>","timeline":"<path d=\"M3.5 6.5h17M7 6.5v5.5a2.5 2.5 0 0 0 2.5 2.5H15M12 14.5v1.5a2.5 2.5 0 0 0 2.5 2.5h4\"/><circle cx=\"7\" cy=\"6.5\" r=\"1.6\"/><circle cx=\"16.5\" cy=\"14.5\" r=\"1.6\"/><circle cx=\"20\" cy=\"18.5\" r=\"1.4\"/>","wiki":"<path d=\"M12 6.5C10.3 5.4 7.6 5 4 5v13c3.6 0 6.3.4 8 1.5 1.7-1.1 4.4-1.5 8-1.5V5c-3.6 0-6.3.4-8 1.5z\"/><path d=\"M12 6.5v13\"/>","resume":"<path d=\"M6 3.5h12a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-15a1 1 0 0 1 1-1z\"/><circle cx=\"9.5\" cy=\"8.5\" r=\"1.6\"/><path d=\"M13.5 8.5H16M8 13h8M8 16.5h5\"/>","building":"<path d=\"M5 20V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v15M14 10h4a1 1 0 0 1 1 1v9M3 20h18\"/><path d=\"M8 8h3M8 12h3M8 16h3M16.5 14v2\"/>","settings":"<path d=\"M4 7.5h9M17 7.5h3M4 16.5h3M11 16.5h9\"/><circle cx=\"15\" cy=\"7.5\" r=\"2\"/><circle cx=\"9\" cy=\"16.5\" r=\"2\"/>","trash":"<path d=\"M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.8 12a1 1 0 0 0 1 1h7.4a1 1 0 0 0 1-1l.8-12M10.3 11v5M13.7 11v5\"/>","plus":"<path d=\"M12 5v14M5 12h14\"/>","search":"<circle cx=\"11\" cy=\"11\" r=\"6\"/><path d=\"m15.5 15.5 4.5 4.5\"/>","github":"<path d=\"M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22\"/>","link":"<path d=\"M10 14a4 4 0 0 0 5.7 0l3.1-3.1a4 4 0 0 0-5.7-5.7L12 6.3\"/><path d=\"M14 10a4 4 0 0 0-5.7 0l-3.1 3.1a4 4 0 0 0 5.7 5.7l1.1-1.1\"/>","unlink":"<path d=\"m13.5 17-1.7 1.7a4 4 0 0 1-5.7-5.7L7.5 11.5M10.5 7l1.7-1.7a4 4 0 0 1 5.7 5.7l-1.4 1.5\"/><path d=\"M4 8.5h2.5M8.5 4v2.5M20 15.5h-2.5M15.5 20v-2.5\"/>","external":"<path d=\"M13.5 4.5h6v6M19.5 4.5 11 13M17 14v4.5a1 1 0 0 1-1 1H5.5a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1H10\"/>","edit":"<path d=\"m4.5 19.5.8-3.8L16 5a1.4 1.4 0 0 1 2 0l1 1a1.4 1.4 0 0 1 0 2L8.3 18.7zM14 7l3 3\"/>","more":"<g fill=\"currentColor\" stroke=\"none\"><circle cx=\"5.5\" cy=\"12\" r=\"1.5\"/><circle cx=\"12\" cy=\"12\" r=\"1.5\"/><circle cx=\"18.5\" cy=\"12\" r=\"1.5\"/></g>","close":"<path d=\"m6 6 12 12M18 6 6 18\"/>","check":"<path d=\"m5 12.5 4.5 4.5L19 7\"/>","chevron-down":"<path d=\"m6 9.5 6 6 6-6\"/>","chevron-up":"<path d=\"m6 14.5 6-6 6 6\"/>","chevron-right":"<path d=\"m9.5 6 6 6-6 6\"/>","chevron-left":"<path d=\"m14.5 6-6 6 6 6\"/>","arrow-up":"<path d=\"M12 19V5M6 11l6-6 6 6\"/>","calendar":"<path d=\"M5 6h14a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zM4 10.5h16M8.5 3.5V7M15.5 3.5V7\"/>","sparkle":"<path d=\"M11 4.5c.7 4.2 2.3 5.8 6.5 6.5-4.2.7-5.8 2.3-6.5 6.5-.7-4.2-2.3-5.8-6.5-6.5 4.2-.7 5.8-2.3 6.5-6.5zM18.5 15.5v5M16 18h5\"/>","folder":"<path d=\"M4 18V6.5a1 1 0 0 1 1-1h4.2l2 2.5H19a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z\"/>","card":"<path d=\"M4.5 5h15a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z\"/><path d=\"M7 9.5h6M7 13h10M7 16h7\"/>","restore":"<path d=\"M8.5 13.5 4 9l4.5-4.5\"/><path d=\"M4 9h10a5.5 5.5 0 0 1 0 11H9\"/>","logout":"<path d=\"M10 4.5H6a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h4M15 8l4 4-4 4M19 12h-9\"/>","user":"<circle cx=\"12\" cy=\"8.5\" r=\"3.7\"/><path d=\"M4.8 20c.7-3.5 3.5-5.3 7.2-5.3s6.5 1.8 7.2 5.3\"/>","copy":"<path d=\"M9.5 8.5h9a1 1 0 0 1 1 1v9.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1V9.5a1 1 0 0 1 1-1z\"/><path d=\"M15.5 8.5V5a1 1 0 0 0-1-1h-9a1 1 0 0 0-1 1v9.5a1 1 0 0 0 1 1h3\"/>","print":"<path d=\"M7.5 9V4h9v5M7.5 16.5H5a1 1 0 0 1-1-1V10a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v5.5a1 1 0 0 1-1 1h-2.5M7.5 14h9v6h-9z\"/>","send":"<path d=\"m4 11.5 16-7-6.5 16-3-6.5zM10.5 14 20 4.5\"/>","history":"<path d=\"M4.5 12A7.5 7.5 0 1 0 7 6.4L4.5 8.5M4.5 4.5v4h4M12 8v4.3l3 1.8\"/>","eye":"<path d=\"M3 12c2-4 5.2-6 9-6s7 2 9 6c-2 4-5.2 6-9 6s-7-2-9-6z\"/><circle cx=\"12\" cy=\"12\" r=\"2.7\"/>","lock":"<path d=\"M6.5 10.5h11a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-7.5a1 1 0 0 1 1-1zM8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5M12 14v2.5\"/>","file":"<path d=\"M6.5 3.5H14l4.5 4.5v11.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-15a1 1 0 0 1 1-1zM13.5 3.8V8.5h4.7\"/>","refresh":"<path d=\"M19.5 11A7.6 7.6 0 0 0 5.8 8L4.5 9.5M4.5 4.8v4.7h4.7M4.5 13a7.6 7.6 0 0 0 13.7 3l1.3-1.5M19.5 19.2v-4.7h-4.7\"/>","menu":"<path d=\"M4 7h16M4 12h16M4 17h16\"/>","warning":"<path d=\"M12 4.5 21 19.5H3zM12 10v4.5\"/><circle cx=\"12\" cy=\"17\" r=\".9\" fill=\"currentColor\" stroke=\"none\"/>"};
 
@@ -20,21 +20,25 @@ const EFFECTS = {};   // 'Menu' | 'Modal' → 그림자 스타일
 const V1 = { prefix: 'v1', collection: 'Rewrite v1', page: 'Rewrite v1', oldPages: ['v1 Foundations', 'v1 Components', 'v1 Screens'] };
 
 /* ---------- 색: 앱의 CSS 변수(prototype/css/styles.css)와 같은 값 ---------- */
-const COLORS = {
-  bg: '#ffffff', surface: '#ffffff', 'surface-2': '#f3f5f8', 'surface-3': '#e8ecf1',
-  border: '#e1e5eb', 'border-strong': '#c8cfd9', 'field-border': '#848e9d',
-  text: '#18202e', 'text-2': '#465164', 'text-3': '#5d6878', 'on-ink': '#ffffff', 'on-ink-2': '#d3d9e2',
-  primary: '#24426f', 'primary-hover': '#182f53', 'primary-soft': '#e9eef6', 'primary-ink': '#1d3760',
-  hl: '#ffeb66', 'hl-soft': '#fff8cf',
-  success: '#1c7349', 'success-soft': '#e5f3eb', danger: '#bd2f28', 'danger-soft': '#fcebe9', warn: '#855600', 'warn-soft': '#fdf1db',
-  'record-0': '#e8ecf1', 'record-1': '#c9d4e3', 'record-2': '#93a9c8', 'record-3': '#5a7aa6', 'record-4': '#24426f', // 잔디: 잉크색 한 가지, 연할수록 적게
+/* 색 단계: 앱의 --orange-* · --grey-* 와 같은 값. 색 값은 여기에만 쓴다 */
+const STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900];
+const SCALES = {
+  orange: ['#fff2e8', '#ffe1ca', '#ffd0ad', '#ffb882', '#ffa05b', '#ff8834', '#e56f1b', '#b4540f', '#8f430c', '#5c2b08'], // 500 이 메인 색
+  grey: ['#f7f7f8', '#efeff1', '#e6e6e9', '#dcdce0', '#b4b4ba', '#8e8e95', '#6a6a72', '#4a4a50', '#303034', '#1c1c1e'],
 };
-const NUMBERS = { 'radius/sm': 6, 'radius/md': 8, 'radius/lg': 14, 'radius/tag': 4, 'radius/pill': 999 };
+const PALETTE = { white: '#ffffff' };
+for (const [name, list] of Object.entries(SCALES)) list.forEach((hex, i) => { PALETTE[`${name}/${STEPS[i]}`] = hex; });
+/* 쓰임 토큰 → 단계. 앱의 CSS 변수(prototype/css/styles.css)와 같은 짝. Figma 에서는 단계 변수를 가리키는 별칭이 된다 */
+const ALIASES = {
+  bg: 'white', surface: 'white', 'surface-2': 'grey/50', 'surface-3': 'grey/100', border: 'grey/200', 'border-strong': 'grey/300', 'field-border': 'grey/500', text: 'grey/900', 'text-2': 'grey/700', 'text-3': 'grey/600', primary: 'orange/500', 'primary-hover': 'orange/600', 'primary-strong': 'orange/600', 'primary-ink': 'orange/700', 'primary-deep': 'orange/800', 'primary-light': 'orange/300', 'primary-tint': 'orange/100', 'primary-soft': 'orange/50', 'on-primary': 'white', success: 'orange/700', 'success-soft': 'orange/50', danger: 'orange/800', 'danger-soft': 'orange/50', warn: 'orange/800', 'warn-soft': 'orange/50', 'record-0': 'grey/100', 'record-1': 'orange/100', 'record-2': 'orange/300', 'record-3': 'orange/500', 'record-4': 'orange/700', // 잔디: 연할수록 적게
+};
+const COLORS = Object.fromEntries(Object.entries(ALIASES).map(([k, v]) => [k, PALETTE[v]]));
+const NUMBERS = { 'radius/sm': 10, 'radius/md': 16, 'radius/lg': 24, 'radius/pill': 999 };
 const rgb = (h) => ({ r: parseInt(h.slice(1, 3), 16) / 255, g: parseInt(h.slice(3, 5), 16) / 255, b: parseInt(h.slice(5, 7), 16) / 255 });
 
 // 변수에 묶인 단색 칠 (변수가 아직 없으면 같은 색의 칠)
 function paint(token, opacity) {
-  const hex = COLORS[token]; if (!hex) throw new Error(`없는 색 토큰: ${token}`);
+  const hex = COLORS[token] || PALETTE[token]; if (!hex) throw new Error(`없는 색 토큰: ${token}`);
   const p = Object.assign({ type: 'SOLID', color: rgb(hex) }, opacity != null ? { opacity } : {});
   return TOKENS[token] ? figma.variables.setBoundVariableForPaint(p, 'color', TOKENS[token]) : p;
 }
@@ -54,7 +58,7 @@ function radius(node, r) {
   if (TOKENS[r]) for (const f of ['topLeftRadius', 'topRightRadius', 'bottomLeftRadius', 'bottomRightRadius']) node.setBoundVariable(f, TOKENS[r]);
   return node;
 }
-const MARK_RADIUS = [2, 5, 3, 4]; // 형광펜 모서리 (--radius-mark)
+const MARK_RADIUS = 6; // 강조한 글자의 모서리 (styles.css 의 mark)
 // 그림자 스타일. Figma 는 비동기로만 붙일 수 있어서 기다릴 일을 PENDING 에 모으고, main 이 끝에서 한꺼번에 기다린다
 const PENDING = [];
 const shadow = (node, kind) => { PENDING.push(node.setEffectStyleIdAsync(EFFECTS[kind].id)); return node; };
@@ -169,7 +173,7 @@ function recolor(node, color) {
   return node;
 }
 // SVG 를 벡터로 (아이콘 컴포넌트를 만들 때만 쓴다)
-function svgNode(body, size, hex = '#465164', sw = 1.6) {
+function svgNode(body, size, hex = '#4a4a50', sw = 1.6) {
   const n = figma.createNodeFromSvg(`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${hex}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">${body.replace(/currentColor/g, hex)}</svg>`);
   n.resize(size, size); return n;
 }
@@ -188,12 +192,12 @@ async function pickFonts() {
   FONT.mono = ['Roboto Mono', 'JetBrains Mono', 'Source Code Pro', 'IBM Plex Mono', 'Courier New'].map((f) => ({ family: f, style: 'Regular' })).find((f) => has(f.family, 'Regular'));
 }
 
-/* ---------- 텍스트 스타일: 앱의 글자 크기 다섯 개(12·13.5·15·17·24)와 소개 문구 34 ---------- */
+/* ---------- 텍스트 스타일: 앱의 글자 크기 다섯 개(12·13.5·15·18·26)와 소개 문구 34 ---------- */
 const TYPE = [
   // [이름, 크기, 줄 높이, 굵기, 설명]
   ['Display/34', 34, 46, 700, '로그인 소개 문구'],
-  ['Heading/24', 24, 32, 700, '화면 제목 (h1). 한 화면에 하나'],
-  ['Title/17', 17, 24, 700, '섹션 제목, 모달 제목, 펼친 카드 제목'],
+  ['Heading/26', 26, 35, 700, '화면 제목 (h1). 한 화면에 하나'],
+  ['Title/18', 18, 25, 700, '섹션 제목, 모달 제목, 펼친 카드 제목'],
   ['Body/15', 15, 25.5, 400, '본문, 대화, 입력칸'],
   ['Body/15 Medium', 15, 22, 500, '메뉴 이름, 버튼(보조)'],
   ['Body/15 Semibold', 15, 22, 600, '목록 제목, 버튼, 카드 제목'],
@@ -213,13 +217,13 @@ async function setupStyles() {
   await Promise.all(fonts.concat(FONT.mono ? [FONT.mono] : []).map((f) => figma.loadFontAsync(f)));
   for (const [name, size, lh, w, desc] of TYPE) {
     const st = figma.createTextStyle(); st.name = `${V1.prefix}/${name}`; st.fontName = { family: FONT.family, style: FONT.weights[w] };
-    st.fontSize = size; st.lineHeight = { unit: 'PIXELS', value: lh }; st.letterSpacing = { unit: 'PERCENT', value: size >= 17 ? -1.5 : 0 }; st.description = desc;
+    st.fontSize = size; st.lineHeight = { unit: 'PIXELS', value: lh }; st.letterSpacing = { unit: 'PERCENT', value: size >= 18 ? -1.5 : 0 }; st.description = desc;
     STYLES[name] = st;
   }
   if (FONT.mono) { const st = figma.createTextStyle(); st.name = `${V1.prefix}/Mono/12`; st.fontName = FONT.mono; st.fontSize = 12; st.lineHeight = { unit: 'PIXELS', value: 19.8 }; st.description = '근거 코드'; STYLES['Mono/12'] = st; }
   else STYLES['Mono/12'] = STYLES['Caption/12'];
-  const shadowOf = (layers) => layers.map(([y, blur, a]) => ({ type: 'DROP_SHADOW', color: { r: 0.094, g: 0.125, b: 0.18, a }, offset: { x: 0, y }, radius: blur, spread: 0, visible: true, blendMode: 'NORMAL' }));
-  for (const [k, layers, desc] of [['Menu', [[1, 2, 0.06], [6, 20, 0.1]], '떠 있는 것: 메뉴, 툴팁, 알림, 이력서 종이'], ['Modal', [[2, 6, 0.08], [20, 56, 0.2]], '모달']]) {
+  const shadowOf = (layers) => layers.map(([y, blur, a]) => ({ type: 'DROP_SHADOW', color: { r: 0, g: 0, b: 0, a }, offset: { x: 0, y }, radius: blur, spread: 0, visible: true, blendMode: 'NORMAL' }));
+  for (const [k, layers, desc] of [['Card', [[1, 2, 0.05]], '카드와 둥근 목록의 옅은 그림자'], ['Menu', [[2, 6, 0.04], [10, 28, 0.09]], '떠 있는 것: 메뉴, 툴팁, 알림, 이력서 종이'], ['Modal', [[4, 12, 0.06], [24, 64, 0.18]], '모달']]) {
     const e = figma.createEffectStyle(); e.name = `${V1.prefix}/Elevation/${k}`; e.effects = shadowOf(layers); e.description = desc; EFFECTS[k] = e;
   }
 }
@@ -228,11 +232,18 @@ async function setupStyles() {
 async function setupVariables() {
   for (const c of await figma.variables.getLocalVariableCollectionsAsync()) if (c.name === V1.collection) c.remove();
   const col = figma.variables.createVariableCollection(V1.collection); col.renameMode(col.modes[0].modeId, 'Light'); const mode = col.modes[0].modeId;
-  for (const [name, hex] of Object.entries(COLORS)) {
+  // 1) 색 단계 변수 (color/orange/500 …)  2) 쓰임 변수는 단계를 가리키는 별칭 → 단계 값만 바꾸면 함께 바뀐다
+  const scale = {};
+  for (const [name, hex] of Object.entries(PALETTE)) {
     const v = figma.variables.createVariable(`color/${name}`, col, 'COLOR'); v.setValueForMode(mode, rgb(hex));
-    v.scopes = name.startsWith('text') || name.startsWith('on-ink') ? ['TEXT_FILL', 'STROKE_COLOR', 'SHAPE_FILL'] : ['FRAME_FILL', 'SHAPE_FILL', 'STROKE_COLOR', 'TEXT_FILL'];
+    v.scopes = ['FRAME_FILL', 'SHAPE_FILL', 'STROKE_COLOR', 'TEXT_FILL']; scale[name] = v;
+  }
+  for (const [name, step] of Object.entries(ALIASES)) {
+    const v = figma.variables.createVariable(`color/${name}`, col, 'COLOR'); v.setValueForMode(mode, figma.variables.createVariableAlias(scale[step]));
+    v.scopes = name.startsWith('text') || name.startsWith('on-primary') ? ['TEXT_FILL', 'STROKE_COLOR', 'SHAPE_FILL'] : ['FRAME_FILL', 'SHAPE_FILL', 'STROKE_COLOR', 'TEXT_FILL'];
     TOKENS[name] = v;
   }
+  for (const [name, v] of Object.entries(scale)) TOKENS[name] = v; // 색 단계도 paint('orange/500') 로 칠할 수 있다
   for (const [name, n] of Object.entries(NUMBERS)) { const v = figma.variables.createVariable(name, col, 'FLOAT'); v.setValueForMode(mode, n); v.scopes = ['CORNER_RADIUS']; TOKENS[name] = v; }
 }
 
@@ -256,23 +267,51 @@ async function resetPages() {
   return page;
 }
 
+/* ---------- 색 단계 한 벌 ---------- */
+// 대비(WCAG): 4.5 이상 AA, 7 이상 AAA
+function contrast(a, b) {
+  const lum = (h) => { const c = rgb(h); const f = (x) => (x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4)); return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
+  const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05);
+}
+async function drawScale(parent, key, title) {
+  const card = al('V', { name: title, gap: 16, pad: 32, fill: 'surface', stroke: 'border', radius: 'radius/lg' }); parent.appendChild(card);
+  await tput(card, title, 'Heading/26', 'text');
+  for (const step of STEPS) {
+    const token = `${key}/${step}`; const hex = PALETTE[token];
+    const row = al('H', { name: `${key}-${step}`, gap: 16, cross: 'center' }); card.appendChild(row);
+    const chip = al('V', { name: 'chip', gap: 4, pad: [8, 10], w: 160, h: 64, fill: token, stroke: 'border', radius: 'radius/sm' }); row.appendChild(chip);
+    for (const [label, on] of [['검은 글자', '#000000'], ['흰 글자', '#ffffff']]) {
+      const n = contrast(hex, on); const grade = n >= 7 ? ' AAA' : n >= 4.5 ? ' AA' : '';
+      const badge = al('H', { name: label, pad: [1, 8], fill: 'surface', radius: 'radius/pill' }); chip.appendChild(badge);
+      await tput(badge, `${label} ${n.toFixed(2)}${grade}`, 'Caption/12', 'text');
+    }
+    const info = al('V', { name: '값', w: 160 }); row.appendChild(info);
+    await tput(info, `${key}-${step}`, 'Body/15 Semibold', 'text'); await tput(info, hex, 'Caption/12', 'text-3');
+    const c = rgb(hex); await tput(info, `rgb(${[c.r, c.g, c.b].map((v) => Math.round(v * 255)).join(', ')})`, 'Caption/12', 'text-3');
+  }
+  return card;
+}
+
 /* ---------- 기초 견본: 색과 글자 (페이지 왼쪽 위) ---------- */
 async function drawFoundations(pageNode) {
   const board = al('V', { name: 'Foundations', gap: 48, pad: 64, fill: 'surface' }); pageNode.appendChild(board);
-  await tput(board, 'Rewrite v1 기초', 'Heading/24', 'text');
-  await tput(board, '흰 종이, 블루블랙 잉크, 형광펜 하나. 노란 형광펜은 「내가 고른 것」과 「AI가 더한 것」에만 쓴다. 자세한 규칙은 docs/design-guide.md', 'Body/15', 'text-2', { w: 960 });
-  // 색
-  const colors = al('V', { name: '색', gap: 16 }); board.appendChild(colors);
-  await tput(colors, '색 (변수: Rewrite v1 / color)', 'Title/17', 'text');
+  await tput(board, 'Rewrite v1 기초', 'Heading/26', 'text');
+  await tput(board, '누구나 편하게 쓰는 서비스. 색은 흰색, 회색, 검정과 주황 하나(#FF8834)뿐이고 주황은 밝기만 조금씩 바꿔 쓴다. 모서리는 둥글게, 여백은 넉넉하게. 자세한 규칙은 docs/design-guide.md', 'Body/15', 'text-2', { w: 960 });
+  // 색 단계: 단계마다 견본, 흰 글자와 검은 글자의 대비, 값
+  const scales = al('H', { name: '색 단계', gap: 40, cross: 'start' }); board.appendChild(scales);
+  for (const [key, title] of [['orange', 'Orange'], ['grey', 'Grey']]) await drawScale(scales, key, title);
+  // 쓰임 토큰
+  const colors = al('V', { name: '쓰임 색', gap: 16 }); board.appendChild(colors);
+  await tput(colors, '쓰임 색 (화면은 이 변수를 쓴다. 아래 글은 가리키는 단계)', 'Title/18', 'text');
   const grid = al('H', { name: '견본', gap: 16, wrap: true, w: 1200 }); grid.counterAxisSpacing = 16; colors.appendChild(grid);
-  for (const name of Object.keys(COLORS)) {
+  for (const name of Object.keys(ALIASES)) {
     const sw = al('V', { name, gap: 8, w: 132 }); grid.appendChild(sw);
     const chip = figma.createRectangle(); chip.name = 'chip'; chip.resize(132, 72); chip.fills = [paint(name)]; radius(chip, 'radius/md'); stroke(chip, 'border'); sw.appendChild(chip);
-    await tput(sw, name, 'Small/13.5 Semibold', 'text'); await tput(sw, COLORS[name], 'Caption/12', 'text-3');
+    await tput(sw, name, 'Small/13.5 Semibold', 'text'); await tput(sw, ALIASES[name], 'Caption/12', 'text-3');
   }
   // 글자
   const type = al('V', { name: '글자', gap: 14 }); board.appendChild(type);
-  await tput(type, `글자 (텍스트 스타일: v1/…, 글꼴 ${FONT.family})`, 'Title/17', 'text');
+  await tput(type, `글자 (텍스트 스타일: v1/…, 글꼴 ${FONT.family})`, 'Title/18', 'text');
   for (const [name, size, lh, w, desc] of TYPE.concat([['Mono/12', 12, 19.8, 400, '근거 코드']])) {
     const row = al('H', { name, gap: 24, cross: 'center' }); type.appendChild(row);
     const label = al('V', { name: 'label', w: 240 }); row.appendChild(label);
@@ -348,103 +387,105 @@ const slotIcon = (name, size, color) => named(icon(name, size, color), 'icon');
 // 안쪽 인스턴스를 부모(컴포넌트 안)에 넣고 밖에서 바꿀 수 있게 노출한다 (Figma 의 Expose nested instances). 화면에서는 setNested 로 바꾼다
 //   노출은 컴포넌트 안에 들어간 다음에만 된다 → 넣은 뒤 정한다
 const expose = (parent, node) => { parent.appendChild(node); try { node.isExposedInstance = true; } catch (e) { /* 노출을 못 하는 환경이면 이름으로 찾아 바꾼다 */ } return node; };
-async function hlBox(child, padX = 4) { const b = al('H', { name: '형광펜', pad: [1, padX], fill: 'hl', radius: MARK_RADIUS }); b.appendChild(child); return b; }
 
 /* ---------- 라이브러리 ---------- */
 async function buildLibrary(pageNode) {
   const root = al('V', { name: 'Components', gap: 56, pad: 64, fill: 'surface' }); pageNode.appendChild(root);
-  await tput(root, 'Rewrite v1 컴포넌트', 'Heading/24', 'text');
+  await tput(root, 'Rewrite v1 컴포넌트', 'Heading/26', 'text');
   const section = async (title, desc) => {
     const s = al('V', { name: title, gap: 16 }); root.appendChild(s);
-    await tput(s, title, 'Title/17', 'text'); if (desc) await tput(s, desc, 'Small/13.5', 'text-3', { w: 1100 });
+    await tput(s, title, 'Title/18', 'text'); if (desc) await tput(s, desc, 'Small/13.5', 'text-3', { w: 1100 });
     const row = al('H', { name: 'items', gap: 32, wrap: true, w: 1800, cross: 'start' }); row.counterAxisSpacing = 32; s.appendChild(row); return row;
   };
 
   // 아이콘
   const iconsSec = al('V', { name: 'Icons', gap: 16 }); root.appendChild(iconsSec);
-  await tput(iconsSec, '아이콘', 'Title/17', 'text');
+  await tput(iconsSec, '아이콘', 'Title/18', 'text');
   await buildIcons(iconsSec);
 
   /* ===== 기본 ===== */
   let s = await section('기본', '버튼은 한 화면에 주 버튼(Primary) 하나. 끈 버튼은 인스턴스의 투명도 45%');
-  const BTN = { Small: { h: 32, pad: [3, 10], text: 'Small/13.5 Semibold', ghost: 'Small/13.5 Medium', icon: 16 }, Medium: { h: 38, pad: [6, 14], text: 'Body/15 Semibold', ghost: 'Body/15 Medium', icon: 16 }, Large: { h: 46, pad: [10, 20], text: 'Body/15 Semibold', ghost: 'Body/15 Medium', icon: 18 } };
-  const TONE = { Primary: { fill: 'primary', stroke: 'primary', fg: 'on-ink' }, Secondary: { fill: 'surface', stroke: 'border-strong', fg: 'text' }, Ghost: { fill: null, stroke: null, fg: 'text-2' }, Danger: { fill: 'surface', stroke: 'danger', fg: 'danger' }, 'Ghost danger': { fill: null, stroke: null, fg: 'danger' } };
+  const BTN = { Small: { h: 32, pad: [3, 13], text: 'Small/13.5 Semibold', ghost: 'Small/13.5 Medium', icon: 16 }, Medium: { h: 40, pad: [6, 18], text: 'Body/15 Semibold', ghost: 'Body/15 Medium', icon: 16 }, Large: { h: 50, pad: [12, 24], text: 'Body/15 Semibold', ghost: 'Body/15 Medium', icon: 18 } };
+  const TONE = { Primary: { fill: 'primary', stroke: 'primary', fg: 'on-primary' }, Secondary: { fill: 'surface', stroke: 'border-strong', fg: 'text' }, Ghost: { fill: null, stroke: null, fg: 'text-2' }, Danger: { fill: 'surface', stroke: 'danger', fg: 'danger' }, 'Ghost danger': { fill: null, stroke: null, fg: 'danger' } };
   await makeSet(s, 'Button', Object.keys(TONE).flatMap((v) => Object.keys(BTN).map((z) => ({ props: { Variant: v, Size: z }, build: async (c) => {
     const t = TONE[v]; const b = BTN[z];
-    auto(c, 'H', { gap: 6, pad: b.pad, h: b.h, main: 'center', cross: 'center', fill: t.fill, stroke: t.stroke, radius: 'radius/sm' });
+    auto(c, 'H', { gap: 6, pad: b.pad, h: b.h, main: 'center', cross: 'center', fill: t.fill, stroke: t.stroke, radius: 'radius/pill' });
     const ic = slotIcon('plus', b.icon, t.fg); ic.visible = false; c.appendChild(ic);
     c.appendChild(named(await text('버튼', v.startsWith('Ghost') ? b.ghost : b.text, t.fg), 'label'));
-  } }))), { dir: 'H', desc: '버튼. Variant: Primary(주 버튼) · Secondary · Ghost · Danger · Ghost danger(테두리 없는 지우는 일: 연결 해제, 탈퇴하기, 완전 삭제), Size: Small 32 · Medium 38 · Large 46', props: [{ name: 'Label', type: 'TEXT', default: '버튼', node: 'label' }, { name: 'Show icon', type: 'BOOLEAN', default: false, node: 'icon' }, { name: 'Icon', type: 'INSTANCE_SWAP', default: 'plus', node: 'icon' }] });
+  } }))), { dir: 'H', desc: '버튼. Variant: Primary(주 버튼) · Secondary · Ghost · Danger · Ghost danger(테두리 없는 지우는 일: 연결 해제, 탈퇴하기, 완전 삭제), Size: Small 32 · Medium 40 · Large 50. 모두 알약 모양', props: [{ name: 'Label', type: 'TEXT', default: '버튼', node: 'label' }, { name: 'Show icon', type: 'BOOLEAN', default: false, node: 'icon' }, { name: 'Icon', type: 'INSTANCE_SWAP', default: 'plus', node: 'icon' }] });
   await makeSet(s, 'Icon button', ['Medium', 'Small'].map((z) => ({ props: { Size: z }, build: async (c) => {
-    const n = z === 'Medium' ? 36 : 32; auto(c, 'H', { w: n, h: n, main: 'center', cross: 'center', radius: 'radius/sm' }); c.appendChild(slotIcon('more', z === 'Medium' ? 20 : 18, 'text-2'));
+    const n = z === 'Medium' ? 36 : 32; auto(c, 'H', { w: n, h: n, main: 'center', cross: 'center', radius: 'radius/pill' }); c.appendChild(slotIcon('more', z === 'Medium' ? 20 : 18, 'text-2'));
   } })), { dir: 'H', desc: '아이콘만 있는 버튼 (메뉴 ⋯, 닫기, 보내기)', props: [{ name: 'Icon', type: 'INSTANCE_SWAP', default: 'more', node: 'icon' }] });
-  const TAG = { Neutral: ['surface-3', 'text-2'], Ink: ['primary-soft', 'primary-ink'], Success: ['success-soft', 'success'], Warn: ['warn-soft', 'warn'], Danger: ['danger-soft', 'danger'] };
+  const TAG = { Neutral: ['surface-3', 'text-2'], Ink: ['primary-soft', 'primary-ink'], Success: ['surface-3', 'text-2'], Warn: ['warn-soft', 'warn'], Danger: ['danger-soft', 'danger'] };
   await makeSet(s, 'Tag', Object.keys(TAG).map((k) => ({ props: { Tone: k }, build: async (c) => {
-    auto(c, 'H', { pad: [1, 7], fill: TAG[k][0], radius: 'radius/tag', cross: 'center' }); c.appendChild(named(await text('태그', 'Caption/12 Semibold', TAG[k][1]), 'label'));
+    auto(c, 'H', { pad: [2, 10], fill: TAG[k][0], radius: 'radius/pill', cross: 'center' }); c.appendChild(named(await text('태그', 'Caption/12 Semibold', TAG[k][1]), 'label'));
   } })), { dir: 'H', desc: '상태 태그. Ink: 진행중, Neutral: 예시, Success: 완료, Warn: 마감 임박', props: [{ name: 'Label', type: 'TEXT', default: '태그', node: 'label' }] });
-  await makeOne(s, 'Avatar', async (c) => { auto(c, 'H', { w: 32, h: 32, main: 'center', cross: 'center', fill: 'primary', radius: 16 }); c.appendChild(named(await text('김', 'Small/13.5 Semibold', 'on-ink'), 'label')); }, { desc: '계정 첫 글자', props: [{ name: 'Initial', type: 'TEXT', default: '김', node: 'label' }] });
-  await makeSet(s, 'Logo', ['Light', 'Ink'].map((k) => ({ props: { On: k }, build: async (c) => {
+  await makeOne(s, 'Avatar', async (c) => { auto(c, 'H', { w: 32, h: 32, main: 'center', cross: 'center', fill: 'primary-tint', radius: 16 }); c.appendChild(named(await text('김', 'Small/13.5 Semibold', 'primary-deep'), 'label')); }, { desc: '계정 첫 글자', props: [{ name: 'Initial', type: 'TEXT', default: '김', node: 'label' }] });
+  await makeOne(s, 'Logo', async (c) => {
     auto(c, 'H', { gap: 10, cross: 'center' });
-    const m = al('H', { name: 'mark', w: 26, h: 26, main: 'center', cross: 'center', fill: 'hl', radius: [3, 7, 4, 6] }); m.appendChild(await text('R', 'Mark/15 Heavy', 'text')); c.appendChild(m);
-    c.appendChild(await text('Rewrite', 'Title/17', k === 'Ink' ? 'on-ink' : 'text'));
-  } })), { dir: 'H', desc: '로고. On=Ink 는 잉크색 바탕(로그인 왼쪽) 위' });
+    const m = al('H', { name: 'mark', w: 28, h: 28, main: 'center', cross: 'center', fill: 'primary', radius: 9 }); m.appendChild(await text('R', 'Mark/15 Heavy', 'on-primary')); c.appendChild(m);
+    c.appendChild(await text('Rewrite', 'Title/18', 'text'));
+  }, { desc: '로고. 주황 둥근 네모에 흰 R' });
   await makeOne(s, 'Divider', async (c) => { c.resize(240, 1); c.fills = [paint('border')]; }, { desc: '가로 구분선. 인스턴스에서 가로 채우기' });
   await makeOne(s, 'Spinner', async (c) => {
     c.resize(16, 16); c.clipsContent = false;
     const e = figma.createEllipse(); e.name = 'ring'; e.resize(16, 16); c.appendChild(e); e.constraints = { horizontal: 'SCALE', vertical: 'SCALE' };
-    try { e.fills = [paint('primary')]; e.arcData = { startingAngle: Math.PI / 4, endingAngle: (7 * Math.PI) / 4, innerRadius: 0.75 }; } // 앱의 .spinner: 2px 테두리, 오른쪽 1/4 비움
-    catch (err) { e.fills = []; stroke(e, 'primary', 2); e.dashPattern = [18, 6]; }
+    try { e.fills = [paint('primary-strong')]; e.arcData = { startingAngle: Math.PI / 4, endingAngle: (7 * Math.PI) / 4, innerRadius: 0.75 }; } // 앱의 .spinner: 2px 테두리, 오른쪽 1/4 비움
+    catch (err) { e.fills = []; stroke(e, 'primary-strong', 2); e.dashPattern = [18, 6]; }
   }, { desc: '불러오는 중 (앱에서는 돈다). 기본 16, 인스턴스는 spinner(크기) 로 늘리고 줄인다' });
 
   /* ===== 입력 ===== */
-  s = await section('입력', '입력칸 높이 39, 테두리 field-border, 초점은 잉크색 테두리. 글이 없을 때는 안내 글(text-3)');
-  const fieldBox = (c, state, o = {}) => auto(c, 'H', { gap: 8, pad: [0, 12, 0, o.left || 12], w: 320, h: o.h || 39, cross: 'center', fill: state === 'Disabled' ? 'surface-2' : 'surface', stroke: state === 'Focus' ? 'primary' : state === 'Error' ? 'danger' : 'field-border', strokeW: state === 'Focus' ? 2 : 1, radius: 'radius/sm' });
+  s = await section('입력', '입력칸 높이 41, 옅은 테두리와 둥근 모서리, 초점은 주황 테두리. 글이 없을 때는 안내 글(text-3)');
+  const fieldBox = (c, state, o = {}) => auto(c, 'H', { gap: 8, pad: [0, 14, 0, o.left || 14], w: 320, h: o.h || 41, cross: 'center', fill: state === 'Disabled' ? 'surface-2' : 'surface', stroke: state === 'Focus' ? 'primary-strong' : state === 'Error' ? 'danger' : 'border-strong', strokeW: state === 'Focus' ? 2 : 1, radius: 'radius/sm' });
   await makeSet(s, 'Input', ['Placeholder', 'Value'].flatMap((ct) => ['Default', 'Focus', 'Error', 'Disabled'].map((st) => ({ props: { Content: ct, State: st }, build: async (c) => {
     fieldBox(c, st); const ic = slotIcon('search', 16, 'text-3'); ic.visible = false; c.appendChild(ic);
     const t = named(await text(ct === 'Value' ? '입력한 글' : '안내 글', 'Body/15', ct === 'Value' && st !== 'Disabled' ? 'text' : 'text-3'), 'value'); c.appendChild(t); t.layoutSizingHorizontal = 'FILL';
     const tr = named(icon('eye', 18, 'text-2'), 'trailing'); tr.visible = false; c.appendChild(tr);
   } }))), { desc: '한 줄 입력칸. 인스턴스에서 가로 채우기. 앞 아이콘(검색), 뒤 아이콘(비밀번호 보기)', props: [{ name: 'Text', type: 'TEXT', default: '안내 글', node: 'value' }, { name: 'Show icon', type: 'BOOLEAN', default: false, node: 'icon' }, { name: 'Icon', type: 'INSTANCE_SWAP', default: 'search', node: 'icon' }, { name: 'Show trailing', type: 'BOOLEAN', default: false, node: 'trailing' }, { name: 'Trailing', type: 'INSTANCE_SWAP', default: 'eye', node: 'trailing' }] });
   await makeSet(s, 'Textarea', ['Placeholder', 'Value'].map((ct) => ({ props: { Content: ct }, build: async (c) => {
-    auto(c, 'V', { pad: [10, 12], w: 320, fill: 'surface', stroke: 'field-border', radius: 'radius/sm' }); c.minHeight = 96;
+    auto(c, 'V', { pad: [12, 14], w: 320, fill: 'surface', stroke: 'border-strong', radius: 'radius/sm' }); c.minHeight = 96;
     const t = named(await text(ct === 'Value' ? '여러 줄로 쓴 글' : '안내 글', 'Body/15', ct === 'Value' ? 'text' : 'text-3'), 'value'); c.appendChild(t); t.layoutSizingHorizontal = 'FILL'; t.textAutoResize = 'HEIGHT';
   } })), { dir: 'H', desc: '여러 줄 입력칸 (최소 높이 96)', props: [{ name: 'Text', type: 'TEXT', default: '안내 글', node: 'value' }] });
   await makeOne(s, 'Select', async (c) => {
     fieldBox(c, 'Default'); const t = named(await text('모든 프로젝트', 'Body/15', 'text'), 'value'); c.appendChild(t); t.layoutSizingHorizontal = 'FILL'; c.appendChild(icon('chevron-down', 16, 'text-2'));
   }, { desc: '고르기 칸', props: [{ name: 'Text', type: 'TEXT', default: '모든 프로젝트', node: 'value' }] });
   await makeSet(s, 'Checkbox', ['Off', 'On'].map((k) => ({ props: { Checked: k }, build: async (c) => {
-    auto(c, 'H', { w: 18, h: 18, main: 'center', cross: 'center', fill: k === 'On' ? 'primary' : 'surface', stroke: k === 'On' ? 'primary' : 'field-border', strokeW: 1.5, radius: 4 });
-    if (k === 'On') c.appendChild(icon('check', 14, 'on-ink'));
+    auto(c, 'H', { w: 18, h: 18, main: 'center', cross: 'center', fill: k === 'On' ? 'primary-strong' : 'surface', stroke: k === 'On' ? 'primary-strong' : 'field-border', strokeW: 1.5, radius: 4 });
+    if (k === 'On') c.appendChild(icon('check', 14, 'on-primary'));
   } })), { dir: 'H' });
   await makeSet(s, 'Radio', ['Off', 'On'].map((k) => ({ props: { Checked: k }, build: async (c) => {
-    auto(c, 'H', { w: 18, h: 18, main: 'center', cross: 'center', fill: 'surface', stroke: k === 'On' ? 'primary' : 'field-border', strokeW: 1.5, radius: 9 });
-    if (k === 'On') { const d = figma.createEllipse(); d.resize(8, 8); d.fills = [paint('primary')]; c.appendChild(d); }
+    auto(c, 'H', { w: 18, h: 18, main: 'center', cross: 'center', fill: 'surface', stroke: k === 'On' ? 'primary-strong' : 'field-border', strokeW: 1.5, radius: 9 });
+    if (k === 'On') { const d = figma.createEllipse(); d.resize(8, 8); d.fills = [paint('primary-strong')]; c.appendChild(d); }
   } })), { dir: 'H' });
   await makeSet(s, 'Switch', ['Off', 'On'].map((k) => ({ props: { On: k }, build: async (c) => {
     auto(c, 'H', { w: 38, h: 22, pad: 3, main: k === 'On' ? 'end' : 'start', cross: 'center', fill: k === 'On' ? 'primary' : 'field-border', radius: 11 });
     const d = figma.createEllipse(); d.resize(16, 16); d.fills = [paint('surface')]; c.appendChild(d);
   } })), { dir: 'H', desc: '켜고 끄기 (카드 바꾸기 전에 묻기)' });
   await makeSet(s, 'Segment', ['Off', 'On'].map((k) => ({ props: { Selected: k }, build: async (c) => {
-    auto(c, 'H', { gap: 6, pad: [3, 14], cross: 'center', fill: k === 'On' ? 'surface' : null, radius: 'radius/sm' }); c.minHeight = 32;
+    auto(c, 'H', { gap: 6, pad: [3, 16], cross: 'center', fill: k === 'On' ? 'surface' : null, radius: 'radius/pill' }); c.minHeight = 32; if (k === 'On') shadow(c, 'Card');
     const ic = slotIcon('github', 16, k === 'On' ? 'text' : 'text-2'); ic.visible = false; c.appendChild(ic);
     c.appendChild(named(await text('보기', k === 'On' ? 'Small/13.5 Semibold' : 'Small/13.5 Medium', k === 'On' ? 'text' : 'text-2'), 'label'));
-  } })), { dir: 'H', desc: '나란한 보기 고르기의 한 칸. 바깥 틀(회색, 안쪽 3)은 화면에서 segmented() 로 만든다', props: [{ name: 'Label', type: 'TEXT', default: '보기', node: 'label' }, { name: 'Show icon', type: 'BOOLEAN', default: false, node: 'icon' }, { name: 'Icon', type: 'INSTANCE_SWAP', default: 'github', node: 'icon' }] });
+  } })), { dir: 'H', desc: '나란한 보기 고르기의 한 칸. 바깥 틀(회색 알약, 안쪽 4)은 화면에서 segmented() 로 만든다', props: [{ name: 'Label', type: 'TEXT', default: '보기', node: 'label' }, { name: 'Show icon', type: 'BOOLEAN', default: false, node: 'icon' }, { name: 'Icon', type: 'INSTANCE_SWAP', default: 'github', node: 'icon' }] });
 
   /* ===== 탐색 ===== */
-  s = await section('탐색', '왼쪽 메뉴. 고른 메뉴는 이름에 형광펜과 굵기');
+  s = await section('탐색', '왼쪽 메뉴. 고른 메뉴는 연한 주황 알약과 진한 주황의 굵은 글자');
   await makeSet(s, 'Nav item', ['Default', 'Active'].map((k) => ({ props: { State: k }, build: async (c) => {
-    auto(c, 'H', { gap: 10, pad: [6, 10], w: 212, cross: 'center', radius: 'radius/sm' }); c.minHeight = 38;
-    c.appendChild(slotIcon('home', 20, k === 'Active' ? 'text' : 'text-2'));
-    const t = named(await text('메뉴', k === 'Active' ? 'Body/15 Semibold' : 'Body/15 Medium', k === 'Active' ? 'text' : 'text-2'), 'label');
-    c.appendChild(k === 'Active' ? await hlBox(t, 5) : t); spacer(c); c.appendChild(named(await text('0', 'Small/13.5', 'text-3'), 'count'));
+    const on = k === 'Active';
+    auto(c, 'H', { gap: 10, pad: [6, 12], w: 212, cross: 'center', fill: on ? 'primary-soft' : null, radius: 'radius/pill' }); c.minHeight = 42;
+    c.appendChild(slotIcon('home', 20, on ? 'primary-strong' : 'text-2'));
+    c.appendChild(named(await text('메뉴', on ? 'Body/15 Semibold' : 'Body/15 Medium', on ? 'primary-deep' : 'text-2'), 'label'));
+    spacer(c); c.appendChild(named(await text('0', 'Small/13.5', 'text-3'), 'count'));
   } })), { desc: '왼쪽 메뉴 항목', props: [{ name: 'Label', type: 'TEXT', default: '메뉴', node: 'label' }, { name: 'Icon', type: 'INSTANCE_SWAP', default: 'home', node: 'icon' }, { name: 'Count', type: 'TEXT', default: '0', node: 'count' }, { name: 'Show count', type: 'BOOLEAN', default: false, node: 'count' }] });
-  await makeOne(s, 'Project chip', async (c) => { auto(c, 'H', { gap: 5, cross: 'center' }); c.appendChild(icon('folder', 15, 'primary')); c.appendChild(named(await text('프로젝트', 'Small/13.5 Semibold', 'primary'), 'label')); }, { desc: '프로젝트 이름표 (잉크색)', props: [{ name: 'Label', type: 'TEXT', default: '프로젝트', node: 'label' }] });
+  await makeOne(s, 'Project chip', async (c) => { auto(c, 'H', { gap: 5, cross: 'center' }); c.appendChild(icon('folder', 15, 'primary-ink')); c.appendChild(named(await text('프로젝트', 'Small/13.5 Semibold', 'primary-ink'), 'label')); }, { desc: '프로젝트 이름표 (진한 주황 글자)', props: [{ name: 'Label', type: 'TEXT', default: '프로젝트', node: 'label' }] });
   await makeSet(s, 'Keyword', ['Default', 'Selected'].map((k) => ({ props: { State: k }, build: async (c) => {
-    auto(c, 'H', { pad: k === 'Selected' ? [0, 5] : 0, fill: k === 'Selected' ? 'hl' : null, radius: k === 'Selected' ? MARK_RADIUS : 0 });
-    c.appendChild(named(await text('역량', k === 'Selected' ? 'Small/13.5 Semibold' : 'Small/13.5 Medium', k === 'Selected' ? 'text' : 'text-2'), 'label'));
-  } })), { dir: 'H', desc: '역량 이름. Selected: 고른 역량(형광펜)', props: [{ name: 'Label', type: 'TEXT', default: '역량', node: 'label' }] });
+    const on = k === 'Selected';
+    auto(c, 'H', { pad: [2, 10], fill: on ? 'primary-tint' : 'surface-3', radius: 'radius/pill' });
+    c.appendChild(named(await text('역량', 'Caption/12 Semibold', on ? 'primary-deep' : 'text-2'), 'label'));
+  } })), { dir: 'H', desc: '역량 알약. 보통은 회색, Selected: 고른 역량(주황)', props: [{ name: 'Label', type: 'TEXT', default: '역량', node: 'label' }] });
   await makeSet(s, 'Keyword option', ['Off', 'On'].map((k) => ({ props: { Selected: k }, build: async (c) => {
-    auto(c, 'H', { pad: [2, 10], h: 32, cross: 'center', fill: k === 'On' ? 'hl' : 'surface', stroke: k === 'On' ? 'hl' : 'border-strong', radius: 'radius/tag' });
-    c.appendChild(named(await text('역량', k === 'On' ? 'Small/13.5 Semibold' : 'Small/13.5 Medium', k === 'On' ? 'text' : 'text-2'), 'label'));
+    const on = k === 'On';
+    auto(c, 'H', { pad: [2, 14], h: 32, cross: 'center', fill: on ? 'primary-soft' : 'surface', stroke: on ? 'primary-strong' : 'border-strong', radius: 'radius/pill' });
+    c.appendChild(named(await text('역량', on ? 'Small/13.5 Semibold' : 'Small/13.5 Medium', on ? 'primary-deep' : 'text-2'), 'label'));
   } })), { dir: 'H', desc: '역량 고르기 모달의 버튼', props: [{ name: 'Label', type: 'TEXT', default: '역량', node: 'label' }] });
 
   /* ===== 알림과 메뉴 ===== */
@@ -456,39 +497,41 @@ async function buildLibrary(pageNode) {
   } })), { desc: '드롭다운 메뉴의 한 줄. Danger: 휴지통으로 옮기기 같은 지우는 일', props: [{ name: 'Label', type: 'TEXT', default: '메뉴', node: 'label' }, { name: 'Show icon', type: 'BOOLEAN', default: true, node: 'icon' }, { name: 'Icon', type: 'INSTANCE_SWAP', default: 'edit', node: 'icon' }] });
   await makeOne(s, 'Toast', async (c) => {
     auto(c, 'H', { gap: 16, pad: [12, 16], cross: 'center', fill: 'text', radius: 'radius/md' }); shadow(c, 'Menu'); c.maxWidth = 400;
-    c.appendChild(named(await text('알림', 'Body/15', 'on-ink'), 'label')); c.appendChild(named(await text('되돌리기', 'Body/15 Semibold', 'hl'), 'action'));
+    c.appendChild(named(await text('알림', 'Body/15', 'on-primary'), 'label')); c.appendChild(named(await text('되돌리기', 'Body/15 Semibold', 'primary-light'), 'action'));
   }, { desc: '아래 가운데에 잠깐 뜨는 알림. 지운 뒤에는 「되돌리기」', props: [{ name: 'Label', type: 'TEXT', default: '알림', node: 'label' }, { name: 'Action', type: 'TEXT', default: '되돌리기', node: 'action' }, { name: 'Show action', type: 'BOOLEAN', default: true, node: 'action' }] });
   await makeOne(s, 'Tooltip', async (c) => { auto(c, 'H', { pad: [4, 8], fill: 'surface', stroke: 'border-strong', radius: 'radius/sm' }); shadow(c, 'Menu'); c.appendChild(named(await text('설명', 'Caption/12', 'text'), 'label')); }, { props: [{ name: 'Label', type: 'TEXT', default: '설명', node: 'label' }] });
-  const BAN = { Info: ['primary-soft', 'primary-ink', 'info'], Warn: ['warn-soft', 'warn', 'warning'], Danger: ['danger-soft', 'danger', 'warning'] };
+  const BAN = { Info: ['primary-soft', 'primary-deep', 'info'], Warn: ['warn-soft', 'warn', 'warning'], Danger: ['danger-soft', 'danger', 'warning'] };
   await makeSet(s, 'Banner', Object.keys(BAN).map((k) => ({ props: { Tone: k }, build: async (c) => {
-    auto(c, 'H', { gap: 10, pad: [12, 16], w: 560, cross: 'center', fill: BAN[k][0], radius: 'radius/md' });
+    auto(c, 'H', { gap: 10, pad: [14, 18], w: 560, cross: 'center', fill: BAN[k][0], radius: 'radius/md' });
     c.appendChild(icon(ICON_PATHS[BAN[k][2]] ? BAN[k][2] : 'warning', 18, BAN[k][1]));
     const t = named(await text('안내', 'Body/15', BAN[k][1]), 'label'); c.appendChild(t); t.layoutSizingHorizontal = 'FILL'; t.textAutoResize = 'HEIGHT';
     expose(c, named(inst('Button', { Variant: 'Secondary', Size: 'Small', Label: '다시 시도' }), 'action')).visible = false;
   } })), { desc: '화면 안 알림. 인스턴스에서 가로 채우기. 오른쪽 단추(action, 다시 시도 등)는 Show action 으로 켜고 글은 banner() 가 바꾼다', props: [{ name: 'Label', type: 'TEXT', default: '안내', node: 'label' }, { name: 'Show action', type: 'BOOLEAN', default: false, node: 'action' }] });
 
   /* ===== AI 채팅 ===== */
-  s = await section('AI 채팅', '대화방 목록, 말풍선, 카드 칩. AI 표시의 형광펜은 「AI가 더한 것」');
-  await makeOne(s, 'Chat/AI mark', async (c) => { auto(c, 'H', { w: 24, h: 24, main: 'center', cross: 'center', fill: 'hl', radius: [3, 7, 4, 6] }); c.appendChild(await text('R', 'Mark/12 Heavy', 'text')); }, { desc: 'AI 답 앞의 표시' });
+  s = await section('AI 채팅', '대화방 목록, 말풍선, 카드 칩. AI 답은 회색, 내 말은 연한 주황 말풍선');
+  await makeOne(s, 'Chat/AI mark', async (c) => { auto(c, 'H', { w: 26, h: 26, main: 'center', cross: 'center', fill: 'primary', radius: 13 }); c.appendChild(await text('R', 'Mark/12 Heavy', 'on-primary')); }, { desc: 'AI 답 앞의 표시' });
   await makeOne(s, 'Chat/My message', async (c) => {
-    auto(c, 'H', { pad: [9, 14], w: 300, fill: 'primary-soft', radius: [12, 12, 3, 12] });
+    auto(c, 'H', { pad: [10, 16], w: 300, fill: 'primary-tint', radius: [20, 20, 8, 20] });
     const t = named(await text('내가 보낸 말', 'Body/15', 'text'), 'label'); c.appendChild(t); t.layoutSizingHorizontal = 'FILL'; t.textAutoResize = 'HEIGHT';
   }, { desc: '내 말풍선. 인스턴스 폭은 글에 맞춰 정한다(최대 520)', props: [{ name: 'Text', type: 'TEXT', default: '내가 보낸 말', node: 'label' }] });
   await makeOne(s, 'Chat/Card chip', async (c) => {
-    auto(c, 'H', { gap: 8, pad: [6, 12], cross: 'center', fill: 'surface', stroke: 'border-strong', radius: 'radius/sm' });
-    c.appendChild(icon('card', 16, 'text-3')); c.appendChild(named(await text('카드 제목', 'Small/13.5 Semibold', 'text'), 'title')); c.appendChild(named(await text('바뀐 칸', 'Small/13.5', 'text-3'), 'fields'));
+    auto(c, 'H', { gap: 8, pad: [6, 14], cross: 'center', fill: 'primary-soft', stroke: 'primary-tint', radius: 'radius/pill' });
+    c.appendChild(icon('card', 16, 'primary-ink')); c.appendChild(named(await text('카드 제목', 'Small/13.5 Semibold', 'text'), 'title')); c.appendChild(named(await text('바뀐 칸', 'Small/13.5', 'text-3'), 'fields'));
   }, { desc: 'AI 답 위에 붙는 칩: 이 답에서 바꾼 카드와 칸. 누르면 오른쪽에서 그 카드를 펼친다', props: [{ name: 'Card', type: 'TEXT', default: '카드 제목', node: 'title' }, { name: 'Fields', type: 'TEXT', default: '바뀐 칸', node: 'fields' }] });
   await makeSet(s, 'Chat/Room row', ['Default', 'Active'].map((k) => ({ props: { State: k }, build: async (c) => {
-    auto(c, 'H', { gap: 8, pad: [4, 10, 4, 28], w: 232, cross: 'center', radius: 'radius/sm' }); c.minHeight = 38;
-    const t = named(await text('대화방 이름', k === 'Active' ? 'Small/13.5 Semibold' : 'Small/13.5', k === 'Active' ? 'text' : 'text-2'), 'label');
-    if (k === 'Active') { c.appendChild(await hlBox(t, 5)); spacer(c); } else { c.appendChild(t); t.layoutSizingHorizontal = 'FILL'; t.textAutoResize = 'HEIGHT'; t.maxLines = 1; t.textTruncation = 'ENDING'; }
+    const on = k === 'Active';
+    auto(c, 'H', { gap: 8, pad: [4, 12, 4, 32], w: 232, cross: 'center', fill: on ? 'primary-soft' : null, radius: 'radius/pill' }); c.minHeight = 40;
+    const t = named(await text('대화방 이름', on ? 'Small/13.5 Semibold' : 'Small/13.5', on ? 'primary-deep' : 'text-2'), 'label');
+    c.appendChild(t); t.layoutSizingHorizontal = 'FILL'; t.textAutoResize = 'HEIGHT'; t.maxLines = 1; t.textTruncation = 'ENDING';
     c.appendChild(named(await text('11/18', 'Caption/12', 'text-3'), 'time'));
   } })), { desc: '대화방 목록의 한 줄. Active: 지금 연 방. 아직 말이 없는 「새 채팅」은 Show time 끔', props: [{ name: 'Name', type: 'TEXT', default: '대화방 이름', node: 'label' }, { name: 'Time', type: 'TEXT', default: '11/18', node: 'time' }, { name: 'Show time', type: 'BOOLEAN', default: true, node: 'time' }] });
   await makeSet(s, 'Chat/Daily row', ['Default', 'Active'].map((k) => ({ props: { State: k }, build: async (c) => {
-    auto(c, 'H', { gap: 6, pad: [4, 14, 4, 28], w: 232, cross: 'center', radius: 'radius/sm' }); c.minHeight = 38;
-    c.appendChild(icon('calendar', 15, 'text-3'));
-    const t = await text('오늘의 질문', k === 'Active' ? 'Small/13.5 Semibold' : 'Small/13.5 Semibold', 'text'); c.appendChild(k === 'Active' ? await hlBox(t, 5) : t);
-    spacer(c); const d = figma.createEllipse(); d.name = 'dot'; d.resize(7, 7); d.fills = [paint('primary')]; c.appendChild(d);
+    const on = k === 'Active';
+    auto(c, 'H', { gap: 6, pad: [4, 16, 4, 32], w: 232, cross: 'center', fill: on ? 'primary-soft' : null, radius: 'radius/pill' }); c.minHeight = 40;
+    c.appendChild(icon('calendar', 15, on ? 'primary-strong' : 'text-3'));
+    c.appendChild(await text('오늘의 질문', 'Small/13.5 Semibold', on ? 'primary-deep' : 'text'));
+    spacer(c); const d = figma.createEllipse(); d.name = 'dot'; d.resize(7, 7); d.fills = [paint('primary-strong')]; c.appendChild(d);
   } })), { desc: '프로젝트마다 맨 위에 고정된 「오늘의 질문」 방. 진행 중인 프로젝트에서 오늘 답하지 않았으면 점. 이름 바꾸기·지우기 없음', props: [{ name: 'Unanswered', type: 'BOOLEAN', default: true, node: 'dot' }] });
   await makeOne(s, 'Chat/Day divider', async (c) => {
     auto(c, 'H', { gap: 12, w: 600, cross: 'center', pad: [8, 0, 0, 0] });
@@ -496,28 +539,28 @@ async function buildLibrary(pageNode) {
     c.appendChild(named(await text('오늘', 'Caption/12 Semibold', 'text-3'), 'label'));
     const l2 = figma.createRectangle(); l2.resize(10, 1); l2.fills = [paint('border')]; c.appendChild(l2); l2.layoutSizingHorizontal = 'FILL';
   }, { desc: '오늘의 질문 방의 날짜 줄', props: [{ name: 'Label', type: 'TEXT', default: '오늘', node: 'label' }] });
-  await makeOne(s, 'Chat/Typing', async (c) => { auto(c, 'H', { gap: 4, h: 24, cross: 'center' }); for (const o of [0.3, 0.6, 1]) { const d = figma.createEllipse(); d.resize(6, 6); d.fills = [paint('text-3')]; d.opacity = o; c.appendChild(d); } }, { desc: 'AI 가 답을 쓰는 중' });
+  await makeOne(s, 'Chat/Typing', async (c) => { auto(c, 'H', { gap: 5, pad: [0, 18], h: 44, cross: 'center', fill: 'surface-2', radius: [8, 20, 20, 20] }); for (const o of [0.3, 0.6, 1]) { const d = figma.createEllipse(); d.resize(7, 7); d.fills = [paint('text-3')]; d.opacity = o; c.appendChild(d); } }, { desc: 'AI 가 답을 쓰는 중' });
 
   /* ===== 경험 카드 ===== */
-  s = await section('경험 카드', '카드는 테두리 카드(그림자 없음). 고른 카드와 펼친 카드는 잉크색 테두리');
+  s = await section('경험 카드', '카드는 둥근 면에 옅은 테두리와 그림자. 고른 카드와 펼친 카드는 주황 테두리');
   await makeOne(s, 'Card/Tile', async (c) => {
-    auto(c, 'V', { gap: 6, pad: [12, 14], w: 320, fill: 'surface', stroke: 'border-strong', radius: 'radius/md' });
+    auto(c, 'V', { gap: 6, pad: [14, 16], w: 320, fill: 'surface', stroke: 'border', radius: 'radius/md' }); shadow(c, 'Card');
     const t = named(await text('카드 제목', 'Body/15 Semibold', 'text'), 'title'); c.appendChild(t); t.layoutSizingHorizontal = 'FILL'; t.textAutoResize = 'HEIGHT';
     const l = named(await text('이력서 한 줄', 'Small/13.5', 'text-2'), 'line'); c.appendChild(l); l.layoutSizingHorizontal = 'FILL'; l.textAutoResize = 'HEIGHT'; l.maxLines = 2; l.textTruncation = 'ENDING';
     c.appendChild(named(await text('역량', 'Caption/12', 'text-2'), 'keywords'));
   }, { desc: 'AI 채팅 오른쪽의 카드 한 장. 누르면 그 자리에서 펼쳐진다', props: [{ name: 'Title', type: 'TEXT', default: '카드 제목', node: 'title' }, { name: 'Resume line', type: 'TEXT', default: '이력서 한 줄', node: 'line' }, { name: 'Keywords', type: 'TEXT', default: '역량', node: 'keywords' }] });
   await makeOne(s, 'Card/Index', async (c) => {
-    auto(c, 'V', { w: 363, fill: 'surface', stroke: 'border-strong', radius: 'radius/tag' });
-    const top = al('H', { name: 'top', gap: 10, pad: [0, 18], cross: 'center', minH: 40, stroke: 'primary', sides: ['bottom'] }); c.appendChild(top); top.layoutSizingHorizontal = 'FILL';
-    const chip = al('H', { name: 'project', gap: 5, cross: 'center' }); top.appendChild(chip); chip.appendChild(icon('folder', 15, 'primary')); chip.appendChild(named(await text('프로젝트', 'Small/13.5 Semibold', 'primary'), 'project'));
+    auto(c, 'V', { gap: 8, pad: [16, 20, 18, 20], w: 363, fill: 'surface', stroke: 'border', radius: 'radius/md' }); shadow(c, 'Card');
+    const top = al('H', { name: 'top', gap: 10, cross: 'center', minH: 24 }); c.appendChild(top); top.layoutSizingHorizontal = 'FILL';
+    const chip = al('H', { name: 'project', gap: 5, cross: 'center' }); top.appendChild(chip); chip.appendChild(icon('folder', 15, 'primary-ink')); chip.appendChild(named(await text('프로젝트', 'Small/13.5 Semibold', 'primary-ink'), 'project'));
     spacer(top); top.appendChild(named(await text('2026.11', 'Small/13.5', 'text-3'), 'period'));
     const gh = al('H', { name: 'github', gap: 4, cross: 'center' }); top.appendChild(gh); gh.appendChild(icon('github', 15, 'text-3')); gh.appendChild(await text('GitHub', 'Small/13.5', 'text-3'));
-    const body = al('V', { name: 'body', gap: 8, pad: [12, 18, 16, 18] }); c.appendChild(body); body.layoutSizingHorizontal = 'FILL';
+    const body = al('V', { name: 'body', gap: 8 }); c.appendChild(body); body.layoutSizingHorizontal = 'FILL';
     await tput(body, '경험 카드 제목', 'Card title/16', 'text', { wrap: true, name: 'title' });
     await tput(body, '이력서 한 줄', 'Small/13.5', 'text-2', { wrap: true, name: 'line' });
-    const kws = al('H', { name: 'keywords', gap: 14, cross: 'center', wrap: true }); kws.counterAxisSpacing = 4; body.appendChild(kws); kws.layoutSizingHorizontal = 'FILL';
+    const kws = al('H', { name: 'keywords', gap: 6, cross: 'center', wrap: true }); kws.counterAxisSpacing = 6; body.appendChild(kws); kws.layoutSizingHorizontal = 'FILL';
     for (const n of ['kw1', 'kw2', 'kw3']) expose(kws, named(inst('Keyword', { State: 'Default', Label: '역량' }), n));
-  }, { desc: '경험 위키 › 전체 카드, 프로젝트의 카드. 위 줄은 프로젝트와 기간(잉크색 밑줄). 역량은 노출한 Keyword 인스턴스 kw1~kw3 (거른 역량은 State=Selected). 화면에서는 indexCard()', props: [{ name: 'Project', type: 'TEXT', default: '프로젝트', node: 'project' }, { name: 'Period', type: 'TEXT', default: '2026.11', node: 'period' }, { name: 'Show GitHub', type: 'BOOLEAN', default: false, node: 'github' }, { name: 'Title', type: 'TEXT', default: '경험 카드 제목', node: 'title' }, { name: 'Resume line', type: 'TEXT', default: '이력서 한 줄', node: 'line' }, { name: 'Show keyword 2', type: 'BOOLEAN', default: true, node: 'kw2' }, { name: 'Show keyword 3', type: 'BOOLEAN', default: true, node: 'kw3' }] });
+  }, { desc: '경험 위키 › 전체 카드, 프로젝트의 카드. 머리에 프로젝트와 기간. 역량은 노출한 Keyword 인스턴스 kw1~kw3 (거른 역량은 State=Selected). 화면에서는 indexCard()', props: [{ name: 'Project', type: 'TEXT', default: '프로젝트', node: 'project' }, { name: 'Period', type: 'TEXT', default: '2026.11', node: 'period' }, { name: 'Show GitHub', type: 'BOOLEAN', default: false, node: 'github' }, { name: 'Title', type: 'TEXT', default: '경험 카드 제목', node: 'title' }, { name: 'Resume line', type: 'TEXT', default: '이력서 한 줄', node: 'line' }, { name: 'Show keyword 2', type: 'BOOLEAN', default: true, node: 'kw2' }, { name: 'Show keyword 3', type: 'BOOLEAN', default: true, node: 'kw3' }] });
 
   /* ===== 목록 ===== */
   s = await section('목록', '목록 줄: 높이 56 이상, 아래 테두리. 인스턴스에서 가로 채우기');
@@ -529,8 +572,8 @@ async function buildLibrary(pageNode) {
     c.appendChild(named(await text('메타', 'Small/13.5', 'text-3'), 'meta'));
   }, { desc: '일반 목록 줄 (휴지통, 홈의 대화방 등)', props: [{ name: 'Title', type: 'TEXT', default: '제목', node: 'title' }, { name: 'Subtitle', type: 'TEXT', default: '설명', node: 'sub' }, { name: 'Show subtitle', type: 'BOOLEAN', default: true, node: 'sub' }, { name: 'Meta', type: 'TEXT', default: '메타', node: 'meta' }, { name: 'Show meta', type: 'BOOLEAN', default: true, node: 'meta' }, { name: 'Show icon', type: 'BOOLEAN', default: true, node: 'icon' }, { name: 'Icon', type: 'INSTANCE_SWAP', default: 'folder', node: 'icon' }] });
   await makeSet(s, 'Wiki/Project row', ['Ongoing', 'Done'].map((k) => ({ props: { State: k }, build: async (c) => {
-    auto(c, 'H', { gap: 12, pad: [11, 8], w: 1120, cross: 'center', fill: 'surface', stroke: 'border', sides: ['bottom'] }); c.minHeight = 72;
-    c.appendChild(icon('folder', 18, 'text-3'));
+    auto(c, 'H', { gap: 14, pad: [16, 18], w: 1120, cross: 'center', fill: 'surface', stroke: 'border', sides: ['bottom'] }); c.minHeight = 72;
+    const fb = al('H', { name: 'folder', w: 40, h: 40, main: 'center', cross: 'center', fill: 'primary-soft', radius: 'radius/sm' }); fb.appendChild(icon('folder', 20, 'primary-ink')); c.appendChild(fb);
     const m = al('V', { name: 'main', gap: 2 }); c.appendChild(m); m.layoutSizingHorizontal = 'FILL';
     const line = al('H', { name: 'name', gap: 8, cross: 'center' }); m.appendChild(line); line.appendChild(named(await text('프로젝트 이름', 'Body/15 Semibold', 'text'), 'name'));
     if (k === 'Ongoing') line.appendChild(inst('Tag', { Tone: 'Ink', Label: '진행중' }));
@@ -543,22 +586,22 @@ async function buildLibrary(pageNode) {
     else { st.appendChild(icon('check', 16, 'text-2')); st.appendChild(await text('완료', 'Small/13.5', 'text-2')); }
   } })), { desc: '경험 위키 › 프로젝트 목록의 한 줄', props: [{ name: 'Name', type: 'TEXT', default: '프로젝트 이름', node: 'name' }, { name: 'Period', type: 'TEXT', default: '2026.09부터', node: 'period' }, { name: 'Role', type: 'TEXT', default: '역할', node: 'role' }, { name: 'Repo', type: 'TEXT', default: 'repo-name', node: 'repoName' }, { name: 'Show repo', type: 'BOOLEAN', default: true, node: 'repo' }, { name: 'Cards', type: 'TEXT', default: '카드 0장', node: 'count' }] });
   await makeSet(s, 'Repo/Choice', ['Default', 'Selected', 'Disabled'].map((k) => ({ props: { State: k }, build: async (c) => {
-    auto(c, 'H', { gap: 12, pad: [13, 16], w: 712, cross: 'center', fill: 'surface', stroke: k === 'Selected' ? 'primary' : 'border-strong', radius: 'radius/md', opacity: k === 'Disabled' ? 0.55 : 1 });
+    auto(c, 'H', { gap: 12, pad: [15, 18], w: 712, cross: 'center', fill: k === 'Selected' ? 'primary-soft' : 'surface', stroke: k === 'Selected' ? 'primary-strong' : 'border-strong', strokeW: k === 'Selected' ? 2 : 1, radius: 'radius/md', opacity: k === 'Disabled' ? 0.55 : 1 });
     c.appendChild(inst('Radio', { Checked: k === 'Selected' ? 'On' : 'Off' }));
     const m = al('V', { name: 'main', gap: 2 }); c.appendChild(m); m.layoutSizingHorizontal = 'FILL';
-    const name = named(await text('repo-name', 'Body/15 Semibold', 'text'), 'name'); m.appendChild(k === 'Selected' ? await hlBox(name) : name);
+    const name = named(await text('repo-name', 'Body/15 Semibold', 'text'), 'name'); m.appendChild(name);
     await tput(m, '레포 설명', 'Small/13.5', 'text-2', { name: 'desc' });
     c.appendChild(named(await text('TypeScript    2026.11', 'Small/13.5', 'text-3'), 'meta'));
   } })), { desc: '「새 프로젝트」 › GitHub에서 가져오기의 레포 한 칸. Disabled: 다른 프로젝트에 연결된 레포', props: [{ name: 'Name', type: 'TEXT', default: 'repo-name', node: 'name' }, { name: 'Description', type: 'TEXT', default: '레포 설명', node: 'desc' }, { name: 'Meta', type: 'TEXT', default: 'TypeScript    2026.11', node: 'meta' }] });
   await makeSet(s, 'Repo/Draft', ['Off', 'On'].map((k) => ({ props: { Selected: k }, build: async (c) => {
-    auto(c, 'H', { gap: 12, pad: [14, 16], w: 620, fill: 'surface', stroke: k === 'On' ? 'primary' : 'border-strong', strokeW: k === 'On' ? 1.5 : 1, radius: 'radius/md' });
+    auto(c, 'H', { gap: 12, pad: [15, 18], w: 620, fill: k === 'On' ? 'primary-soft' : 'surface', stroke: k === 'On' ? 'primary-strong' : 'border-strong', strokeW: k === 'On' ? 2 : 1, radius: 'radius/md' });
     c.appendChild(inst('Checkbox', { Checked: k }));
     const m = al('V', { name: 'main', gap: 4 }); c.appendChild(m); m.layoutSizingHorizontal = 'FILL';
-    const t = named(await text('작업 제목', 'Body/15 Semibold', 'text'), 'title'); m.appendChild(k === 'On' ? await hlBox(t) : t);
+    const t = named(await text('작업 제목', 'Body/15 Semibold', 'text'), 'title'); m.appendChild(t);
     await tput(m, '이력서 한 줄', 'Small/13.5', 'text-2', { wrap: true, name: 'line' }); await tput(m, '역량', 'Small/13.5 Medium', 'text-2', { name: 'keywords' });
     const more = al('H', { name: 'more', gap: 8, cross: 'center', pad: [4, 0, 0, 0] }); m.appendChild(more);
     more.appendChild(icon('chevron-right', 14, 'text-3')); more.appendChild(await text('자세히 보기', 'Small/13.5 Medium', 'text-2')); more.appendChild(named(await text('커밋 3개  PR 1개  코드 2곳', 'Small/13.5', 'text-3'), 'evidence'));
-  } })), { desc: '레포 분석에서 찾은 작업. 고른 것은 잉크 테두리와 제목 형광펜', props: [{ name: 'Title', type: 'TEXT', default: '작업 제목', node: 'title' }, { name: 'Resume line', type: 'TEXT', default: '이력서 한 줄', node: 'line' }, { name: 'Keywords', type: 'TEXT', default: '역량', node: 'keywords' }, { name: 'Evidence', type: 'TEXT', default: '커밋 3개  PR 1개  코드 2곳', node: 'evidence' }, { name: 'Show more', type: 'BOOLEAN', default: true, node: 'more' }] });
+  } })), { desc: '레포 분석에서 찾은 작업. 고른 것은 연한 주황 면과 주황 테두리', props: [{ name: 'Title', type: 'TEXT', default: '작업 제목', node: 'title' }, { name: 'Resume line', type: 'TEXT', default: '이력서 한 줄', node: 'line' }, { name: 'Keywords', type: 'TEXT', default: '역량', node: 'keywords' }, { name: 'Evidence', type: 'TEXT', default: '커밋 3개  PR 1개  코드 2곳', node: 'evidence' }, { name: 'Show more', type: 'BOOLEAN', default: true, node: 'more' }] });
   await makeOne(s, 'Repo/Made card', async (c) => {
     auto(c, 'H', { gap: 12, pad: [10, 12], w: 620, cross: 'center', fill: 'surface', stroke: 'border', sides: ['bottom'] });
     c.appendChild(icon('card', 18, 'text-3'));
@@ -576,11 +619,11 @@ async function buildLibrary(pageNode) {
     if (k === 'Current') holder.appendChild(spinner(20)); // 앱의 .steps .is-now: 도는 원
     else {
       const m = al('H', { name: 'circle', w: 20, h: 20, main: 'center', cross: 'center', radius: 10, fill: k === 'Done' ? 'primary' : null, stroke: k === 'Done' ? 'primary' : 'border-strong', strokeW: 2 }); holder.appendChild(m);
-      if (k === 'Done') m.appendChild(icon('check', 14, 'on-ink'));
+      if (k === 'Done') m.appendChild(icon('check', 14, 'on-primary'));
     }
     const t = named(await text('단계', k === 'Current' ? 'Body/15 Semibold' : 'Body/15', { Done: 'text-2', Current: 'text', Pending: 'text-3' }[k]), 'label');
     c.appendChild(t); t.layoutSizingHorizontal = 'FILL'; t.textAutoResize = 'HEIGHT';
-  } })), { desc: 'GitHub 레포 분석의 한 단계. Done: 잉크색 원과 체크, Current: 도는 원과 굵은 글, Pending: 빈 원. 인스턴스에서 가로 채우기', props: [{ name: 'Label', type: 'TEXT', default: '단계', node: 'label' }] });
+  } })), { desc: 'GitHub 레포 분석의 한 단계. Done: 주황 원과 체크, Current: 도는 원과 굵은 글, Pending: 빈 원. 인스턴스에서 가로 채우기', props: [{ name: 'Label', type: 'TEXT', default: '단계', node: 'label' }] });
   await makeSet(s, 'Repo/STAR row', ['Value', 'Empty'].map((k) => ({ props: { Content: k }, build: async (c) => {
     auto(c, 'H', { gap: 12, pad: [4, 0], w: 640, cross: 'start' });
     const dt = named(await text('상황', 'Small/13.5', 'text-3'), 'label'); c.appendChild(dt); dt.resize(44, dt.height); dt.textAutoResize = 'HEIGHT';
@@ -596,7 +639,7 @@ async function buildLibrary(pageNode) {
     auto(c, 'H', { gap: 12, pad: [0, 14, 0, 0], w: 640, fill: k === 'On' ? 'primary-soft' : null });
     c.appendChild(named(await text('1', 'Mono/12', 'text-3', { w: 32, align: 'right' }), 'number'));
     c.appendChild(named(await text('code', 'Mono/12', 'text'), 'code'));
-  } })), { desc: '근거 코드 한 줄: 줄 번호(32, 오른쪽 맞춤) + 코드(고정폭, 줄바꿈 없음). Highlight=On: 근거가 되는 줄(잉크 연한 바탕). 인스턴스에서 가로 채우기', props: [{ name: 'Number', type: 'TEXT', default: '1', node: 'number' }, { name: 'Code', type: 'TEXT', default: 'code', node: 'code' }] });
+  } })), { desc: '근거 코드 한 줄: 줄 번호(32, 오른쪽 맞춤) + 코드(고정폭, 줄바꿈 없음). Highlight=On: 근거가 되는 줄(연한 주황 바탕). 인스턴스에서 가로 채우기', props: [{ name: 'Number', type: 'TEXT', default: '1', node: 'number' }, { name: 'Code', type: 'TEXT', default: 'code', node: 'code' }] });
   return root;
 }
 
@@ -611,12 +654,12 @@ const W = 1920, H = 1080, SIDEBAR_W = 236; // 데스크톱 화면
 const NAV = [['홈', 'home', 'Home'], ['AI 채팅', 'chat', 'Chat'], ['경험 위키', 'wiki', 'Wiki'], ['경험 타임라인', 'timeline', 'Timeline']];
 async function buildShellComponents(parent) {
   const sec = al('V', { name: '화면 틀', gap: 16 }); parent.appendChild(sec);
-  await tput(sec, '화면 틀', 'Title/17', 'text');
+  await tput(sec, '화면 틀', 'Title/18', 'text');
   await tput(sec, '왼쪽 메뉴(236). 1차 범위라 마스터 이력서와 지원 기업은 메뉴에 없다. 화면에서 세로 채우기', 'Small/13.5', 'text-3');
   const row = al('H', { name: 'items', gap: 32 }); sec.appendChild(row);
   await makeSet(row, 'Shell/Sidebar', ['Home', 'Chat', 'Wiki', 'Timeline', 'Trash', 'None'].map((act) => ({ props: { Active: act }, build: async (c) => {
-    auto(c, 'V', { gap: 2, pad: [0, 12, 12, 12], w: SIDEBAR_W, h: H, fill: 'surface-2', stroke: 'border', sides: ['right'] });
-    const brand = al('H', { name: 'brand', pad: [0, 8], h: 56, w: 212, cross: 'center' }); c.appendChild(brand); brand.appendChild(inst('Logo', { On: 'Light' }));
+    auto(c, 'V', { gap: 2, pad: [0, 12, 12, 12], w: SIDEBAR_W, h: H, fill: 'surface', stroke: 'border', sides: ['right'] });
+    const brand = al('H', { name: 'brand', pad: [0, 8], h: 56, w: 212, cross: 'center' }); c.appendChild(brand); brand.appendChild(inst('Logo'));
     gap(c, 8);
     for (const [label, ic, key] of NAV) c.appendChild(inst('Nav item', { State: act === key ? 'Active' : 'Default', Label: label, Icon: ic }));
     const grow = figma.createFrame(); grow.name = 'spacer'; grow.fills = []; c.appendChild(grow); grow.layoutSizingHorizontal = 'FILL'; grow.layoutSizingVertical = 'FILL';
@@ -663,8 +706,8 @@ async function page(main, o = {}) {
     if (o.above && o.above.length) line('제목 위', o.above, 8, [0, 0, 8, 0]);
     if (o.titleExtra && o.titleExtra.length) {
       const r = al('H', { name: '제목 줄', gap: 10, cross: 'center' }); put(left, r, { fill: true });
-      await tput(r, o.title, 'Heading/24', 'text', { wrap: true, name: 'h1' }); o.titleExtra.forEach((n) => r.appendChild(n));
-    } else await tput(left, o.title, 'Heading/24', 'text', { wrap: true, name: 'h1' });
+      await tput(r, o.title, 'Heading/26', 'text', { wrap: true, name: 'h1' }); o.titleExtra.forEach((n) => r.appendChild(n));
+    } else await tput(left, o.title, 'Heading/26', 'text', { wrap: true, name: 'h1' });
     if (o.meta && o.meta.length) line('정보', o.meta, 14, [8, 0, 0, 0]);
     if (o.sub) { gap(left, 6); const t = await tput(left, o.sub, 'Body/15', 'text-2', { wrap: true, name: '설명' }); t.maxWidth = 600; } // 앱의 .page-head p (64ch)
     for (const n of o.below || []) { gap(left, 10); put(left, n, { fill: true }); }
@@ -676,12 +719,12 @@ async function page(main, o = {}) {
 // 제목이 있는 상단바 (경험 타임라인처럼 화면을 꽉 쓰는 곳)
 async function titleBar(main, title) {
   const bar = al('H', { name: '상단바', pad: [0, 40], h: 56, cross: 'center', fill: 'bg', stroke: 'border', sides: ['bottom'] }); put(main, bar, { fill: true });
-  bar.appendChild(await text(title, 'Title/17', 'text')); return bar;
+  bar.appendChild(await text(title, 'Title/18', 'text')); return bar;
 }
 // 섹션 제목 (+ 오른쪽 링크)
 async function sectionTitle(col, title, more, count) {
   const h = al('H', { name: title, gap: 8, cross: 'center', pad: [0, 0, 12, 0] }); put(col, h, { fill: true });
-  h.appendChild(await text(title, 'Title/17', 'text')); if (count) h.appendChild(await text(count, 'Small/13.5', 'text-3'));
+  h.appendChild(await text(title, 'Title/18', 'text')); if (count) h.appendChild(await text(count, 'Small/13.5', 'text-3'));
   if (more) { spacer(h); h.appendChild(await text(more, 'Small/13.5 Medium', 'text-2')); }
   return h;
 }
@@ -692,7 +735,7 @@ const btn = (label, variant = 'Secondary', size = 'Medium', ic) => inst('Button'
 const disable = (node) => { node.opacity = 0.45; return node; }; // 꺼진 버튼
 // 나란한 보기 고르기: segmented([{ label, icon }], 고른 순서)
 function segmented(items, on = 0) {
-  const s = al('H', { name: '보기 고르기', gap: 2, pad: 3, fill: 'surface-3', radius: 'radius/md' });
+  const s = al('H', { name: '보기 고르기', gap: 2, pad: 4, fill: 'surface-3', radius: 'radius/pill' });
   items.forEach((it, i) => s.appendChild(inst('Segment', Object.assign({ Selected: i === on ? 'On' : 'Off', Label: it.label || it }, it.icon ? { 'Show icon': true, Icon: it.icon } : {}))));
   return s;
 }
@@ -712,7 +755,7 @@ async function field(parent, o) {
 // 빈 화면: empty(parent, '제목', '설명', [버튼])
 async function empty(parent, title, desc, buttons = []) {
   const e = al('V', { name: '빈 화면', gap: 4, pad: [56, 20], cross: 'center' }); put(parent, e, { fill: true });
-  await tput(e, title, 'Title/17', 'text', { align: 'center' }); if (desc) await tput(e, desc, 'Body/15', 'text-2', { align: 'center' });
+  await tput(e, title, 'Title/18', 'text', { align: 'center' }); if (desc) await tput(e, desc, 'Body/15', 'text-2', { align: 'center' });
   if (buttons.length) { gap(e, 14); const r = al('H', { name: '단추', gap: 8 }); e.appendChild(r); buttons.forEach((b) => r.appendChild(b)); }
   return e;
 }
@@ -761,8 +804,8 @@ async function evidence(parent, o) {
   if (o.code && o.code.length) {
     const list = al('V', { name: '코드 블록', gap: 12 }); put(await group('코드'), list, { fill: true });
     for (const f of o.code) {
-      const blk = al('V', { name: f.path.split('/').pop(), stroke: 'border', radius: 'radius/sm', clip: true }); put(list, blk, { fill: true });
-      const ph = al('H', { name: '경로', pad: [7, 12], fill: 'surface-2', stroke: 'border', sides: ['bottom'] }); put(blk, ph, { fill: true });
+      const blk = al('V', { name: f.path.split('/').pop(), stroke: 'border', radius: 'radius/md', clip: true }); put(list, blk, { fill: true });
+      const ph = al('H', { name: '경로', pad: [9, 14], fill: 'surface-2', stroke: 'border', sides: ['bottom'] }); put(blk, ph, { fill: true });
       await tput(ph, f.path, 'Caption/12', 'text-2', { wrap: true });
       const pre = al('V', { name: '코드', pad: [8, 0] }); put(blk, pre, { fill: true });
       for (const [n, src] of f.lines) put(pre, named(inst('Evidence/Code line', { Highlight: (f.hl || []).includes(n) ? 'On' : 'Off', Number: String(n), Code: src || ' ' }), String(n)), { fill: true });
@@ -773,7 +816,7 @@ async function evidence(parent, o) {
 // 레포 분석에서 찾은 작업을 고르고 「자세히 보기」를 펼친 모습 (.rf-draft > details[open])
 //   d: { title, line, keywords: '역량    역량', star: [[칸, 글]] (글이 비면 Empty), evidence: evidence() 옵션 }
 async function openDraft(parent, d) {
-  const box = al('V', { name: `${d.title} (자세히 보기 펼침)`, fill: 'surface', stroke: 'primary', strokeW: 1.5, radius: 'radius/md', clip: true }); put(parent, box, { fill: true });
+  const box = al('V', { name: `${d.title} (자세히 보기 펼침)`, fill: 'surface', stroke: 'primary-strong', strokeW: 2, radius: 'radius/md', clip: true }); put(parent, box, { fill: true });
   const v = inst('Repo/Draft', { Selected: 'On', Title: d.title, 'Resume line': d.line, Keywords: d.keywords, 'Show more': false });
   put(box, v, { fill: true }); v.strokes = []; v.paddingBottom = 6; // 바깥 틀이 테두리를 그린다
   const det = al('V', { name: '자세히 보기' }); put(box, det, { fill: true });
@@ -795,7 +838,7 @@ async function modal(frame, o) {
   const dim = figma.createRectangle(); dim.name = '배경 어둡게'; dim.resize(frame.width, frame.height); dim.fills = [paint('text', 0.45)]; frame.appendChild(dim);
   const m = al('V', { name: o.title, w: o.width || 480, fill: 'surface', radius: 'radius/lg', clip: true }); shadow(m, 'Modal'); frame.appendChild(m);
   const head = al('H', { name: '머리', gap: 12, pad: [22, 24, 0, 24], cross: 'center' }); put(m, head, { fill: true });
-  await tput(head, o.title, 'Title/17', 'text', { wrap: true }); if (o.close) head.appendChild(inst('Icon button', { Size: 'Small', Icon: 'close' }));
+  await tput(head, o.title, 'Title/18', 'text', { wrap: true }); if (o.close) head.appendChild(inst('Icon button', { Size: 'Small', Icon: 'close' }));
   const body = al('V', { name: '내용', gap: 18, pad: [10, 24, 24, 24] }); put(m, body, { fill: true });
   if (o.body) await o.body(body);
   if (o.buttons && o.buttons.length) { const foot = al('H', { name: '단추', gap: 8, pad: [14, 24], main: 'end', stroke: 'border', sides: ['top'] }); put(m, foot, { fill: true }); o.buttons.forEach((b) => foot.appendChild(b)); }
@@ -806,7 +849,7 @@ async function modal(frame, o) {
 const modalText = (body, chars) => tput(body, chars, 'Body/15', 'text-2', { wrap: true });
 // 드롭다운 메뉴: menu(frame, [{ label, icon, danger } | '-'], [x, y], { w: 폭 (기본 232) })
 function menu(frame, items, at, o = {}) {
-  const m = al('V', { name: '메뉴', gap: 0, pad: 6, w: o.w || 232, fill: 'surface', stroke: 'border', radius: 'radius/md' }); shadow(m, 'Menu'); frame.appendChild(m);
+  const m = al('V', { name: '메뉴', gap: 0, pad: 8, w: o.w || 232, fill: 'surface', stroke: 'border', radius: 'radius/md' }); shadow(m, 'Menu'); frame.appendChild(m);
   for (const it of items) {
     if (it === '-') { const d = inst('Divider'); put(m, d, { fill: true }); d.name = 'hr'; continue; }
     const r = inst('Menu item', Object.assign({ Tone: it.danger ? 'Danger' : 'Default', Label: it.label }, it.icon ? { Icon: it.icon } : { 'Show icon': false })); put(m, r, { fill: true });
@@ -837,14 +880,18 @@ function toast(frame, label, action) {
   t.x = Math.round((frame.width - t.width) / 2); t.y = Math.min(frame.height, H) - t.height - 24; return t;
 }
 function tooltip(frame, label, at) { const t = inst('Tooltip', { Label: label }); frame.appendChild(t); t.x = at[0]; t.y = at[1]; return t; }
-// 형광펜 글자 (AI가 더한 것, 내가 고른 것)
-async function marked(chars, style = 'Body/15', color = 'text') { const b = al('H', { name: '형광펜', pad: [1, 3], fill: 'hl', radius: MARK_RADIUS }); b.appendChild(await text(chars, style, color)); return b; }
+// 강조 글자 (AI가 더한 것)
+async function marked(chars, style = 'Body/15', color = 'text') { const b = al('H', { name: '강조', pad: [1, 4], fill: 'primary-tint', radius: MARK_RADIUS }); b.appendChild(await text(chars, style, color)); return b; }
+// 둥근 면 하나로 묶은 목록 (.home .list, 위키의 프로젝트 목록, 설정과 휴지통의 묶음). pad: [세로, 가로]
+function listBox(parent, name, pad = [0, 0]) { const b = al('V', { name, pad, fill: 'surface', stroke: 'border', radius: 'radius/md', clip: true }); shadow(b, 'Card'); put(parent, b, { fill: true }); return b; }
+// 목록의 마지막 줄은 아래 선을 없앤다
+const lastRow = (box) => { const n = box.children[box.children.length - 1]; if (n) n.strokes = []; return box; };
 
 /* ===== screens/10-auth.js ===== */
 /* 로그인 · 회원가입(#/login, #/signup)과 시작하기(#/onboarding).
    앱: prototype/js/screens/auth.js, css/screens/auth.css, styles.css(.auth*), js/screens/onboarding.js, css/screens/onboarding.css,
        js/repo-flow.js(레포 고르기, css/screens/repo-flow.css), 예시 계정 js/seed-repos.js(SEED.github)
-   컴포넌트: Auth/Resume paper(움직임이 끝난 이력서 한 장), Auth/Brand panel(로그인 왼쪽 잉크 판),
+   컴포넌트: Auth/Resume paper(움직임이 끝난 이력서 한 장), Auth/Brand panel(로그인 왼쪽 연한 주황 판),
             Onboarding/Header(로고 + 로그아웃), Onboarding/Progress(Step 1 = 50%, Step 2 = 100%) */
 
 { // 이 파일의 이름이 다른 화면 파일과 겹치지 않도록 한 스코프에 둔다
@@ -860,23 +907,23 @@ const AUTH_PAPER_W = 720; // .au-paper 최대 폭 (안쪽 640)
 // 이력서 종이의 회색 줄(.au-bars i): 폭 목록 → 세로로 쌓은 막대
 function authBars(name, widths, cross = 'start') {
   const s = al('V', { name, gap: 8, cross });
-  for (const w of widths) { const b = figma.createRectangle(); b.name = 'bar'; b.resize(w, 8); b.fills = fills('surface-3'); radius(b, 2); s.appendChild(b); }
+  for (const w of widths) { const b = figma.createRectangle(); b.name = 'bar'; b.resize(w, 8); b.fills = fills('surface-3'); radius(b, 4); s.appendChild(b); }
   return s;
 }
 
 EXTRA_COMPONENTS.push({
   title: '로그인 · 시작하기',
   build: async (row) => {
-    /* 이력서 한 장: 말한 문장이 이력서 문장으로 바뀌고 수치에 형광펜(AI가 더한 것)이 그어진 끝 모습 */
+    /* 이력서 한 장: 말한 문장이 이력서 문장으로 바뀌고 수치가 연한 주황으로 강조된 끝 모습 */
     await makeOne(row, 'Auth/Resume paper', async (c) => {
-      auto(c, 'V', { pad: [36, 40, 60, 40], w: AUTH_PAPER_W, fill: 'surface', radius: [3, 3, 0, 0] });
-      await c.setEffectStyleIdAsync(EFFECTS.Modal.id); // shadow() 는 동기 대입(effectStyleId)이라 dynamic-page 에서 막힌다
-      const head = al('H', { name: '이름', gap: 24, pad: [0, 0, 16, 0], main: 'between', cross: 'end', stroke: 'text', strokeW: 2, sides: ['bottom'] }); put(c, head, { fill: true });
+      auto(c, 'V', { pad: [36, 40, 60, 40], w: AUTH_PAPER_W, fill: 'surface', stroke: 'primary-tint', sides: ['top', 'left', 'right'], radius: [24, 24, 0, 0] });
+      await c.setEffectStyleIdAsync(EFFECTS.Menu.id); // shadow() 는 동기 대입(effectStyleId)이라 dynamic-page 에서 막힌다
+      const head = al('H', { name: '이름', gap: 24, pad: [0, 0, 18, 0], main: 'between', cross: 'end', stroke: 'border', sides: ['bottom'] }); put(c, head, { fill: true });
       const who = al('V', { name: '사람' }); head.appendChild(who);
-      await tput(who, '김준호', 'Heading/24', 'text'); await tput(who, '백엔드 개발자', 'Small/13.5', 'text-2');
+      await tput(who, '김준호', 'Heading/26', 'text'); await tput(who, '백엔드 개발자', 'Small/13.5', 'text-2');
       const contact = authBars('연락처', [120, 86], 'end'); contact.paddingBottom = 4; head.appendChild(contact);
 
-      const section = async (title) => { const s = al('V', { name: title, gap: 12, pad: [24, 0, 0, 0] }); put(c, s, { fill: true }); await tput(s, title, 'Small/13.5 Semibold', 'primary-ink'); return s; };
+      const section = async (title) => { const s = al('V', { name: title, gap: 12, pad: [24, 0, 0, 0] }); put(c, s, { fill: true }); const pill = al('H', { name: '섹션 이름', pad: [2, 12], fill: 'primary-soft', radius: 'radius/pill' }); s.appendChild(pill); pill.appendChild(await text(title, 'Caption/12 Semibold', 'primary-ink')); return s; };
       const projects = await section('프로젝트');
       const slots = al('V', { name: '항목', gap: 16 }); put(projects, slots, { fill: true });
       for (const sc of AUTH_SCENES) {
@@ -884,39 +931,39 @@ EXTRA_COMPONENTS.push({
         const sh = al('H', { name: '프로젝트', gap: 16, main: 'between', cross: 'center', minH: 24 }); put(slot, sh, { fill: true });
         sh.appendChild(await text(sc.p, 'Body/15 Semibold', 'text')); sh.appendChild(await text(sc.when, 'Caption/12', 'text-3'));
         const ln = al('H', { name: '이력서 문장', cross: 'center', pad: [0, 0, 0, 2], minH: 26 }); slot.appendChild(ln);
-        const dot = figma.createEllipse(); dot.name = '점'; dot.resize(4, 4); dot.fills = fills('text-3'); ln.appendChild(dot); gap(ln, 1, 8);
+        const dot = figma.createEllipse(); dot.name = '점'; dot.resize(6, 6); dot.fills = fills('primary'); ln.appendChild(dot); gap(ln, 1, 8);
         const [a, mark, b] = sc.line;
-        ln.appendChild(await text(a, 'Body/15 Medium', 'text')); ln.appendChild(await marked(mark, 'Body/15 Semibold', 'text')); ln.appendChild(await text(b, 'Body/15 Medium', 'text'));
+        ln.appendChild(await text(a, 'Body/15 Medium', 'text')); ln.appendChild(await marked(mark, 'Body/15 Semibold', 'primary-deep')); ln.appendChild(await text(b, 'Body/15 Medium', 'text'));
       }
       (await section('기술')).appendChild(authBars('막대', [410, 307]));
       (await section('학력')).appendChild(authBars('막대', [358, 512, 256]));
-    }, { desc: '로그인 왼쪽의 이력서 한 장. 움직임(말한 문장 → 빨간 줄 → 이력서 문장 → 형광펜)이 끝난 모습. 판 안에서 세로 채우기' });
+    }, { desc: '로그인 왼쪽의 이력서 한 장. 움직임(말한 문장 → 주황 취소선 → 이력서 문장 → 강조)이 끝난 모습. 판 안에서 세로 채우기' });
 
-    /* 로그인 왼쪽 잉크 판: 로고 + 다시 보기, 소개 문구, 이력서 한 장 (아래는 판 밖으로 잘린다) */
+    /* 로그인 왼쪽 연한 주황 판: 로고 + 다시 보기, 소개 문구, 이력서 한 장 (아래는 판 밖으로 잘린다) */
     await makeOne(row, 'Auth/Brand panel', async (c) => {
-      auto(c, 'V', { pad: [24, 24, 0, 56], w: W / 2, h: H, fill: 'primary-hover', clip: true });
+      auto(c, 'V', { pad: [24, 24, 0, 56], w: W / 2, h: H, fill: 'primary-soft', clip: true });
       const top = al('H', { name: '위', h: 56, cross: 'center' }); put(c, top, { fill: true });
-      top.appendChild(inst('Logo', { On: 'Ink' })); spacer(top);
-      const replay = al('H', { name: '다시 보기', gap: 6, pad: [0, 10], h: 32, cross: 'center', radius: 'radius/sm' }); top.appendChild(replay);
-      replay.appendChild(icon('refresh', 15, 'on-ink-2')); replay.appendChild(await text('다시 보기', 'Small/13.5 Medium', 'on-ink-2'));
+      top.appendChild(inst('Logo')); spacer(top);
+      const replay = al('H', { name: '다시 보기', gap: 6, pad: [0, 14], h: 32, cross: 'center', fill: 'surface', stroke: 'primary-tint', radius: 'radius/pill' }); top.appendChild(replay);
+      replay.appendChild(icon('refresh', 15, 'text-2')); replay.appendChild(await text('다시 보기', 'Small/13.5 Medium', 'text-2'));
       gap(c, 64);
       const pitch = al('V', { name: '소개 문구', gap: 12 }); c.appendChild(pitch);
-      pitch.appendChild(await text('편하게 말한 경험이\n이력서 한 줄이 돼요', 'Display/34', 'on-ink', { name: '한 줄 약속' }));
-      pitch.appendChild(await text('AI와 이야기하거나 GitHub를 연결하면 경험 카드로 정리하고, 이력서와 자소서까지 이어 써요.', 'Body/15', 'on-ink-2', { w: 440, name: '설명' }));
+      pitch.appendChild(await text('편하게 말한 경험이\n이력서 한 줄이 돼요', 'Display/34', 'text', { name: '한 줄 약속' }));
+      pitch.appendChild(await text('AI와 이야기하거나 GitHub를 연결하면 경험 카드로 정리하고, 이력서와 자소서까지 이어 써요.', 'Body/15', 'text-2', { w: 440, name: '설명' }));
       gap(c, 48);
       const paper = inst('Auth/Resume paper'); put(c, paper, { fillV: true });
-    }, { desc: '로그인 · 회원가입 왼쪽(960). 잉크색(primary-hover) 위에 로고(On=Ink), 다시 보기, 소개 문구, 이력서 한 장' });
+    }, { desc: '로그인 · 회원가입 왼쪽(960). 연한 주황(primary-soft) 위에 로고, 다시 보기, 소개 문구, 이력서 한 장' });
 
     /* 시작하기 머리: 로고 + 로그아웃 */
     await makeOne(row, 'Onboarding/Header', async (c) => {
       auto(c, 'H', { pad: [0, 40], w: W, h: 56, main: 'between', cross: 'center', fill: 'bg' });
-      c.appendChild(inst('Logo', { On: 'Light' })); c.appendChild(btn('로그아웃', 'Ghost', 'Small'));
+      c.appendChild(inst('Logo')); c.appendChild(btn('로그아웃', 'Ghost', 'Small'));
     }, { desc: '시작하기 위쪽 줄 (.ob-head). 화면 폭 채우기' });
 
-    /* 시작하기 진행 막대 (.progress, 폭 96) */
+    /* 시작하기 진행 막대 (.progress, 폭 120) */
     await makeSet(row, 'Onboarding/Progress', ['1', '2'].map((k) => ({ props: { Step: k }, build: async (c) => {
-      auto(c, 'H', { w: 96, h: 6, fill: 'surface-3', radius: 3, clip: true });
-      const bar = figma.createRectangle(); bar.name = 'value'; bar.resize(k === '1' ? 48 : 96, 6); bar.fills = fills('primary'); radius(bar, 3); c.appendChild(bar);
+      auto(c, 'H', { w: 120, h: 10, fill: 'surface-3', radius: 'radius/pill', clip: true });
+      const bar = figma.createRectangle(); bar.name = 'value'; bar.resize(k === '1' ? 60 : 120, 10); bar.fills = fills('primary'); radius(bar, 'radius/pill'); c.appendChild(bar);
     } })), { dir: 'H', desc: '시작하기 진행. Step 1 = 50% (목표 직무), Step 2 = 100% (첫 프로젝트)' });
   },
 });
@@ -931,7 +978,7 @@ async function authScreen(frame, kind, fields) {
 
   const form = al('V', { name: signup ? '회원가입 폼' : '로그인 폼', gap: 40, w: 408, pad: [48, 24] }); right.appendChild(form);
   const main = al('V', { name: '폼', gap: 24 }); put(form, main, { fill: true });
-  await tput(main, signup ? '회원가입' : '로그인', 'Heading/24', 'text', { name: 'h1' });
+  await tput(main, signup ? '회원가입' : '로그인', 'Heading/26', 'text', { name: 'h1' });
   const list = al('V', { name: '입력칸', gap: 20 }); put(main, list, { fill: true });
   for (const f of fields) await field(list, f);
 
@@ -941,7 +988,7 @@ async function authScreen(frame, kind, fields) {
   put(btns, btn('예시 계정으로 둘러보기', 'Secondary', 'Large'), { fill: true });
   const alt = al('H', { name: '다른 쪽으로', gap: 4, main: 'center', cross: 'center' }); put(actions, alt, { fill: true });
   alt.appendChild(await text(signup ? '이미 계정이 있나요?' : '아직 계정이 없나요?', 'Small/13.5', 'text-2'));
-  alt.appendChild(await text(signup ? '로그인' : '회원가입', 'Small/13.5 Medium', 'primary', { underline: true, name: 'link' }));
+  alt.appendChild(await text(signup ? '로그인' : '회원가입', 'Small/13.5 Medium', 'primary-ink', { underline: true, name: 'link' }));
 
   await tput(form, '프로토타입이라 계정과 데이터는 이 브라우저에만 저장돼요. 다른 곳에서 쓰는 비밀번호는 쓰지 마세요.', 'Small/13.5', 'text-3', { wrap: true, name: '안내' });
   return screen;
@@ -988,7 +1035,7 @@ async function onboarding(frame, step, title) {
   const body = al('V', { name: '가운데', gap: 24, w: 560, pad: [48, 16, 64, 16] }); screen.appendChild(body);
   const head = al('V', { name: '머리', gap: 28 }); put(body, head, { fill: true });
   head.appendChild(inst('Onboarding/Progress', { Step: String(step) }));
-  await tput(head, title, 'Heading/24', 'text', { wrap: true, name: 'h1' });
+  await tput(head, title, 'Heading/26', 'text', { wrap: true, name: 'h1' });
   const content = al('V', { name: '내용', gap: 20 }); put(body, content, { fill: true });
   return { screen, body, content };
 }
@@ -1100,23 +1147,23 @@ SCREENS.push({
   /* ---------- 이 화면의 컴포넌트: 이어서 대화하기 한 줄 ---------- */
   EXTRA_COMPONENTS.push({ title: '홈', build: async (row) => {
     await makeOne(row, 'Home/Chat row', async (c) => {
-      auto(c, 'H', { gap: 12, pad: [11, 8], w: 760, cross: 'center', stroke: 'border', sides: ['bottom'] }); c.minHeight = 56;
+      auto(c, 'H', { gap: 12, pad: [13, 18], w: 760, cross: 'center', stroke: 'border', sides: ['bottom'] }); c.minHeight = 56;
       const t = named(await text('대화방 이름', 'Body/15 Semibold', 'text'), 'hc-title'); c.appendChild(t); t.layoutSizingHorizontal = 'FILL'; t.maxLines = 1; t.textTruncation = 'ENDING';
       const chip = al('H', { name: 'project', gap: 5, cross: 'center' }); c.appendChild(chip);
-      chip.appendChild(icon('folder', 15, 'primary')); chip.appendChild(named(await text('프로젝트', 'Small/13.5 Semibold', 'primary'), 'hc-project'));
+      chip.appendChild(icon('folder', 15, 'primary-ink')); chip.appendChild(named(await text('프로젝트', 'Small/13.5 Semibold', 'primary-ink'), 'hc-project'));
     }, { desc: '홈 › 이어서 대화하기의 한 줄: 대화방 이름과 프로젝트. 누르면 그 대화방으로', props: [{ name: 'Title', type: 'TEXT', default: '대화방 이름', node: 'hc-title' }, { name: 'Project', type: 'TEXT', default: '프로젝트', node: 'hc-project' }] });
   } });
 
   /* ---------- 블록 ---------- */
-  const cellRect = (level, name) => { const r = figma.createRectangle(); r.name = name; r.resize(CELL, CELL); r.cornerRadius = 2; r.fills = [paint(`record-${level}`)]; return r; };
+  const cellRect = (level, name) => { const r = figma.createRectangle(); r.name = name; r.resize(CELL, CELL); r.cornerRadius = 3; r.fills = [paint(`record-${level}`)]; return r; };
 
   // 꾸준히 기록하기 → 11월 27일 칸을 돌려준다 (툴팁 자리)
   async function recordBlock(col) {
     await sectionTitle(col, '꾸준히 기록하기');
-    const rc = al('V', { name: '꾸준히 기록하기', gap: 16, pad: 20, fill: 'surface-2', radius: 'radius/md' }); put(col, rc, { fill: true });
+    const rc = al('V', { name: '꾸준히 기록하기', gap: 18, pad: 24, fill: 'surface-2', radius: 'radius/lg' }); put(col, rc, { fill: true });
     const top = al('H', { name: '연속 기록', gap: 16, cross: 'center' }); put(rc, top, { fill: true });
     const st = al('H', { name: '연속', gap: 4, cross: 'baseline' }); top.appendChild(st);
-    st.appendChild(await text('20일', 'Title/17', 'text')); st.appendChild(await text('연속 기록하고 있어요', 'Body/15', 'text'));
+    st.appendChild(await text('20일', 'Title/18', 'primary-ink')); st.appendChild(await text('연속 기록하고 있어요', 'Body/15', 'text'));
     spacer(top); top.appendChild(await text('최근 1년 동안 61일 기록했어요', 'Small/13.5', 'text-3'));
 
     // 잔디: 왼쪽 요일 열 + (달 줄, 주마다 한 열)
@@ -1157,16 +1204,17 @@ SCREENS.push({
   // 내 역량: 레이더 (그림은 SVG, 이름과 카드 수는 글자)
   async function skillsBlock(col) {
     await sectionTitle(col, '내 역량', '경험 타임라인');
-    const sk = al('V', { name: '내 역량', gap: 12, pad: 20, fill: 'surface-2', radius: 'radius/md', cross: 'center' }); put(col, sk, { fill: true });
+    const sk = al('V', { name: '내 역량', gap: 16, pad: 24, fill: 'surface-2', radius: 'radius/lg', cross: 'center' }); put(col, sk, { fill: true });
     const W0 = 600, H0 = 452, CX = 300, CY = 226, R = 150, N = SKILLS.length, TOPV = 8, RINGS = 4;
     const at = (i, v) => { const a = -Math.PI / 2 + (i * 2 * Math.PI) / N; return [CX + Math.cos(a) * R * v, CY + Math.sin(a) * R * v]; };
     const poly = (fn) => SKILLS.map((k, i) => at(i, fn(k)).map((x) => x.toFixed(1)).join(',')).join(' ');
     const C = COLORS;
     let s = `<svg width="${W0}" height="${H0}" viewBox="0 0 ${W0} ${H0}" xmlns="http://www.w3.org/2000/svg" fill="none">`;
-    for (let j = 1; j <= RINGS; j++) s += `<polygon points="${poly(() => j / RINGS)}" stroke="${j === RINGS ? C['border-strong'] : C.border}" stroke-width="1" ${j === RINGS ? '' : 'stroke-dasharray="3 4"'}/>`;
+    s += `<polygon points="${poly(() => 1)}" fill="${C.surface}"/>`;
+    for (let j = 1; j <= RINGS; j++) s += `<polygon points="${poly(() => j / RINGS)}" stroke="${C['border-strong']}" stroke-width="1" ${j === RINGS ? '' : 'stroke-dasharray="3 4"'}/>`;
     SKILLS.forEach((k, i) => { const [x, y] = at(i, 1); s += `<line x1="${CX}" y1="${CY}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${C.border}" stroke-width="1"/>`; });
-    s += `<polygon points="${poly((k) => k[1] / TOPV)}" fill="${C.primary}" fill-opacity="0.12" stroke="${C.primary}" stroke-width="2" stroke-linejoin="round"/>`;
-    SKILLS.forEach((k, i) => { const [x, y] = at(i, k[1] / TOPV); s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.5" fill="${C.primary}" stroke="${C.surface}" stroke-width="2"/>`; });
+    s += `<polygon points="${poly((k) => k[1] / TOPV)}" fill="${C.primary}" fill-opacity="0.2" stroke="${C['primary-strong']}" stroke-width="2.5" stroke-linejoin="round"/>`;
+    SKILLS.forEach((k, i) => { const [x, y] = at(i, k[1] / TOPV); s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.5" fill="${C['primary-strong']}" stroke="${C.surface}" stroke-width="2"/>`; });
     s += '</svg>';
     const fig = figma.createFrame(); fig.name = '레이더'; fig.fills = []; fig.clipsContent = false; fig.resize(W0, H0); sk.appendChild(fig);
     const chart = bindSvg(figma.createNodeFromSvg(s)); chart.name = '그림'; fig.appendChild(chart); chart.x = 0; chart.y = 0;
@@ -1182,8 +1230,9 @@ SCREENS.push({
 
   async function chatsBlock(col) {
     await sectionTitle(col, '이어서 대화하기', '전체 보기');
-    const list = al('V', { name: '대화방', stroke: 'border', sides: ['top'] }); put(col, list, { fill: true });
+    const list = listBox(col, '대화방');
     for (const [t, p] of RECENT) { const r = inst('Home/Chat row', { Title: t, Project: p }); r.name = t; put(list, r, { fill: true }); }
+    lastRow(list);
   }
 
   // 홈 전체 → { screen, hover(11월 27일 칸) }
@@ -1203,7 +1252,7 @@ SCREENS.push({
     const { screen, main } = shell(frame, 'Home', { trash: 0 });
     const col = await page(main, { narrow: true });
     const e = al('V', { name: '빈 화면', gap: 4, pad: [96, 20, 40, 20], cross: 'center' }); put(col, e, { fill: true });
-    await tput(e, '첫 프로젝트를 만들어 보세요', 'Heading/24', 'text', { align: 'center' });
+    await tput(e, '첫 프로젝트를 만들어 보세요', 'Heading/26', 'text', { align: 'center' });
     await tput(e, '팀 과제, 동아리, 아르바이트도 프로젝트예요.', 'Body/15', 'text-2', { align: 'center' });
     gap(e, 14); e.appendChild(btn('새 프로젝트', 'Primary', 'Large', 'plus'));
     fit(frame, screen);
@@ -1273,15 +1322,15 @@ const PH = { room: '이야기를 이어서 적어 주세요', daily: '오늘의 
 EXTRA_COMPONENTS.push({
   title: 'AI 채팅: 묻기, 레포 분석, 펼친 카드',
   build: async (row) => {
-    // 묻기 상자의 한 칸: 칸 이름, 원래 글, 더한 글(기다리는 중에는 형광펜)
+    // 묻기 상자의 한 칸: 칸 이름, 원래 글, 더한 글(기다리는 중에는 주황 강조)
     await makeSet(row, 'Chat/Diff row', ['Wait', 'Closed'].map((k) => ({ props: { Tone: k }, build: async (c) => {
       const wait = k === 'Wait';
       auto(c, 'V', { gap: 2, w: 600 });
       c.appendChild(named(await text('행동', 'Small/13.5 Semibold', 'text-3'), 'field'));
       const b = named(await text('원래 글', 'Body/15', wait ? 'text' : 'text-2'), 'before'); c.appendChild(b); b.layoutSizingHorizontal = 'FILL'; b.textAutoResize = 'HEIGHT';
-      const a = al('H', Object.assign({ name: 'added' }, wait ? { pad: [1, 3], fill: 'hl', radius: MARK_RADIUS } : {})); c.appendChild(a); a.layoutSizingHorizontal = 'FILL';
+      const a = al('H', Object.assign({ name: 'added' }, wait ? { pad: [1, 4], fill: 'primary-tint', radius: MARK_RADIUS } : {})); c.appendChild(a); a.layoutSizingHorizontal = 'FILL';
       const t = named(await text('더한 글', 'Body/15', wait ? 'text' : 'text-2'), 'addedText'); a.appendChild(t); t.layoutSizingHorizontal = 'FILL'; t.textAutoResize = 'HEIGHT';
-    } })), { dir: 'H', desc: '카드를 바꾸기 전에 묻는 상자의 한 칸. Wait: 더한 글에 형광펜. Closed(답한 뒤): 흐린 글, 형광펜 없음', props: [
+    } })), { dir: 'H', desc: '카드를 바꾸기 전에 묻는 상자의 한 칸. Wait: 더한 글에 주황 강조. Closed(답한 뒤): 흐린 글, 강조 없음', props: [
       { name: 'Field', type: 'TEXT', default: '행동', node: 'field' }, { name: 'Before', type: 'TEXT', default: '원래 글', node: 'before' }, { name: 'Show before', type: 'BOOLEAN', default: true, node: 'before' },
       { name: 'Added', type: 'TEXT', default: '더한 글', node: 'addedText' }, { name: 'Show added', type: 'BOOLEAN', default: true, node: 'added' }] });
 
@@ -1289,7 +1338,7 @@ EXTRA_COMPONENTS.push({
     const DONE = { Ok: ['check', '허용했어요'], No: ['close', '거절했어요'], Fail: ['warning', '반영하지 못했어요'] };
     await makeSet(row, 'Chat/Confirm', ['Wait', 'Ok', 'No', 'Fail'].map((k) => ({ props: { State: k }, build: async (c) => {
       const wait = k === 'Wait';
-      auto(c, 'V', { gap: 12, pad: [14, 16], w: 640, fill: wait ? 'surface' : null, stroke: 'border-strong', radius: 'radius/md' });
+      auto(c, 'V', { gap: 14, pad: [16, 18], w: 640, fill: wait ? 'surface' : null, stroke: wait ? 'primary-light' : 'border-strong', radius: 20 }); if (wait) shadow(c, 'Card');
       if (!wait) c.dashPattern = [4, 4];
       const rows = al('V', { name: 'rows', gap: 10 }); c.appendChild(rows); rows.layoutSizingHorizontal = 'FILL';
       for (let n = 1; n <= 4; n++) { const r = expose(rows, named(inst('Chat/Diff row', { Tone: wait ? 'Wait' : 'Closed' }), `row ${n}`)); r.layoutSizingHorizontal = 'FILL'; }
@@ -1306,7 +1355,7 @@ EXTRA_COMPONENTS.push({
 
     // 오른쪽 펼친 카드의 한 칸
     await makeSet(row, 'Chat/Card field', ['Default', 'Changed', 'Blank', 'Keywords'].map((k) => ({ props: { State: k }, build: async (c) => {
-      auto(c, 'V', { gap: 4, pad: [12, 8], w: 304, fill: k === 'Changed' ? 'hl-soft' : null, stroke: 'border-strong', sides: ['top'] });
+      auto(c, 'V', { gap: 4, pad: [12, 8], w: 304, fill: k === 'Changed' ? 'primary-soft' : null, stroke: 'border', sides: ['top'] });
       c.appendChild(named(await text('상황', 'Small/13.5 Semibold', 'text-3'), 'label'));
       if (k === 'Blank') {
         const b = al('H', { name: 'blank', pad: [6, 12], fill: 'surface-2', stroke: 'border-strong', radius: 'radius/sm' }); b.dashPattern = [4, 3]; c.appendChild(b); b.layoutSizingHorizontal = 'FILL';
@@ -1315,10 +1364,10 @@ EXTRA_COMPONENTS.push({
       const kw = k === 'Keywords';
       const v = named(await text('내용', kw ? 'Small/13.5 Medium' : 'Body/15', kw ? 'text-2' : 'text'), 'value'); c.appendChild(v); v.layoutSizingHorizontal = 'FILL'; v.textAutoResize = 'HEIGHT';
       if (k === 'Changed') {
-        const m = al('H', { name: 'added', pad: [1, 3], fill: 'hl', radius: MARK_RADIUS }); c.appendChild(m); m.layoutSizingHorizontal = 'FILL';
+        const m = al('H', { name: 'added', pad: [1, 4], fill: 'primary-tint', radius: MARK_RADIUS }); c.appendChild(m); m.layoutSizingHorizontal = 'FILL';
         const t = named(await text('더한 글', 'Body/15', 'text'), 'addedText'); m.appendChild(t); t.layoutSizingHorizontal = 'FILL'; t.textAutoResize = 'HEIGHT';
       }
-    } })), { desc: 'AI 채팅 오른쪽 펼친 카드의 한 칸(상황·과제·행동·결과·역량·이력서 한 줄). Changed: AI가 방금 바꾼 칸(연한 형광펜 바탕, 더한 글은 형광펜). Blank: 아직 비어 있어요', props: [
+    } })), { desc: 'AI 채팅 오른쪽 펼친 카드의 한 칸(상황·과제·행동·결과·역량·이력서 한 줄). Changed: AI가 방금 바꾼 칸(연한 주황 바탕, 더한 글은 주황 강조). Blank: 아직 비어 있어요', props: [
       { name: 'Label', type: 'TEXT', default: '상황', node: 'label' }, { name: 'Value', type: 'TEXT', default: '내용', node: 'value' },
       { name: 'Added', type: 'TEXT', default: '더한 글', node: 'addedText' }] });
 
@@ -1357,22 +1406,22 @@ async function chatTree(parent, o = {}) {
   const head = al('H', { name: '단추', gap: 8, pad: [16, 16, 12, 16] }); put(t, head, { fill: true });
   if (list.length) { put(head, btn('새 채팅', 'Primary', 'Medium', 'plus'), { fill: true }); put(head, btn('새 프로젝트', 'Secondary', 'Medium'), { fill: true }); }
   else put(head, btn('새 프로젝트', 'Primary', 'Medium', 'plus'), { fill: true });
-  const nav = al('V', { name: '프로젝트별 채팅', gap: 12, pad: [4, 10, 24, 10] }); put(t, nav, { fill: true });
+  const nav = al('V', { name: '프로젝트별 채팅', gap: 14, pad: [4, 10, 24, 10] }); put(t, nav, { fill: true });
   if (!list.length) { const p = al('V', { name: '프로젝트 없음', pad: [8, 8] }); put(nav, p, { fill: true }); await tput(p, '프로젝트를 만들면 바로 이야기를 시작할 수 있어요.', 'Small/13.5', 'text-3', { wrap: true }); return t; }
   for (const p of list) {
     const over = (o.rooms || {})[p.name] || {}; const rooms = over.rooms || p.rooms; const more = 'more' in over ? over.more : p.more;
-    const pj = al('V', { name: p.name }); put(nav, pj, { fill: true });
+    const pj = al('V', { name: p.name, gap: 2 }); put(nav, pj, { fill: true });
     const hover = o.hover === p.name;
-    const pr = al('H', { name: '프로젝트 이름', gap: 6, pad: [4, 6], cross: 'center', minH: 38, radius: 'radius/sm', fill: hover ? 'surface-2' : null }); put(pj, pr, { fill: true });
+    const pr = al('H', { name: '프로젝트 이름', gap: 6, pad: [4, 10], cross: 'center', minH: 40, radius: 'radius/pill', fill: hover ? 'surface-2' : null }); put(pj, pr, { fill: true });
     pr.appendChild(icon('chevron-down', 16, 'text-3')); pr.appendChild(await text(p.name, 'Small/13.5 Semibold', 'text'));
     if (p.gh) pr.appendChild(named(icon('github', 14, 'text-3'), 'GitHub 연결됨'));
     if (hover) { spacer(pr); pr.appendChild(inst('Icon button', { Size: 'Small', Icon: 'plus' })); const m = inst('Icon button', { Size: 'Small', Icon: 'more' }); m.name = '프로젝트 메뉴'; m.fills = fills('surface-3'); pr.appendChild(m); }
     const here = act.project === p.name;
     if (here && act.room === 'new') put(pj, inst('Chat/Room row', { State: 'Active', Name: '새 채팅', 'Show time': false }), { fill: true });
-    if (o.noChats) { const n = al('H', { name: '대화방 없음', pad: [6, 0, 6, 28] }); put(pj, n, { fill: true }); n.appendChild(await text('아직 대화방이 없어요', 'Small/13.5', 'text-3')); continue; }
+    if (o.noChats) { const n = al('H', { name: '대화방 없음', pad: [6, 0, 6, 32] }); put(pj, n, { fill: true }); n.appendChild(await text('아직 대화방이 없어요', 'Small/13.5', 'text-3')); continue; }
     const d = inst('Chat/Daily row', { State: here && act.room === 'daily' ? 'Active' : 'Default', Unanswered: !!p.ongoing }); put(pj, d, { fill: true });
     for (const [name, when] of rooms) put(pj, inst('Chat/Room row', { State: here && act.room === name ? 'Active' : 'Default', Name: name, Time: when }), { fill: true });
-    if (more) { const m = al('H', { name: '더 보기', pad: [6, 0, 6, 28] }); put(pj, m, { fill: true }); m.appendChild(await text(`${more}개 더 보기`, 'Small/13.5', 'text-3')); }
+    if (more) { const m = al('H', { name: '더 보기', pad: [6, 0, 6, 32] }); put(pj, m, { fill: true }); m.appendChild(await text(`${more}개 더 보기`, 'Small/13.5', 'text-3')); }
   }
   return t;
 }
@@ -1386,7 +1435,7 @@ async function cardPanel(parent, o = {}) {
   const h2 = al('H', { name: '제목', gap: 8, cross: 'center' }); put(top, h2, { fill: true });
   h2.appendChild(await text('경험 카드', 'Body/15 Semibold', 'text')); if (ids.length) h2.appendChild(await text(`${ids.length}장`, 'Small/13.5 Medium', 'text-3'));
   if (o.status) top.appendChild(inst('Chat/Panel status', { State: o.status }));
-  const body = al('V', { name: '카드 목록', gap: 8, pad: 20 }); put(p, body, { fill: true });
+  const body = al('V', { name: '카드 목록', gap: 10, pad: [20, 16, 24, 16] }); put(p, body, { fill: true });
   if (!ids.length) {
     const e = al('V', { name: '빈 목록', gap: 4, pad: [16, 0] }); put(body, e, { fill: true });
     await tput(e, '이야기를 들려주면 AI가 이 프로젝트의 경험 카드를 만들어요.', 'Body/15', 'text-2', { wrap: true });
@@ -1402,9 +1451,9 @@ async function cardPanel(parent, o = {}) {
 }
 // 목록의 제자리에서 펼친 카드. changed: 방금 바뀐 칸 → 더한 글 (before 에 원래 글)
 async function openCard(list, c, changed = {}, before = {}) {
-  const det = al('V', { name: `펼친 카드: ${c.title}`, gap: 8, pad: [16, 8, 14, 8], fill: 'surface', stroke: 'primary', radius: 'radius/md' }); put(list, det, { fill: true });
+  const det = al('V', { name: `펼친 카드: ${c.title}`, gap: 8, pad: [16, 8, 14, 8], fill: 'surface', stroke: 'primary-strong', radius: 'radius/md' }); shadow(det, 'Card'); put(list, det, { fill: true });
   const head = al('H', { name: '머리 (누르면 접힘)', gap: 8, pad: [0, 8], cross: 'start' }); put(det, head, { fill: true });
-  await tput(head, c.title, 'Title/17', 'text', { wrap: true }); head.appendChild(icon('chevron-up', 16, 'text-3'));
+  await tput(head, c.title, 'Title/18', 'text', { wrap: true }); head.appendChild(icon('chevron-up', 16, 'text-3'));
   const fs = al('V', { name: '칸', pad: [4, 0, 0, 0] }); put(det, fs, { fill: true });
   const row = (props) => { const f = inst('Chat/Card field', props); f.name = props.Label; put(fs, f, { fill: true }); };
   STAR.forEach((label, i) => {
@@ -1432,8 +1481,18 @@ async function roomHead(room, o) {
 async function roomBody(room, o) {
   await roomHead(room, o);
   const body = al('V', { name: '대화', cross: 'center', main: o.grow ? 'start' : (o.align || 'end'), clip: !o.grow }); put(room, body, { fill: true, fillV: !o.grow });
-  const col = al('V', { name: '대화 열', w: COL_W, gap: 20, pad: [28, 28, 24, 28] }); body.appendChild(col);
+  const col = al('V', { name: '대화 열', w: COL_W, gap: 24, pad: [28, 28, 24, 28] }); body.appendChild(col);
   return col;
+}
+// AI 표시. 첫 줄이 말풍선이면 첫 글자 줄에 맞춰 9 내린다
+function aiMark(row, onBubble) { const h = al('V', { name: 'AI 표시', pad: [onBubble ? 9 : 0, 0, 0, 0] }); row.appendChild(h); h.appendChild(inst('Chat/AI mark')); }
+// AI 말풍선 (.chat-t): 회색, 꼬리 쪽(왼쪽 위)만 덜 둥글다. 짧은 글은 글에 맞추고 긴 글은 폭 560(64ch)에서 줄바꿈
+async function aiBubble(box, s) {
+  const longest = Math.max(...s.split('\n').map((line) => { let w = 0; for (const ch of line) w += /[가-힣]/.test(ch) ? 15 : ch === ' ' ? 4 : 8.5; return w; }));
+  const wrap = longest + 32 > 560;
+  const b = al('V', Object.assign({ name: '말풍선', pad: [10, 16], fill: 'surface-2', radius: [8, 20, 20, 20] }, wrap ? { w: 560 } : {})); box.appendChild(b);
+  await tput(b, s, 'Body/15', 'text', { wrap, name: '글' });
+  return b;
 }
 // 대화를 차례로 쌓는다
 function talk(col) {
@@ -1445,15 +1504,15 @@ function talk(col) {
     // o: { name, chip: [카드, 바뀐 칸], then: async (box) => {} 글 아래에 붙는 것 }
     async ai(s, o = {}) {
       const r = al('H', { name: o.name || 'AI 답', gap: 12 }); put(col, r, { fill: true });
-      r.appendChild(inst('Chat/AI mark'));
+      aiMark(r, !!s && !o.chip);
       const box = al('V', { name: '내용', gap: 12 }); put(r, box, { fill: true });
       if (o.chip) box.appendChild(inst('Chat/Card chip', { Card: o.chip[0], Fields: o.chip[1] }));
-      if (s) await tput(box, s, 'Body/15', 'text', { wrap: true, name: '글' });
+      if (s) await aiBubble(box, s);
       if (o.then) await o.then(box);
       return box;
     },
     day(label) { const d = inst('Chat/Day divider', { Label: label }); d.name = `날짜: ${label}`; put(col, d, { fill: true }); },
-    typing() { const r = al('H', { name: 'AI 답 쓰는 중', gap: 12 }); put(col, r, { fill: true }); r.appendChild(inst('Chat/AI mark')); r.appendChild(inst('Chat/Typing')); },
+    typing() { const r = al('H', { name: 'AI 답 쓰는 중', gap: 12 }); put(col, r, { fill: true }); aiMark(r, true); r.appendChild(inst('Chat/Typing')); },
   };
 }
 // 입력: 빠른 단추(GitHub, 카드 바꾸기 전에 묻기) + 입력칸. o: { quick: false, connect: GitHub 연결 전, permOn }
@@ -1466,9 +1525,9 @@ async function composer(room, ph, o = {}) {
     const perm = al('H', { name: '카드 바꾸기 전에 묻기', gap: 8, pad: [0, 10], cross: 'center' }); q.appendChild(perm);
     perm.appendChild(inst('Switch', { On: o.permOn ? 'On' : 'Off' })); perm.appendChild(await text('카드 바꾸기 전에 묻기', 'Small/13.5 Medium', 'text-2'));
   }
-  const input = al('H', { name: '입력칸', gap: 8, pad: [5, 6, 5, 14], cross: 'center', fill: 'surface', stroke: 'field-border', radius: 'radius/sm', minH: 48 }); put(form, input, { fill: true });
+  const input = al('H', { name: '입력칸', gap: 8, pad: [5, 6, 5, 20], cross: 'center', fill: 'surface', stroke: 'border-strong', radius: 'radius/lg', minH: 48 }); put(form, input, { fill: true });
   await tput(input, ph, 'Body/15', 'text-3', { wrap: true, name: '안내 글' });
-  const send = inst('Icon button', { Size: 'Medium', Icon: 'send' }); send.name = '보내기'; recolor(send, 'primary'); disable(send); input.appendChild(send);
+  const send = inst('Icon button', { Size: 'Medium', Icon: 'send' }); send.name = '보내기'; send.fills = fills('surface-3'); recolor(send, 'text-3'); input.appendChild(send); // 쓴 글이 없으면 회색 동그라미
   return foot;
 }
 
@@ -1589,8 +1648,8 @@ const jwtScreen = (frame, o = {}) => chatScreen(frame, { tree: JWT_TREE, panel: 
 
 // 새 채팅 안내 (AI 의 말이 아니라 대화에 남지 않는다)
 async function guide(col, title, paras) {
-  const g = al('V', { name: '안내', gap: 8, w: 576 }); col.appendChild(g);
-  await tput(g, title, 'Title/17', 'text', { wrap: true, name: '제목 (h2)' });
+  const g = al('V', { name: '안내', gap: 8, w: 576, pad: [22, 24], fill: 'primary-soft', radius: 'radius/lg' }); col.appendChild(g);
+  await tput(g, title, 'Title/18', 'text', { wrap: true, name: '제목 (h2)' });
   const ps = al('V', { name: '글', gap: 6 }); put(g, ps, { fill: true });
   for (const p of paras) await tput(ps, p, 'Body/15', 'text-2', { wrap: true });
 }
@@ -1627,7 +1686,7 @@ SCREENS.push({ group: G, title: '오늘의 질문', build: async (frame) => {
   } });
 } });
 
-// 3. 대화방: AI 가 답을 쓰는 중, 오른쪽은 방금 바뀐 카드(바뀐 칸 연한 형광펜, 더한 글 형광펜)와 「담는 중」
+// 3. 대화방: AI 가 답을 쓰는 중, 오른쪽은 방금 바뀐 카드(바뀐 칸 연한 주황, 더한 글 주황 강조)와 「담는 중」
 SCREENS.push({ group: G, title: '대화방', build: async (frame) => { await jwtScreen(frame, { typing: true }); } });
 
 // 4. 새 채팅
@@ -1636,7 +1695,7 @@ SCREENS.push({ group: G, title: '새 채팅 / 프로젝트 고르기', build: as
     await roomHead(room, { title: '새 채팅' });
     const body = al('V', { name: '대화', cross: 'center' }); put(room, body, { fill: true, fillV: true });
     const pick = al('V', { name: '프로젝트 고르기', gap: 16, pad: [40, 28], w: 520 }); body.appendChild(pick);
-    await tput(pick, '어떤 프로젝트 이야기인가요?', 'Title/17', 'text', { name: '제목 (h2)' });
+    await tput(pick, '어떤 프로젝트 이야기인가요?', 'Title/18', 'text', { name: '제목 (h2)' });
     const list = al('V', { name: '프로젝트', stroke: 'border', sides: ['top'] }); put(pick, list, { fill: true });
     for (const p of TREE) { const r = inst('Chat/Project choice', { Name: p.name, 'Show GitHub': !!p.gh }); r.name = p.name; put(list, r, { fill: true }); }
     pick.appendChild(btn('새 프로젝트', 'Secondary', 'Medium', 'plus'));
@@ -1647,7 +1706,7 @@ SCREENS.push({ group: G, title: '새 채팅 / 프로젝트 없음', build: async
     await roomHead(room, { title: '새 채팅' });
     const body = al('V', { name: '대화', cross: 'center' }); put(room, body, { fill: true, fillV: true });
     const pick = al('V', { name: '프로젝트 고르기', gap: 16, pad: [40, 28], w: 520 }); body.appendChild(pick);
-    await tput(pick, '먼저 프로젝트를 만들어 주세요', 'Title/17', 'text', { name: '제목 (h2)' });
+    await tput(pick, '먼저 프로젝트를 만들어 주세요', 'Title/18', 'text', { name: '제목 (h2)' });
     await tput(pick, '팀 과제, 동아리, 아르바이트도 프로젝트예요.', 'Body/15', 'text-2');
     pick.appendChild(btn('새 프로젝트', 'Primary', 'Medium', 'plus'));
   } });
@@ -1792,12 +1851,12 @@ function projectList(col, done) {
     const p = rows.find((r) => r[0] === done); p[1] = false; p[2] = `${p[2].replace('부터', '')} ~ 2026.11`; // 끝난 달이 비어 있으면 이번 달
     rows = rows.filter((r) => r[1]).concat([p], rows.filter((r) => !r[1] && r !== p));
   }
-  const list = al('V', { name: '프로젝트 목록', stroke: 'border', sides: ['top'] }); put(col, list, { fill: true });
+  const list = listBox(col, '프로젝트 목록');
   for (const [name, ongoing, period, role, repo, n] of rows) {
     const r = inst('Wiki/Project row', Object.assign({ State: ongoing ? 'Ongoing' : 'Done', Name: name, Period: period, Role: role, 'Show repo': !!repo, Cards: `카드 ${n}장` }, repo ? { Repo: repo } : {}));
     r.name = name; put(list, r, { fill: true });
   }
-  return list;
+  return lastRow(list);
 }
 async function projectsScreen(frame, o = {}) {
   const { screen, col } = await wikiPage(frame, { view: 0 });
@@ -1811,6 +1870,7 @@ function cardFilter(col, o = {}) {
   const q = inst('Input', { Content: o.q ? 'Value' : 'Placeholder', Text: o.q || '카드 검색', 'Show icon': true, Icon: 'search' }); q.name = '카드 검색'; put(row, q, { fill: true });
   const p = inst('Select', { Text: o.project || '모든 프로젝트' }); p.name = '프로젝트'; row.appendChild(p); p.resize(200, p.height);
   const k = inst('Select', { Text: o.kw || '모든 역량' }); k.name = '역량'; row.appendChild(k); k.resize(170, k.height);
+  for (const n of [q, p, k]) radius(n, 'radius/pill'); // .vt-filter: 알약 모양
   gap(col, 20);
   return row;
 }
@@ -1828,7 +1888,7 @@ function cardGrid(col, cards, make) {
   }
   return grid;
 }
-// 카드 한 장. match: 거른 역량 (그 역량에 형광펜)
+// 카드 한 장. match: 거른 역량 (그 역량은 주황)
 const wikiCard = ([title, project, period, github, kws, line], match) => indexCard({ project, period, github, title, line, keywords: kws.split(','), match });
 
 /* ---------- 새 프로젝트 모달 (G2) 과 레포 고르기 (G1) ---------- */
@@ -2064,7 +2124,7 @@ async function pjHead(main, p) {
 
 // GitHub 패널 (.panel.pj-gh). primary: 레포는 있고 카드가 없을 때 「GitHub로 경험 카드 만들기」가 주 버튼
 async function pjGithub(col, p, primary) {
-  const panel = al('V', { name: 'GitHub', fill: 'surface-2', radius: 'radius/md', pad: 20 }); put(col, panel, { fill: true });
+  const panel = al('V', { name: 'GitHub', fill: 'surface-2', radius: 'radius/lg', pad: 20 }); put(col, panel, { fill: true });
   const rows = [];
   if (!p.repos.length) {
     const off = al('H', { name: '연결 전', gap: 12, cross: 'center' }); put(panel, off, { fill: true });
@@ -2107,14 +2167,14 @@ async function pjCards(col, p, primary) {
   const sec = al('V', { name: '경험 카드' }); put(col, sec, { fill: true });
   const h = al('H', { name: '섹션 머리', gap: 16, main: 'between', cross: 'center', pad: [0, 0, 12, 0] }); put(sec, h, { fill: true });
   const t = al('H', { name: '제목', gap: 8, cross: 'center' }); h.appendChild(t);
-  t.appendChild(await text('경험 카드', 'Title/17', 'text'));
+  t.appendChild(await text('경험 카드', 'Title/18', 'text'));
   if (p.cards.length) {
     t.appendChild(await text(String(p.cards.length), 'Small/13.5', 'text-3', { name: '개수' }));
     const b = al('H', { name: '만들기', gap: 8, cross: 'center' }); h.appendChild(b); pjMakeBtns(primary).forEach((x) => b.appendChild(x));
     pjGrid(sec, p.cards, p.title);
   } else {
     const desc = `${p.repos.length ? '연결한 GitHub에서 여러 장을 한 번에 만들거나, AI와 이야기하며 한 장씩 만들 수 있어요.' : 'AI와 이야기하면 첫 카드가 만들어져요. GitHub를 연결하면 여러 장을 한 번에 만들 수도 있어요.'} AI 없이 직접 써도 돼요.`;
-    const e = await empty(sec, '아직 경험 카드가 없어요', desc, pjMakeBtns(primary)); e.paddingTop = 28;
+    const e = await empty(sec, '아직 경험 카드가 없어요', desc, pjMakeBtns(primary)); e.paddingTop = e.paddingBottom = 40; e.fills = fills('primary-soft'); radius(e, 'radius/lg'); // .pj-empty: 연한 주황 면
   }
   return sec;
 }
@@ -2390,13 +2450,13 @@ const CD_KEYWORDS = ['문제 해결력', '분석적 사고', '창의력', '기�
 const CD_W = 760; // 좁은 페이지의 내용 폭
 
 /* ---------- 컴포넌트 ---------- */
-// 꺼진 저장 버튼 (.wr-foot .btn[disabled]: 회색 바탕, 테두리, text-3)
+// 꺼진 저장 버튼 (.wr-foot .btn[disabled]: 회색 알약, 테두리, text-3)
 async function cdSaveOff() {
-  const b = al('H', { name: '저장 (꺼짐)', pad: [3, 10], h: 32, main: 'center', cross: 'center', fill: 'surface-2', stroke: 'border', radius: 'radius/sm' });
+  const b = al('H', { name: '저장 (꺼짐)', pad: [3, 13], h: 32, main: 'center', cross: 'center', fill: 'surface-2', stroke: 'border', radius: 'radius/pill' });
   b.appendChild(await text('저장', 'Small/13.5 Semibold', 'text-3')); return b;
 }
 // 「AI 채팅에서 채우기」 같은 글 링크 (.link)
-const cdLink = (label, name) => text(label, 'Small/13.5 Medium', 'primary', { underline: true, name: name || label });
+const cdLink = (label, name) => text(label, 'Small/13.5 Medium', 'primary-ink', { underline: true, name: name || label });
 
 EXTRA_COMPONENTS.push({
   title: '경험 카드',
@@ -2414,12 +2474,13 @@ EXTRA_COMPONENTS.push({
     // STAR 한 줄: 칸 이름(72) + 테두리 없는 입력칸. 고칠 때만 테두리와 저장 줄
     await makeSet(row, 'Card/STAR row', ['Idle', 'Empty', 'Editing', 'Saved'].map((k) => ({ props: { State: k }, build: async (c) => {
       auto(c, 'H', { gap: 6, pad: [12, 0, 18, 0], w: CD_W, stroke: 'border', sides: ['bottom'] });
-      const dt = al('H', { name: '칸 이름', w: 72, pad: [8, 0, 0, 0] }); c.appendChild(dt);
-      dt.appendChild(named(await text('상황', 'Small/13.5 Semibold', 'text-3'), 'star-label'));
+      const dt = al('H', { name: '칸 이름', w: 72, pad: [7, 0, 0, 0] }); c.appendChild(dt);
+      const pill = al('H', { name: '알약', pad: [2, 12], fill: 'primary-soft', radius: 'radius/pill' }); dt.appendChild(pill);
+      pill.appendChild(named(await text('상황', 'Small/13.5 Semibold', 'primary-deep'), 'star-label'));
       const dd = al('V', { name: '칸', gap: 4 }); put(c, dd, { fill: true });
       const box = al('V', { name: '입력칸', pad: [5, 10], radius: 'radius/sm',
         fill: k === 'Editing' || k === 'Saved' ? 'surface' : null,
-        stroke: k === 'Editing' ? 'primary' : k === 'Saved' ? 'border-strong' : null, strokeW: k === 'Editing' ? 2 : 1 });
+        stroke: k === 'Editing' ? 'primary-strong' : k === 'Saved' ? 'border-strong' : null, strokeW: k === 'Editing' ? 2 : 1 });
       put(dd, box, { fill: true });
       await tput(box, k === 'Empty' ? CD_STAR_PH.situation : '칸에 쓴 글', 'Body/15', k === 'Empty' ? 'text-3' : 'text', { wrap: true, name: 'star-text' });
       if (k === 'Empty') { const f = al('H', { name: '저장 줄', cross: 'center', minH: 32 }); put(dd, f, { fill: true }); f.appendChild(await cdLink('AI 채팅에서 채우기')); }
@@ -2454,12 +2515,12 @@ async function cdHead(main, d) {
 
 // 이력서 한 줄 (회색 판 .panel): 머리(이름, N자), 한 줄 입력칸, 저장 줄
 async function cdLinePanel(col, d) {
-  const p = al('V', { name: '이력서 한 줄', pad: 20, fill: 'surface-2', radius: 'radius/md' }); put(col, p, { fill: true });
+  const p = al('V', { name: '이력서 한 줄', pad: [22, 24], fill: 'primary-soft', radius: 'radius/lg' }); put(col, p, { fill: true });
   const top = al('H', { name: '머리', gap: 10, cross: 'center' }); put(p, top, { fill: true });
-  top.appendChild(await text('이력서 한 줄', 'Title/17', 'text')); spacer(top);
+  top.appendChild(await text('이력서 한 줄', 'Title/18', 'text')); spacer(top);
   top.appendChild(await text(`${d.line.length}자`, 'Small/13.5', 'text-3', { name: '글자 수' }));
   gap(p, 8);
-  const box = al('V', { name: '입력칸', pad: [10, 12], fill: 'surface', stroke: 'field-border', radius: 'radius/sm' }); put(p, box, { fill: true });
+  const box = al('V', { name: '입력칸', pad: [12, 14], fill: 'surface', stroke: 'border-strong', radius: 'radius/sm' }); put(p, box, { fill: true });
   await tput(box, d.line || '이 경험을 이력서에 적을 한 문장', 'Body/15 Semibold', d.line ? 'text' : 'text-3', { wrap: true });
   gap(p, 8);
   put(p, inst('Card/Write footer', { State: 'Idle', 'Show hint': true, Hint: CD_LINE_HINT }), { fill: true });
@@ -2468,13 +2529,13 @@ async function cdLinePanel(col, d) {
 
 // STAR: 칸마다 Card/STAR row. states: { result: 'Editing', task: 'Saved' } (없으면 글이 있으면 Idle, 없으면 Empty)
 async function cdStar(col, d, states = {}) {
-  const s = al('V', { name: 'STAR', stroke: 'border', sides: ['top'] }); put(col, s, { fill: true });
+  const s = al('V', { name: 'STAR' }); put(col, s, { fill: true });
   for (const [key, label] of CD_STAR) {
     const v = (states[key] && states[key].text) || d.star[key];
     const state = (states[key] && states[key].state) || (v ? 'Idle' : 'Empty');
     const r = inst('Card/STAR row', { State: state, Label: label, Text: v || CD_STAR_PH[key] }); r.name = label; put(s, r, { fill: true });
   }
-  return s;
+  return lastRow(s);
 }
 
 // 회고: 직접 쓰는 칸
@@ -2493,7 +2554,7 @@ async function cdEvidence(col, ev, open) {
   const s = al('V', { name: open ? '근거 (펼침)' : '근거 (닫힘)' }); put(col, s, { fill: true });
   const sum = al('H', { name: '근거 머리', gap: 8, cross: 'center', minH: 44 }); put(s, sum, { fill: true });
   sum.appendChild(icon(open ? 'chevron-down' : 'chevron-right', 18, 'text-3'));
-  sum.appendChild(await text('근거', 'Title/17', 'text'));
+  sum.appendChild(await text('근거', 'Title/18', 'text'));
   const opts = { repo: ev.repo, sample: ev.sample, commits: ev.commits, prs: ev.prs, code: ev.files.map((f) => ({ path: cdRange(f), lines: f.code.map((src, i) => [f.start + i, src]), hl: f.hl })) };
   const counts = al('H', { name: '개수', gap: 14, cross: 'center', pad: [0, 0, 0, 4] }); sum.appendChild(counts);
   for (const c of evidenceCounts(opts)) counts.appendChild(await text(c, 'Small/13.5', 'text-3'));
@@ -2602,7 +2663,7 @@ SCREENS.push({
 
 /* ===== screens/70-timeline.js ===== */
 /* 경험 타임라인 (#/timeline, prototype/js/screens/timeline.js + css/screens/timeline.css)
-   왼쪽에서 오른쪽으로 시간. 프로젝트는 가지(잉크 선), 카드는 그 달에서 갈라져 나온 잔가지.
+   왼쪽에서 오른쪽으로 시간. 프로젝트는 가지(주황 선), 카드는 그 달에서 갈라져 나온 잔가지.
    화면: 경험 타임라인 · 경험 타임라인 / 역량으로 거르기 · 경험 타임라인 / 처음
    그림은 앱의 SVG 좌표(G, 달 폭 MW)를 그대로 따른다. 선과 점은 토큰 색, 이름은 텍스트 스타일 */
 {
@@ -2646,15 +2707,15 @@ SCREENS.push({
     await makeSet(row, 'Timeline/Twig', ['Default', 'Hit', 'Dim'].map((k) => ({ props: { State: k }, build: async (c) => {
       auto(c, 'H', { h: 24, cross: 'center', opacity: k === 'Dim' ? 0.28 : 1 });
       const hold = figma.createFrame(); hold.name = 'elbow'; hold.fills = []; hold.clipsContent = false; hold.resize(10, 24); c.appendChild(hold);
-      const el = figma.createFrame(); el.name = 'twig'; el.fills = []; el.resize(10, 12.75); stroke(el, k === 'Hit' ? 'primary' : 'field-border', 1.5, ['left', 'bottom']); el.bottomLeftRadius = 9; hold.appendChild(el); el.x = 0; el.y = 0;
-      const pill = al('H', { name: 'card', gap: 6, pad: [0, 6, 0, 4], h: 24, cross: 'center', fill: k === 'Hit' ? 'hl' : null, radius: 'radius/tag' }); c.appendChild(pill);
-      const dot = figma.createEllipse(); dot.name = 'dot'; dot.resize(10, 10); dot.fills = [paint('surface')]; stroke(dot, 'primary', 2); pill.appendChild(dot);
+      const el = figma.createFrame(); el.name = 'twig'; el.fills = []; el.resize(10, 12.75); stroke(el, k === 'Hit' ? 'primary-strong' : 'primary-light', k === 'Hit' ? 2.2 : 1.8, ['left', 'bottom']); el.bottomLeftRadius = 9; hold.appendChild(el); el.x = 0; el.y = 0;
+      const pill = al('H', { name: 'card', gap: 6, pad: [0, 6, 0, 4], h: 24, cross: 'center', fill: k === 'Hit' ? 'primary-tint' : null, radius: 'radius/pill' }); c.appendChild(pill);
+      const dot = figma.createEllipse(); dot.name = 'dot'; dot.resize(10, 10); dot.fills = [paint(k === 'Hit' ? 'primary-strong' : 'surface')]; stroke(dot, k === 'Hit' ? 'primary-ink' : 'primary-strong', 2); pill.appendChild(dot);
       pill.appendChild(named(await text('카드 이름', k === 'Hit' ? 'Small/13.5 Semibold' : 'Small/13.5 Medium', k === 'Hit' ? 'text' : 'text-2'), 'tw-name'));
-    } })), { dir: 'H', desc: '타임라인의 카드 한 장. Hit: 고른 역량이 담긴 카드(형광펜), Dim: 고른 역량이 없는 카드', props: [{ name: 'Name', type: 'TEXT', default: '카드 이름', node: 'tw-name' }] });
+    } })), { dir: 'H', desc: '타임라인의 카드 한 장. Hit: 고른 역량이 담긴 카드(연한 주황 알약), Dim: 고른 역량이 없는 카드', props: [{ name: 'Name', type: 'TEXT', default: '카드 이름', node: 'tw-name' }] });
     // 프로젝트 이름과 접기 단추. 인스턴스를 (시작 x - 8, 가지 y - 28)에 놓는다
     await makeSet(row, 'Timeline/Project', ['Open', 'Folded'].map((k) => ({ props: { Fold: k }, build: async (c) => {
       auto(c, 'H', { gap: 3, cross: 'center' });
-      const b = al('H', { name: 'fold', w: 20, h: 22, main: 'center', cross: 'center', radius: 'radius/tag' }); c.appendChild(b);
+      const b = al('H', { name: 'fold', w: 20, h: 22, main: 'center', cross: 'center', radius: 8 }); c.appendChild(b);
       b.appendChild(icon(k === 'Open' ? 'chevron-down' : 'chevron-right', 14, 'text-3'));
       c.appendChild(named(await text('프로젝트', 'Small/13.5 Semibold', 'text'), 'tp-name'));
     } })), { dir: 'H', desc: '타임라인의 프로젝트 이름(누르면 프로젝트로)과 왼쪽 접기 단추. Folded: 카드를 접어 둔 모습', props: [{ name: 'Name', type: 'TEXT', default: '프로젝트', node: 'tp-name' }] });
@@ -2687,8 +2748,8 @@ SCREENS.push({
       await place(axis, `${Math.floor(m / 12)}년`, 'Caption/12 Semibold', 'text-3', gx + 6, G.top - 28 - 12);
     }
     const nx = x(NOW);
-    const now = figma.createFrame(); now.name = '지금 선'; now.fills = []; now.resize(1, H - (G.top - 22)); stroke(now, 'border-strong', 1, ['left']); now.dashPattern = [3, 4]; axis.appendChild(now); now.x = nx; now.y = G.top - 22;
-    await place(axis, '지금', 'Caption/12 Semibold', 'text-2', nx - 20, G.top - 28 - 12, { w: 40, align: 'center' });
+    const now = figma.createFrame(); now.name = '지금 선'; now.fills = []; now.resize(1, H - (G.top - 22)); stroke(now, 'primary-light', 1.5, ['left']); now.dashPattern = [3, 4]; axis.appendChild(now); now.x = nx; now.y = G.top - 22;
+    await place(axis, '지금', 'Caption/12 Semibold', 'primary-ink', nx - 20, G.top - 28 - 12, { w: 40, align: 'center' });
 
     const cards = {}; let y = G.top;
     for (const p of PROJECTS) {
@@ -2696,28 +2757,28 @@ SCREENS.push({
       const open = OPEN.has(p.name);
       const g = figma.createFrame(); g.name = p.name; g.fills = []; g.clipsContent = false; g.resize(width, 1); cv.appendChild(g); g.x = 0; g.y = 0;
       // 가지
-      rect(g, '가지', xs, ly - 1.25, Math.max(2.5, xe - xs), 2.5, 'primary', { radius: 1.25 });
+      rect(g, '가지', xs, ly - 1.75, Math.max(3.5, xe - xs), 3.5, 'primary-strong', { radius: 1.75 });
       if (p.ongoing) {
-        const tail = al('H', { name: '진행 중', gap: 5, cross: 'center', opacity: 0.6 }); g.appendChild(tail); tail.x = xe + 4; tail.y = ly - 1.25;
-        for (let i = 0; i < Math.floor(MW / 7); i++) { const d = figma.createRectangle(); d.name = 'dash'; d.resize(2, 2.5); d.cornerRadius = 1.25; d.fills = [paint('primary')]; tail.appendChild(d); }
-      } else dotAt(g, '끝', xe, ly, 3.5, 'primary');
+        const tail = al('H', { name: '진행 중', gap: 5, cross: 'center', opacity: 0.6 }); g.appendChild(tail); tail.x = xe + 4; tail.y = ly - 1.75;
+        for (let i = 0; i < Math.floor(MW / 7); i++) { const d = figma.createRectangle(); d.name = 'dash'; d.resize(2, 3.5); d.cornerRadius = 1.75; d.fills = [paint('primary-strong')]; tail.appendChild(d); }
+      } else dotAt(g, '끝', xe, ly, 4, 'primary-strong');
       const hits = kw ? p.cards.filter((c) => c[2].includes(kw)) : [];
       if (!open) {
-        for (const c of p.cards) { const hit = kw && c[2].includes(kw); dotAt(g, `갈래: ${c[1]}`, x(ym(c[0])), ly, hit ? 4.5 : 3, hit ? 'hl' : 'primary', hit ? { stroke: 'primary', sw: 1.5 } : {}); }
+        for (const c of p.cards) { const hit = kw && c[2].includes(kw); dotAt(g, `갈래: ${c[1]}`, x(ym(c[0])), ly, hit ? 4.5 : 3, hit ? 'primary-tint' : 'primary-strong', hit ? { stroke: 'primary-ink', sw: 2 } : {}); }
         await place(g, `카드 ${p.cards.length}장${hits.length ? `, 그중 「${kw}」 ${hits.length}장` : ''}`, 'Caption/12', 'text-3', xe + (p.ongoing ? MW : 0) + 12, ly - 8);
         y = ly + G.gap;
       } else {
         p.cards.forEach((c, k) => {
           const cy = ly + G.row * (k + 1); const cx = x(ym(c[0])); const hit = !kw || c[2].includes(kw);
           const state = kw ? (hit ? 'Hit' : 'Dim') : 'Default';
-          rect(g, '줄기', cx - 0.75, ly, 1.5, cy - 12 - ly, state === 'Hit' ? 'primary' : 'field-border', { opacity: state === 'Dim' ? 0.28 : 1 });
+          rect(g, '줄기', cx - 0.75, ly, 1.5, cy - 12 - ly, state === 'Hit' ? 'primary-strong' : 'primary-light', { opacity: state === 'Dim' ? 0.28 : 1 });
           const tw = inst('Timeline/Twig', { State: state, Name: short(c[1]) }); tw.name = c[1]; g.appendChild(tw); tw.x = cx - 0.75; tw.y = cy - 12;
           cards[c[1]] = { node: tw, card: c, project: p.name };
         });
-        for (const c of p.cards) dotAt(g, '갈래', x(ym(c[0])), ly, 2.5, 'primary');
+        for (const c of p.cards) dotAt(g, '갈래', x(ym(c[0])), ly, 2.5, 'primary-strong');
         y = ly + G.row * p.cards.length + G.gap;
       }
-      dotAt(g, '시작', xs, ly, 5, 'primary', { stroke: 'surface', sw: 2 });
+      dotAt(g, '시작', xs, ly, 5, 'primary-strong', { stroke: 'surface', sw: 2 });
       const head = inst('Timeline/Project', { Fold: open ? 'Open' : 'Folded', Name: p.name }); head.name = `${p.name} 이름`; g.appendChild(head); head.x = xs - 8; head.y = ly - 28;
     }
     return { canvas: cv, cards };
@@ -2744,12 +2805,12 @@ SCREENS.push({
 
   SCREENS.push({ group: '경험 타임라인', title: '역량으로 거르기', build: async (frame) => {
     const { cards } = await timeline(frame, '리더십');
-    // 카드에 올렸을 때: 제목, 프로젝트, 달, 역량 (고른 역량은 형광펜)
+    // 카드에 올렸을 때: 제목, 프로젝트, 달, 역량 (고른 역량은 주황)
     const c = cards['일정이 밀렸을 때 기능 범위 조율'];
-    const tip = al('V', { name: '카드 툴팁', gap: 2, pad: [10, 12], fill: 'surface', stroke: 'border-strong', radius: 'radius/sm', maxW: 280 }); shadow(tip, 'Menu'); frame.appendChild(tip);
+    const tip = al('V', { name: '카드 툴팁', gap: 2, pad: [12, 14], fill: 'surface', stroke: 'border', radius: 'radius/md', maxW: 280 }); shadow(tip, 'Menu'); frame.appendChild(tip);
     await tput(tip, c.card[1], 'Small/13.5 Semibold', 'text'); await tput(tip, c.project, 'Small/13.5', 'text-2');
     const [yy, mm] = c.card[0].split('-').map(Number); await tput(tip, `${yy}년 ${mm}월`, 'Small/13.5', 'text-2');
-    const kws = al('H', { name: '역량', gap: 12, pad: [4, 0, 0, 0], wrap: true, cross: 'center' }); kws.counterAxisSpacing = 2; tip.appendChild(kws);
+    const kws = al('H', { name: '역량', gap: 6, pad: [6, 0, 0, 0], wrap: true, cross: 'center' }); kws.counterAxisSpacing = 6; tip.appendChild(kws);
     for (const k of c.card[2]) kws.appendChild(inst('Keyword', { State: k === '리더십' ? 'Selected' : 'Default', Label: k }));
     const dot = c.node.findOne((n) => n.name === 'dot');
     const b = boxIn(dot, frame) || { x: SIDEBAR_W + c.node.x + 6, y: 56 + 56 + c.node.y + 7, h: 10 }; // 계산할 수 없을 때: 왼쪽 메뉴 + 잔가지 자리, 상단바 · 도구 줄 아래
@@ -2799,8 +2860,9 @@ SCREENS.push({
   };
   const rows = async (col, title, list) => {
     await sectionTitle(col, title);
-    const box = al('V', { name: `${title} 줄`, stroke: 'border', sides: ['top'] }); put(col, box, { fill: true });
+    const box = listBox(col, `${title} 줄`, [4, 20]);
     for (const r of list) put(box, r, { fill: true });
+    lastRow(box);
     gap(col, 40);
   };
 
@@ -2857,14 +2919,14 @@ SCREENS.push({
   /* ---------- 이 화면의 컴포넌트: 휴지통 한 줄 ---------- */
   EXTRA_COMPONENTS.push({ title: '휴지통', build: async (row) => {
     await makeOne(row, 'Trash/Row', async (c) => {
-      auto(c, 'H', { gap: 12, pad: [11, 8], w: 760, cross: 'center', stroke: 'border', sides: ['bottom'] }); c.minHeight = 56;
-      c.appendChild(named(icon('card', 20, 'text-3'), 'type-icon'));
+      auto(c, 'H', { gap: 12, pad: [14, 0], w: 760, cross: 'center', stroke: 'border', sides: ['bottom'] }); c.minHeight = 56;
+      const dot = al('H', { name: '아이콘 자리', w: 38, h: 38, main: 'center', cross: 'center', fill: 'surface-2', radius: 'radius/pill' }); c.appendChild(dot); dot.appendChild(named(icon('card', 20, 'text-3'), 'type-icon'));
       const m = al('V', { name: 'main', gap: 4 }); c.appendChild(m); m.layoutSizingHorizontal = 'FILL';
       await tput(m, '항목 이름', 'Body/15 Semibold', 'text', { wrap: true, name: 'tr-title' });
       const sub = al('H', { name: 'sub', gap: 12, cross: 'center', wrap: true }); sub.counterAxisSpacing = 4; put(m, sub, { fill: true });
       sub.appendChild(named(await text('경험 카드', 'Small/13.5', 'text-3'), 'tr-type'));
       const chip = al('H', { name: 'tr-chip', gap: 5, cross: 'center' }); sub.appendChild(chip);
-      chip.appendChild(icon('folder', 14, 'primary')); chip.appendChild(named(await text('프로젝트', 'Small/13.5 Semibold', 'primary'), 'tr-project'));
+      chip.appendChild(icon('folder', 14, 'primary-ink')); chip.appendChild(named(await text('프로젝트', 'Small/13.5 Semibold', 'primary-ink'), 'tr-project'));
       sub.appendChild(named(await text('경험 카드 1개 포함', 'Small/13.5', 'text-3'), 'tr-inside'));
       sub.appendChild(named(await text('29일 뒤 삭제', 'Small/13.5', 'text-3'), 'tr-days'));
       const acts = al('H', { name: 'actions', gap: 4, cross: 'center' }); c.appendChild(acts);
@@ -2887,7 +2949,7 @@ SCREENS.push({
     const col = await page(main, items.length
       ? { narrow: true, title: '휴지통', sub: '30일이 지나면 완전히 삭제돼요.', actions: [btn('휴지통 비우기', 'Danger', 'Medium')] }
       : { narrow: true, title: '휴지통' });
-    if (items.length) { const list = al('V', { name: '휴지통 항목', stroke: 'border', sides: ['top'] }); put(col, list, { fill: true }); for (const t of items) put(list, rowOf(t), { fill: true }); }
+    if (items.length) { const list = listBox(col, '휴지통 항목', [4, 20]); for (const t of items) put(list, rowOf(t), { fill: true }); lastRow(list); }
     else await empty(col, '휴지통이 비어 있어요', '버린 항목은 30일 동안 여기에 있어요.');
     fit(frame, screen);
   }
@@ -2926,7 +2988,7 @@ async function main() {
   const lib = await buildLibrary(page); lib.x = found.width + 400; lib.y = 0; // 기초 오른쪽에 컴포넌트
   await buildShellComponents(lib);
   for (const x of EXTRA_COMPONENTS) { // 화면 파일이 더한 컴포넌트
-    const sec = al('V', { name: x.title, gap: 16 }); lib.appendChild(sec); await tput(sec, x.title, 'Title/17', 'text');
+    const sec = al('V', { name: x.title, gap: 16 }); lib.appendChild(sec); await tput(sec, x.title, 'Title/18', 'text');
     const row = al('H', { name: 'items', gap: 32, wrap: true, w: 1800, cross: 'start' }); row.counterAxisSpacing = 32; sec.appendChild(row); await x.build(row);
   }
 
@@ -2936,7 +2998,7 @@ async function main() {
   let y = Math.ceil(Math.max(found.height, lib.height)) + 800; // 화면은 그 아래 (그룹마다 한 줄)
   const top = await text('화면', 'Display/34', 'text'); page.appendChild(top); top.x = 0; top.y = y; y += 120;
   for (const g of groups) {
-    const label = await text(g, 'Heading/24', 'text'); page.appendChild(label); label.x = 0; label.y = y; y += 80;
+    const label = await text(g, 'Heading/26', 'text'); page.appendChild(label); label.x = 0; label.y = y; y += 80;
     let x = 0; let rowH = 0;
     for (const s of SCREENS.filter((x) => x.group === g)) {
       const f = figma.createFrame(); f.name = `${g} / ${s.title}`; f.resize(s.w || W, s.h || H); f.fills = fills('bg'); f.clipsContent = true;

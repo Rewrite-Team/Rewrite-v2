@@ -1,6 +1,8 @@
 /* ===== 설정 (.set-*) ===== */
-.set-rows { border-top: 1px solid var(--border); }
+/* 묶음마다 둥근 카드 하나, 안의 줄은 옅은 선으로만 나눈다 */
+.set-rows { padding: 4px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
 .set-row { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 4px 16px; align-items: center; min-height: 64px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.set-row:last-child { border-bottom: 0; }
 .set-label { font-weight: 600; }
 .set-ctrl { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .set-field { width: 100%; max-width: 360px; }
@@ -10,6 +12,7 @@
 .set-leave { margin-bottom: 16px; }
 
 @media (max-width: 600px) {
+  .set-rows { padding: 2px 16px; }
   .set-row { grid-template-columns: minmax(0, 1fr); padding: 14px 0; }
   .set-field { max-width: none; }
   .set-ctrl:has(> :nth-child(3)) { flex-wrap: wrap; }

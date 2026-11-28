@@ -1,7 +1,7 @@
 /* 로그인 · 회원가입(#/login, #/signup)과 시작하기(#/onboarding).
    앱: prototype/js/screens/auth.js, css/screens/auth.css, styles.css(.auth*), js/screens/onboarding.js, css/screens/onboarding.css,
        js/repo-flow.js(레포 고르기, css/screens/repo-flow.css), 예시 계정 js/seed-repos.js(SEED.github)
-   컴포넌트: Auth/Resume paper(움직임이 끝난 이력서 한 장), Auth/Brand panel(로그인 왼쪽 잉크 판),
+   컴포넌트: Auth/Resume paper(움직임이 끝난 이력서 한 장), Auth/Brand panel(로그인 왼쪽 연한 주황 판),
             Onboarding/Header(로고 + 로그아웃), Onboarding/Progress(Step 1 = 50%, Step 2 = 100%) */
 
 { // 이 파일의 이름이 다른 화면 파일과 겹치지 않도록 한 스코프에 둔다
@@ -17,23 +17,23 @@ const AUTH_PAPER_W = 720; // .au-paper 최대 폭 (안쪽 640)
 // 이력서 종이의 회색 줄(.au-bars i): 폭 목록 → 세로로 쌓은 막대
 function authBars(name, widths, cross = 'start') {
   const s = al('V', { name, gap: 8, cross });
-  for (const w of widths) { const b = figma.createRectangle(); b.name = 'bar'; b.resize(w, 8); b.fills = fills('surface-3'); radius(b, 2); s.appendChild(b); }
+  for (const w of widths) { const b = figma.createRectangle(); b.name = 'bar'; b.resize(w, 8); b.fills = fills('surface-3'); radius(b, 4); s.appendChild(b); }
   return s;
 }
 
 EXTRA_COMPONENTS.push({
   title: '로그인 · 시작하기',
   build: async (row) => {
-    /* 이력서 한 장: 말한 문장이 이력서 문장으로 바뀌고 수치에 형광펜(AI가 더한 것)이 그어진 끝 모습 */
+    /* 이력서 한 장: 말한 문장이 이력서 문장으로 바뀌고 수치가 연한 주황으로 강조된 끝 모습 */
     await makeOne(row, 'Auth/Resume paper', async (c) => {
-      auto(c, 'V', { pad: [36, 40, 60, 40], w: AUTH_PAPER_W, fill: 'surface', radius: [3, 3, 0, 0] });
-      await c.setEffectStyleIdAsync(EFFECTS.Modal.id); // shadow() 는 동기 대입(effectStyleId)이라 dynamic-page 에서 막힌다
-      const head = al('H', { name: '이름', gap: 24, pad: [0, 0, 16, 0], main: 'between', cross: 'end', stroke: 'text', strokeW: 2, sides: ['bottom'] }); put(c, head, { fill: true });
+      auto(c, 'V', { pad: [36, 40, 60, 40], w: AUTH_PAPER_W, fill: 'surface', stroke: 'primary-tint', sides: ['top', 'left', 'right'], radius: [24, 24, 0, 0] });
+      await c.setEffectStyleIdAsync(EFFECTS.Menu.id); // shadow() 는 동기 대입(effectStyleId)이라 dynamic-page 에서 막힌다
+      const head = al('H', { name: '이름', gap: 24, pad: [0, 0, 18, 0], main: 'between', cross: 'end', stroke: 'border', sides: ['bottom'] }); put(c, head, { fill: true });
       const who = al('V', { name: '사람' }); head.appendChild(who);
-      await tput(who, '김준호', 'Heading/24', 'text'); await tput(who, '백엔드 개발자', 'Small/13.5', 'text-2');
+      await tput(who, '김준호', 'Heading/26', 'text'); await tput(who, '백엔드 개발자', 'Small/13.5', 'text-2');
       const contact = authBars('연락처', [120, 86], 'end'); contact.paddingBottom = 4; head.appendChild(contact);
 
-      const section = async (title) => { const s = al('V', { name: title, gap: 12, pad: [24, 0, 0, 0] }); put(c, s, { fill: true }); await tput(s, title, 'Small/13.5 Semibold', 'primary-ink'); return s; };
+      const section = async (title) => { const s = al('V', { name: title, gap: 12, pad: [24, 0, 0, 0] }); put(c, s, { fill: true }); const pill = al('H', { name: '섹션 이름', pad: [2, 12], fill: 'primary-soft', radius: 'radius/pill' }); s.appendChild(pill); pill.appendChild(await text(title, 'Caption/12 Semibold', 'primary-ink')); return s; };
       const projects = await section('프로젝트');
       const slots = al('V', { name: '항목', gap: 16 }); put(projects, slots, { fill: true });
       for (const sc of AUTH_SCENES) {
@@ -41,39 +41,39 @@ EXTRA_COMPONENTS.push({
         const sh = al('H', { name: '프로젝트', gap: 16, main: 'between', cross: 'center', minH: 24 }); put(slot, sh, { fill: true });
         sh.appendChild(await text(sc.p, 'Body/15 Semibold', 'text')); sh.appendChild(await text(sc.when, 'Caption/12', 'text-3'));
         const ln = al('H', { name: '이력서 문장', cross: 'center', pad: [0, 0, 0, 2], minH: 26 }); slot.appendChild(ln);
-        const dot = figma.createEllipse(); dot.name = '점'; dot.resize(4, 4); dot.fills = fills('text-3'); ln.appendChild(dot); gap(ln, 1, 8);
+        const dot = figma.createEllipse(); dot.name = '점'; dot.resize(6, 6); dot.fills = fills('primary'); ln.appendChild(dot); gap(ln, 1, 8);
         const [a, mark, b] = sc.line;
-        ln.appendChild(await text(a, 'Body/15 Medium', 'text')); ln.appendChild(await marked(mark, 'Body/15 Semibold', 'text')); ln.appendChild(await text(b, 'Body/15 Medium', 'text'));
+        ln.appendChild(await text(a, 'Body/15 Medium', 'text')); ln.appendChild(await marked(mark, 'Body/15 Semibold', 'primary-deep')); ln.appendChild(await text(b, 'Body/15 Medium', 'text'));
       }
       (await section('기술')).appendChild(authBars('막대', [410, 307]));
       (await section('학력')).appendChild(authBars('막대', [358, 512, 256]));
-    }, { desc: '로그인 왼쪽의 이력서 한 장. 움직임(말한 문장 → 빨간 줄 → 이력서 문장 → 형광펜)이 끝난 모습. 판 안에서 세로 채우기' });
+    }, { desc: '로그인 왼쪽의 이력서 한 장. 움직임(말한 문장 → 주황 취소선 → 이력서 문장 → 강조)이 끝난 모습. 판 안에서 세로 채우기' });
 
-    /* 로그인 왼쪽 잉크 판: 로고 + 다시 보기, 소개 문구, 이력서 한 장 (아래는 판 밖으로 잘린다) */
+    /* 로그인 왼쪽 연한 주황 판: 로고 + 다시 보기, 소개 문구, 이력서 한 장 (아래는 판 밖으로 잘린다) */
     await makeOne(row, 'Auth/Brand panel', async (c) => {
-      auto(c, 'V', { pad: [24, 24, 0, 56], w: W / 2, h: H, fill: 'primary-hover', clip: true });
+      auto(c, 'V', { pad: [24, 24, 0, 56], w: W / 2, h: H, fill: 'primary-soft', clip: true });
       const top = al('H', { name: '위', h: 56, cross: 'center' }); put(c, top, { fill: true });
-      top.appendChild(inst('Logo', { On: 'Ink' })); spacer(top);
-      const replay = al('H', { name: '다시 보기', gap: 6, pad: [0, 10], h: 32, cross: 'center', radius: 'radius/sm' }); top.appendChild(replay);
-      replay.appendChild(icon('refresh', 15, 'on-ink-2')); replay.appendChild(await text('다시 보기', 'Small/13.5 Medium', 'on-ink-2'));
+      top.appendChild(inst('Logo')); spacer(top);
+      const replay = al('H', { name: '다시 보기', gap: 6, pad: [0, 14], h: 32, cross: 'center', fill: 'surface', stroke: 'primary-tint', radius: 'radius/pill' }); top.appendChild(replay);
+      replay.appendChild(icon('refresh', 15, 'text-2')); replay.appendChild(await text('다시 보기', 'Small/13.5 Medium', 'text-2'));
       gap(c, 64);
       const pitch = al('V', { name: '소개 문구', gap: 12 }); c.appendChild(pitch);
-      pitch.appendChild(await text('편하게 말한 경험이\n이력서 한 줄이 돼요', 'Display/34', 'on-ink', { name: '한 줄 약속' }));
-      pitch.appendChild(await text('AI와 이야기하거나 GitHub를 연결하면 경험 카드로 정리하고, 이력서와 자소서까지 이어 써요.', 'Body/15', 'on-ink-2', { w: 440, name: '설명' }));
+      pitch.appendChild(await text('편하게 말한 경험이\n이력서 한 줄이 돼요', 'Display/34', 'text', { name: '한 줄 약속' }));
+      pitch.appendChild(await text('AI와 이야기하거나 GitHub를 연결하면 경험 카드로 정리하고, 이력서와 자소서까지 이어 써요.', 'Body/15', 'text-2', { w: 440, name: '설명' }));
       gap(c, 48);
       const paper = inst('Auth/Resume paper'); put(c, paper, { fillV: true });
-    }, { desc: '로그인 · 회원가입 왼쪽(960). 잉크색(primary-hover) 위에 로고(On=Ink), 다시 보기, 소개 문구, 이력서 한 장' });
+    }, { desc: '로그인 · 회원가입 왼쪽(960). 연한 주황(primary-soft) 위에 로고, 다시 보기, 소개 문구, 이력서 한 장' });
 
     /* 시작하기 머리: 로고 + 로그아웃 */
     await makeOne(row, 'Onboarding/Header', async (c) => {
       auto(c, 'H', { pad: [0, 40], w: W, h: 56, main: 'between', cross: 'center', fill: 'bg' });
-      c.appendChild(inst('Logo', { On: 'Light' })); c.appendChild(btn('로그아웃', 'Ghost', 'Small'));
+      c.appendChild(inst('Logo')); c.appendChild(btn('로그아웃', 'Ghost', 'Small'));
     }, { desc: '시작하기 위쪽 줄 (.ob-head). 화면 폭 채우기' });
 
-    /* 시작하기 진행 막대 (.progress, 폭 96) */
+    /* 시작하기 진행 막대 (.progress, 폭 120) */
     await makeSet(row, 'Onboarding/Progress', ['1', '2'].map((k) => ({ props: { Step: k }, build: async (c) => {
-      auto(c, 'H', { w: 96, h: 6, fill: 'surface-3', radius: 3, clip: true });
-      const bar = figma.createRectangle(); bar.name = 'value'; bar.resize(k === '1' ? 48 : 96, 6); bar.fills = fills('primary'); radius(bar, 3); c.appendChild(bar);
+      auto(c, 'H', { w: 120, h: 10, fill: 'surface-3', radius: 'radius/pill', clip: true });
+      const bar = figma.createRectangle(); bar.name = 'value'; bar.resize(k === '1' ? 60 : 120, 10); bar.fills = fills('primary'); radius(bar, 'radius/pill'); c.appendChild(bar);
     } })), { dir: 'H', desc: '시작하기 진행. Step 1 = 50% (목표 직무), Step 2 = 100% (첫 프로젝트)' });
   },
 });
@@ -88,7 +88,7 @@ async function authScreen(frame, kind, fields) {
 
   const form = al('V', { name: signup ? '회원가입 폼' : '로그인 폼', gap: 40, w: 408, pad: [48, 24] }); right.appendChild(form);
   const main = al('V', { name: '폼', gap: 24 }); put(form, main, { fill: true });
-  await tput(main, signup ? '회원가입' : '로그인', 'Heading/24', 'text', { name: 'h1' });
+  await tput(main, signup ? '회원가입' : '로그인', 'Heading/26', 'text', { name: 'h1' });
   const list = al('V', { name: '입력칸', gap: 20 }); put(main, list, { fill: true });
   for (const f of fields) await field(list, f);
 
@@ -98,7 +98,7 @@ async function authScreen(frame, kind, fields) {
   put(btns, btn('예시 계정으로 둘러보기', 'Secondary', 'Large'), { fill: true });
   const alt = al('H', { name: '다른 쪽으로', gap: 4, main: 'center', cross: 'center' }); put(actions, alt, { fill: true });
   alt.appendChild(await text(signup ? '이미 계정이 있나요?' : '아직 계정이 없나요?', 'Small/13.5', 'text-2'));
-  alt.appendChild(await text(signup ? '로그인' : '회원가입', 'Small/13.5 Medium', 'primary', { underline: true, name: 'link' }));
+  alt.appendChild(await text(signup ? '로그인' : '회원가입', 'Small/13.5 Medium', 'primary-ink', { underline: true, name: 'link' }));
 
   await tput(form, '프로토타입이라 계정과 데이터는 이 브라우저에만 저장돼요. 다른 곳에서 쓰는 비밀번호는 쓰지 마세요.', 'Small/13.5', 'text-3', { wrap: true, name: '안내' });
   return screen;
@@ -145,7 +145,7 @@ async function onboarding(frame, step, title) {
   const body = al('V', { name: '가운데', gap: 24, w: 560, pad: [48, 16, 64, 16] }); screen.appendChild(body);
   const head = al('V', { name: '머리', gap: 28 }); put(body, head, { fill: true });
   head.appendChild(inst('Onboarding/Progress', { Step: String(step) }));
-  await tput(head, title, 'Heading/24', 'text', { wrap: true, name: 'h1' });
+  await tput(head, title, 'Heading/26', 'text', { wrap: true, name: 'h1' });
   const content = al('V', { name: '내용', gap: 20 }); put(body, content, { fill: true });
   return { screen, body, content };
 }

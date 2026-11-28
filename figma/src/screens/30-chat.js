@@ -45,15 +45,15 @@ const PH = { room: '이야기를 이어서 적어 주세요', daily: '오늘의 
 EXTRA_COMPONENTS.push({
   title: 'AI 채팅: 묻기, 레포 분석, 펼친 카드',
   build: async (row) => {
-    // 묻기 상자의 한 칸: 칸 이름, 원래 글, 더한 글(기다리는 중에는 형광펜)
+    // 묻기 상자의 한 칸: 칸 이름, 원래 글, 더한 글(기다리는 중에는 주황 강조)
     await makeSet(row, 'Chat/Diff row', ['Wait', 'Closed'].map((k) => ({ props: { Tone: k }, build: async (c) => {
       const wait = k === 'Wait';
       auto(c, 'V', { gap: 2, w: 600 });
       c.appendChild(named(await text('행동', 'Small/13.5 Semibold', 'text-3'), 'field'));
       const b = named(await text('원래 글', 'Body/15', wait ? 'text' : 'text-2'), 'before'); c.appendChild(b); b.layoutSizingHorizontal = 'FILL'; b.textAutoResize = 'HEIGHT';
-      const a = al('H', Object.assign({ name: 'added' }, wait ? { pad: [1, 3], fill: 'hl', radius: MARK_RADIUS } : {})); c.appendChild(a); a.layoutSizingHorizontal = 'FILL';
+      const a = al('H', Object.assign({ name: 'added' }, wait ? { pad: [1, 4], fill: 'primary-tint', radius: MARK_RADIUS } : {})); c.appendChild(a); a.layoutSizingHorizontal = 'FILL';
       const t = named(await text('더한 글', 'Body/15', wait ? 'text' : 'text-2'), 'addedText'); a.appendChild(t); t.layoutSizingHorizontal = 'FILL'; t.textAutoResize = 'HEIGHT';
-    } })), { dir: 'H', desc: '카드를 바꾸기 전에 묻는 상자의 한 칸. Wait: 더한 글에 형광펜. Closed(답한 뒤): 흐린 글, 형광펜 없음', props: [
+    } })), { dir: 'H', desc: '카드를 바꾸기 전에 묻는 상자의 한 칸. Wait: 더한 글에 주황 강조. Closed(답한 뒤): 흐린 글, 강조 없음', props: [
       { name: 'Field', type: 'TEXT', default: '행동', node: 'field' }, { name: 'Before', type: 'TEXT', default: '원래 글', node: 'before' }, { name: 'Show before', type: 'BOOLEAN', default: true, node: 'before' },
       { name: 'Added', type: 'TEXT', default: '더한 글', node: 'addedText' }, { name: 'Show added', type: 'BOOLEAN', default: true, node: 'added' }] });
 
@@ -61,7 +61,7 @@ EXTRA_COMPONENTS.push({
     const DONE = { Ok: ['check', '허용했어요'], No: ['close', '거절했어요'], Fail: ['warning', '반영하지 못했어요'] };
     await makeSet(row, 'Chat/Confirm', ['Wait', 'Ok', 'No', 'Fail'].map((k) => ({ props: { State: k }, build: async (c) => {
       const wait = k === 'Wait';
-      auto(c, 'V', { gap: 12, pad: [14, 16], w: 640, fill: wait ? 'surface' : null, stroke: 'border-strong', radius: 'radius/md' });
+      auto(c, 'V', { gap: 14, pad: [16, 18], w: 640, fill: wait ? 'surface' : null, stroke: wait ? 'primary-light' : 'border-strong', radius: 20 }); if (wait) shadow(c, 'Card');
       if (!wait) c.dashPattern = [4, 4];
       const rows = al('V', { name: 'rows', gap: 10 }); c.appendChild(rows); rows.layoutSizingHorizontal = 'FILL';
       for (let n = 1; n <= 4; n++) { const r = expose(rows, named(inst('Chat/Diff row', { Tone: wait ? 'Wait' : 'Closed' }), `row ${n}`)); r.layoutSizingHorizontal = 'FILL'; }
@@ -78,7 +78,7 @@ EXTRA_COMPONENTS.push({
 
     // 오른쪽 펼친 카드의 한 칸
     await makeSet(row, 'Chat/Card field', ['Default', 'Changed', 'Blank', 'Keywords'].map((k) => ({ props: { State: k }, build: async (c) => {
-      auto(c, 'V', { gap: 4, pad: [12, 8], w: 304, fill: k === 'Changed' ? 'hl-soft' : null, stroke: 'border-strong', sides: ['top'] });
+      auto(c, 'V', { gap: 4, pad: [12, 8], w: 304, fill: k === 'Changed' ? 'primary-soft' : null, stroke: 'border', sides: ['top'] });
       c.appendChild(named(await text('상황', 'Small/13.5 Semibold', 'text-3'), 'label'));
       if (k === 'Blank') {
         const b = al('H', { name: 'blank', pad: [6, 12], fill: 'surface-2', stroke: 'border-strong', radius: 'radius/sm' }); b.dashPattern = [4, 3]; c.appendChild(b); b.layoutSizingHorizontal = 'FILL';
@@ -87,10 +87,10 @@ EXTRA_COMPONENTS.push({
       const kw = k === 'Keywords';
       const v = named(await text('내용', kw ? 'Small/13.5 Medium' : 'Body/15', kw ? 'text-2' : 'text'), 'value'); c.appendChild(v); v.layoutSizingHorizontal = 'FILL'; v.textAutoResize = 'HEIGHT';
       if (k === 'Changed') {
-        const m = al('H', { name: 'added', pad: [1, 3], fill: 'hl', radius: MARK_RADIUS }); c.appendChild(m); m.layoutSizingHorizontal = 'FILL';
+        const m = al('H', { name: 'added', pad: [1, 4], fill: 'primary-tint', radius: MARK_RADIUS }); c.appendChild(m); m.layoutSizingHorizontal = 'FILL';
         const t = named(await text('더한 글', 'Body/15', 'text'), 'addedText'); m.appendChild(t); t.layoutSizingHorizontal = 'FILL'; t.textAutoResize = 'HEIGHT';
       }
-    } })), { desc: 'AI 채팅 오른쪽 펼친 카드의 한 칸(상황·과제·행동·결과·역량·이력서 한 줄). Changed: AI가 방금 바꾼 칸(연한 형광펜 바탕, 더한 글은 형광펜). Blank: 아직 비어 있어요', props: [
+    } })), { desc: 'AI 채팅 오른쪽 펼친 카드의 한 칸(상황·과제·행동·결과·역량·이력서 한 줄). Changed: AI가 방금 바꾼 칸(연한 주황 바탕, 더한 글은 주황 강조). Blank: 아직 비어 있어요', props: [
       { name: 'Label', type: 'TEXT', default: '상황', node: 'label' }, { name: 'Value', type: 'TEXT', default: '내용', node: 'value' },
       { name: 'Added', type: 'TEXT', default: '더한 글', node: 'addedText' }] });
 
@@ -129,22 +129,22 @@ async function chatTree(parent, o = {}) {
   const head = al('H', { name: '단추', gap: 8, pad: [16, 16, 12, 16] }); put(t, head, { fill: true });
   if (list.length) { put(head, btn('새 채팅', 'Primary', 'Medium', 'plus'), { fill: true }); put(head, btn('새 프로젝트', 'Secondary', 'Medium'), { fill: true }); }
   else put(head, btn('새 프로젝트', 'Primary', 'Medium', 'plus'), { fill: true });
-  const nav = al('V', { name: '프로젝트별 채팅', gap: 12, pad: [4, 10, 24, 10] }); put(t, nav, { fill: true });
+  const nav = al('V', { name: '프로젝트별 채팅', gap: 14, pad: [4, 10, 24, 10] }); put(t, nav, { fill: true });
   if (!list.length) { const p = al('V', { name: '프로젝트 없음', pad: [8, 8] }); put(nav, p, { fill: true }); await tput(p, '프로젝트를 만들면 바로 이야기를 시작할 수 있어요.', 'Small/13.5', 'text-3', { wrap: true }); return t; }
   for (const p of list) {
     const over = (o.rooms || {})[p.name] || {}; const rooms = over.rooms || p.rooms; const more = 'more' in over ? over.more : p.more;
-    const pj = al('V', { name: p.name }); put(nav, pj, { fill: true });
+    const pj = al('V', { name: p.name, gap: 2 }); put(nav, pj, { fill: true });
     const hover = o.hover === p.name;
-    const pr = al('H', { name: '프로젝트 이름', gap: 6, pad: [4, 6], cross: 'center', minH: 38, radius: 'radius/sm', fill: hover ? 'surface-2' : null }); put(pj, pr, { fill: true });
+    const pr = al('H', { name: '프로젝트 이름', gap: 6, pad: [4, 10], cross: 'center', minH: 40, radius: 'radius/pill', fill: hover ? 'surface-2' : null }); put(pj, pr, { fill: true });
     pr.appendChild(icon('chevron-down', 16, 'text-3')); pr.appendChild(await text(p.name, 'Small/13.5 Semibold', 'text'));
     if (p.gh) pr.appendChild(named(icon('github', 14, 'text-3'), 'GitHub 연결됨'));
     if (hover) { spacer(pr); pr.appendChild(inst('Icon button', { Size: 'Small', Icon: 'plus' })); const m = inst('Icon button', { Size: 'Small', Icon: 'more' }); m.name = '프로젝트 메뉴'; m.fills = fills('surface-3'); pr.appendChild(m); }
     const here = act.project === p.name;
     if (here && act.room === 'new') put(pj, inst('Chat/Room row', { State: 'Active', Name: '새 채팅', 'Show time': false }), { fill: true });
-    if (o.noChats) { const n = al('H', { name: '대화방 없음', pad: [6, 0, 6, 28] }); put(pj, n, { fill: true }); n.appendChild(await text('아직 대화방이 없어요', 'Small/13.5', 'text-3')); continue; }
+    if (o.noChats) { const n = al('H', { name: '대화방 없음', pad: [6, 0, 6, 32] }); put(pj, n, { fill: true }); n.appendChild(await text('아직 대화방이 없어요', 'Small/13.5', 'text-3')); continue; }
     const d = inst('Chat/Daily row', { State: here && act.room === 'daily' ? 'Active' : 'Default', Unanswered: !!p.ongoing }); put(pj, d, { fill: true });
     for (const [name, when] of rooms) put(pj, inst('Chat/Room row', { State: here && act.room === name ? 'Active' : 'Default', Name: name, Time: when }), { fill: true });
-    if (more) { const m = al('H', { name: '더 보기', pad: [6, 0, 6, 28] }); put(pj, m, { fill: true }); m.appendChild(await text(`${more}개 더 보기`, 'Small/13.5', 'text-3')); }
+    if (more) { const m = al('H', { name: '더 보기', pad: [6, 0, 6, 32] }); put(pj, m, { fill: true }); m.appendChild(await text(`${more}개 더 보기`, 'Small/13.5', 'text-3')); }
   }
   return t;
 }
@@ -158,7 +158,7 @@ async function cardPanel(parent, o = {}) {
   const h2 = al('H', { name: '제목', gap: 8, cross: 'center' }); put(top, h2, { fill: true });
   h2.appendChild(await text('경험 카드', 'Body/15 Semibold', 'text')); if (ids.length) h2.appendChild(await text(`${ids.length}장`, 'Small/13.5 Medium', 'text-3'));
   if (o.status) top.appendChild(inst('Chat/Panel status', { State: o.status }));
-  const body = al('V', { name: '카드 목록', gap: 8, pad: 20 }); put(p, body, { fill: true });
+  const body = al('V', { name: '카드 목록', gap: 10, pad: [20, 16, 24, 16] }); put(p, body, { fill: true });
   if (!ids.length) {
     const e = al('V', { name: '빈 목록', gap: 4, pad: [16, 0] }); put(body, e, { fill: true });
     await tput(e, '이야기를 들려주면 AI가 이 프로젝트의 경험 카드를 만들어요.', 'Body/15', 'text-2', { wrap: true });
@@ -174,9 +174,9 @@ async function cardPanel(parent, o = {}) {
 }
 // 목록의 제자리에서 펼친 카드. changed: 방금 바뀐 칸 → 더한 글 (before 에 원래 글)
 async function openCard(list, c, changed = {}, before = {}) {
-  const det = al('V', { name: `펼친 카드: ${c.title}`, gap: 8, pad: [16, 8, 14, 8], fill: 'surface', stroke: 'primary', radius: 'radius/md' }); put(list, det, { fill: true });
+  const det = al('V', { name: `펼친 카드: ${c.title}`, gap: 8, pad: [16, 8, 14, 8], fill: 'surface', stroke: 'primary-strong', radius: 'radius/md' }); shadow(det, 'Card'); put(list, det, { fill: true });
   const head = al('H', { name: '머리 (누르면 접힘)', gap: 8, pad: [0, 8], cross: 'start' }); put(det, head, { fill: true });
-  await tput(head, c.title, 'Title/17', 'text', { wrap: true }); head.appendChild(icon('chevron-up', 16, 'text-3'));
+  await tput(head, c.title, 'Title/18', 'text', { wrap: true }); head.appendChild(icon('chevron-up', 16, 'text-3'));
   const fs = al('V', { name: '칸', pad: [4, 0, 0, 0] }); put(det, fs, { fill: true });
   const row = (props) => { const f = inst('Chat/Card field', props); f.name = props.Label; put(fs, f, { fill: true }); };
   STAR.forEach((label, i) => {
@@ -204,8 +204,18 @@ async function roomHead(room, o) {
 async function roomBody(room, o) {
   await roomHead(room, o);
   const body = al('V', { name: '대화', cross: 'center', main: o.grow ? 'start' : (o.align || 'end'), clip: !o.grow }); put(room, body, { fill: true, fillV: !o.grow });
-  const col = al('V', { name: '대화 열', w: COL_W, gap: 20, pad: [28, 28, 24, 28] }); body.appendChild(col);
+  const col = al('V', { name: '대화 열', w: COL_W, gap: 24, pad: [28, 28, 24, 28] }); body.appendChild(col);
   return col;
+}
+// AI 표시. 첫 줄이 말풍선이면 첫 글자 줄에 맞춰 9 내린다
+function aiMark(row, onBubble) { const h = al('V', { name: 'AI 표시', pad: [onBubble ? 9 : 0, 0, 0, 0] }); row.appendChild(h); h.appendChild(inst('Chat/AI mark')); }
+// AI 말풍선 (.chat-t): 회색, 꼬리 쪽(왼쪽 위)만 덜 둥글다. 짧은 글은 글에 맞추고 긴 글은 폭 560(64ch)에서 줄바꿈
+async function aiBubble(box, s) {
+  const longest = Math.max(...s.split('\n').map((line) => { let w = 0; for (const ch of line) w += /[가-힣]/.test(ch) ? 15 : ch === ' ' ? 4 : 8.5; return w; }));
+  const wrap = longest + 32 > 560;
+  const b = al('V', Object.assign({ name: '말풍선', pad: [10, 16], fill: 'surface-2', radius: [8, 20, 20, 20] }, wrap ? { w: 560 } : {})); box.appendChild(b);
+  await tput(b, s, 'Body/15', 'text', { wrap, name: '글' });
+  return b;
 }
 // 대화를 차례로 쌓는다
 function talk(col) {
@@ -217,15 +227,15 @@ function talk(col) {
     // o: { name, chip: [카드, 바뀐 칸], then: async (box) => {} 글 아래에 붙는 것 }
     async ai(s, o = {}) {
       const r = al('H', { name: o.name || 'AI 답', gap: 12 }); put(col, r, { fill: true });
-      r.appendChild(inst('Chat/AI mark'));
+      aiMark(r, !!s && !o.chip);
       const box = al('V', { name: '내용', gap: 12 }); put(r, box, { fill: true });
       if (o.chip) box.appendChild(inst('Chat/Card chip', { Card: o.chip[0], Fields: o.chip[1] }));
-      if (s) await tput(box, s, 'Body/15', 'text', { wrap: true, name: '글' });
+      if (s) await aiBubble(box, s);
       if (o.then) await o.then(box);
       return box;
     },
     day(label) { const d = inst('Chat/Day divider', { Label: label }); d.name = `날짜: ${label}`; put(col, d, { fill: true }); },
-    typing() { const r = al('H', { name: 'AI 답 쓰는 중', gap: 12 }); put(col, r, { fill: true }); r.appendChild(inst('Chat/AI mark')); r.appendChild(inst('Chat/Typing')); },
+    typing() { const r = al('H', { name: 'AI 답 쓰는 중', gap: 12 }); put(col, r, { fill: true }); aiMark(r, true); r.appendChild(inst('Chat/Typing')); },
   };
 }
 // 입력: 빠른 단추(GitHub, 카드 바꾸기 전에 묻기) + 입력칸. o: { quick: false, connect: GitHub 연결 전, permOn }
@@ -238,9 +248,9 @@ async function composer(room, ph, o = {}) {
     const perm = al('H', { name: '카드 바꾸기 전에 묻기', gap: 8, pad: [0, 10], cross: 'center' }); q.appendChild(perm);
     perm.appendChild(inst('Switch', { On: o.permOn ? 'On' : 'Off' })); perm.appendChild(await text('카드 바꾸기 전에 묻기', 'Small/13.5 Medium', 'text-2'));
   }
-  const input = al('H', { name: '입력칸', gap: 8, pad: [5, 6, 5, 14], cross: 'center', fill: 'surface', stroke: 'field-border', radius: 'radius/sm', minH: 48 }); put(form, input, { fill: true });
+  const input = al('H', { name: '입력칸', gap: 8, pad: [5, 6, 5, 20], cross: 'center', fill: 'surface', stroke: 'border-strong', radius: 'radius/lg', minH: 48 }); put(form, input, { fill: true });
   await tput(input, ph, 'Body/15', 'text-3', { wrap: true, name: '안내 글' });
-  const send = inst('Icon button', { Size: 'Medium', Icon: 'send' }); send.name = '보내기'; recolor(send, 'primary'); disable(send); input.appendChild(send);
+  const send = inst('Icon button', { Size: 'Medium', Icon: 'send' }); send.name = '보내기'; send.fills = fills('surface-3'); recolor(send, 'text-3'); input.appendChild(send); // 쓴 글이 없으면 회색 동그라미
   return foot;
 }
 
@@ -361,8 +371,8 @@ const jwtScreen = (frame, o = {}) => chatScreen(frame, { tree: JWT_TREE, panel: 
 
 // 새 채팅 안내 (AI 의 말이 아니라 대화에 남지 않는다)
 async function guide(col, title, paras) {
-  const g = al('V', { name: '안내', gap: 8, w: 576 }); col.appendChild(g);
-  await tput(g, title, 'Title/17', 'text', { wrap: true, name: '제목 (h2)' });
+  const g = al('V', { name: '안내', gap: 8, w: 576, pad: [22, 24], fill: 'primary-soft', radius: 'radius/lg' }); col.appendChild(g);
+  await tput(g, title, 'Title/18', 'text', { wrap: true, name: '제목 (h2)' });
   const ps = al('V', { name: '글', gap: 6 }); put(g, ps, { fill: true });
   for (const p of paras) await tput(ps, p, 'Body/15', 'text-2', { wrap: true });
 }
@@ -399,7 +409,7 @@ SCREENS.push({ group: G, title: '오늘의 질문', build: async (frame) => {
   } });
 } });
 
-// 3. 대화방: AI 가 답을 쓰는 중, 오른쪽은 방금 바뀐 카드(바뀐 칸 연한 형광펜, 더한 글 형광펜)와 「담는 중」
+// 3. 대화방: AI 가 답을 쓰는 중, 오른쪽은 방금 바뀐 카드(바뀐 칸 연한 주황, 더한 글 주황 강조)와 「담는 중」
 SCREENS.push({ group: G, title: '대화방', build: async (frame) => { await jwtScreen(frame, { typing: true }); } });
 
 // 4. 새 채팅
@@ -408,7 +418,7 @@ SCREENS.push({ group: G, title: '새 채팅 / 프로젝트 고르기', build: as
     await roomHead(room, { title: '새 채팅' });
     const body = al('V', { name: '대화', cross: 'center' }); put(room, body, { fill: true, fillV: true });
     const pick = al('V', { name: '프로젝트 고르기', gap: 16, pad: [40, 28], w: 520 }); body.appendChild(pick);
-    await tput(pick, '어떤 프로젝트 이야기인가요?', 'Title/17', 'text', { name: '제목 (h2)' });
+    await tput(pick, '어떤 프로젝트 이야기인가요?', 'Title/18', 'text', { name: '제목 (h2)' });
     const list = al('V', { name: '프로젝트', stroke: 'border', sides: ['top'] }); put(pick, list, { fill: true });
     for (const p of TREE) { const r = inst('Chat/Project choice', { Name: p.name, 'Show GitHub': !!p.gh }); r.name = p.name; put(list, r, { fill: true }); }
     pick.appendChild(btn('새 프로젝트', 'Secondary', 'Medium', 'plus'));
@@ -419,7 +429,7 @@ SCREENS.push({ group: G, title: '새 채팅 / 프로젝트 없음', build: async
     await roomHead(room, { title: '새 채팅' });
     const body = al('V', { name: '대화', cross: 'center' }); put(room, body, { fill: true, fillV: true });
     const pick = al('V', { name: '프로젝트 고르기', gap: 16, pad: [40, 28], w: 520 }); body.appendChild(pick);
-    await tput(pick, '먼저 프로젝트를 만들어 주세요', 'Title/17', 'text', { name: '제목 (h2)' });
+    await tput(pick, '먼저 프로젝트를 만들어 주세요', 'Title/18', 'text', { name: '제목 (h2)' });
     await tput(pick, '팀 과제, 동아리, 아르바이트도 프로젝트예요.', 'Body/15', 'text-2');
     pick.appendChild(btn('새 프로젝트', 'Primary', 'Medium', 'plus'));
   } });

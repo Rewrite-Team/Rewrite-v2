@@ -24,7 +24,7 @@
     { p: '알고리즘 스터디', when: '2025.03 ~ 2025.12', say: '자꾸 그만두는 사람이 생겼어요', line: '난이도를 3단계로 나눠 10개월간 [평균 참여율 85%] 유지' },
     { p: '카페 아르바이트', when: '2024.03 ~ 2025.02', say: '주문이 밀리면 정신이 없었어요', line: '메뉴별 주문 수를 집계해 대기 시간을 [절반 가까이] 단축' },
   ];
-  // 낱말마다 감싸서 차례로 나타나게 한다. [ ] 안은 형광펜
+  // 낱말마다 감싸서 차례로 나타나게 한다. [ ] 안은 강조할 핵심 구절
   function lineHTML(text) {
     let i = 0; const words = (t) => t.split(/(\s+)/).map((w) => (w.trim() ? `<span class="au-w" style="--i:${i++}">${esc(w)}</span>` : w)).join('');
     return text.split(/[[\]]/).map((t, k) => (k % 2 ? `<mark class="au-mark">${words(t)}</mark>` : words(t))).join('');

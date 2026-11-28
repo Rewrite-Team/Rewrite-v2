@@ -1,7 +1,11 @@
 /* 휴지통 (.tr-*) */
+.tr-list { padding: 4px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+.tr-list > :last-child { border-bottom: 0; }
+.tr-row { padding-top: 14px; padding-bottom: 14px; }
+.tr-row > svg { box-sizing: content-box; padding: 9px; border-radius: 50%; background: var(--surface-2); }
 .tr-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 4px; }
 @media (max-width: 600px) {
+  .tr-list { padding: 2px 16px; }
   .tr-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 12px; align-items: start; }
-  .tr-row > svg { margin-top: 3px; }
   .tr-row > .list-row-actions { grid-column: 2; }
 }

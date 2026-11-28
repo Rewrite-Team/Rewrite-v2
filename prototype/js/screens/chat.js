@@ -36,7 +36,7 @@
       if (!a) { if (first.size || n.classList.contains('is-new')) n.animate([{ opacity: 0, transform: 'scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: 280, delay: 80, easing: EASE, fill: 'backwards' }); return; }
       const dx = a.left - b.left; const dy = a.top - b.top;
       if (n.dataset.flip === opened && n.classList.contains('cc-detail')) {
-        n.animate([{ transform: `translate(${dx}px, ${dy}px)`, clipPath: `inset(0 0 ${Math.max(0, b.height - a.height)}px 0 round 8px)` }, { transform: 'none', clipPath: 'inset(0 0 0 0 round 8px)' }], { duration: 340, easing: EASE });
+        n.animate([{ transform: `translate(${dx}px, ${dy}px)`, clipPath: `inset(0 0 ${Math.max(0, b.height - a.height)}px 0 round 16px)` }, { transform: 'none', clipPath: 'inset(0 0 0 0 round 16px)' }], { duration: 340, easing: EASE });
         n.querySelectorAll('.chat-f, .chat-card-foot').forEach((f, i) => f.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 240, delay: 140 + i * 45, easing: EASE, fill: 'backwards' }));
       } else if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) n.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: 360, easing: EASE });
     });
@@ -80,10 +80,10 @@
 
   /* ---------------- 오른쪽: 이 프로젝트의 경험 카드 ---------------- */
   // 카드 목록은 늘 그 순서 그대로다. 고른 카드는 제자리에서 펼쳐지고, 머리를 다시 누르면 접힌다.
-  // AI 가 카드를 바꾸면 그 카드가 펼쳐지고, 바뀐 칸에 형광펜이 지나간다. 움직임은 바뀐 직후 한 번만
+  // AI 가 카드를 바꾸면 그 카드가 펼쳐지고, 바뀐 칸에 연한 주황이 깔렸다가 걷힌다. 움직임은 바뀐 직후 한 번만
   const BLANK = '아직 비어 있어요';
   const cardsIn = (pid) => S.state.experiences.filter((e) => e.projectId === pid).reverse(); // 새 카드가 위로. 고칠 때마다 순서가 바뀌지 않는다
-  // 방금 바뀐 글자: 덧붙인 것은 형광펜, 바꾼 것은 취소선 → 형광펜, 지운 것은 취소선
+  // 방금 바뀐 글자: 덧붙인 것은 주황 강조, 바꾼 것은 취소선 → 주황 강조, 지운 것은 취소선
   function diffHTML(old, now, show) {
     if (!show || old === now) return esc(now);
     if (!old) return `<mark class="mark is-in">${esc(now)}</mark>`;
@@ -242,7 +242,7 @@
     if (m.who === 'me') return `<div class="chat-m is-me" data-m-id="${m.id}"><div class="chat-b"><span class="sr-only">나</span>${esc(m.text)}</div></div>`;
     return aiHTML(`${m.touch ? touchHTML(m.touch) : ''}<p class="chat-t">${esc(m.kind === 'github' ? ghText(m) : m.text)}</p>${m.kind === 'link' ? linkHTML(chat, m) : m.kind === 'github' ? ghHTML(chat, m) : m.kind === 'confirm' ? confirmHTML(m) : ''}`, m.id);
   }
-  // 허락을 구하는 답: 바뀔 칸만 앞뒤로 보여 주고(지운 글자는 취소선, 더한 글자는 형광펜), 허용·항상 허용·거절
+  // 허락을 구하는 답: 바뀔 칸만 앞뒤로 보여 주고(지운 글자는 취소선, 더한 글자는 주황 강조), 허용·항상 허용·거절
   function confirmHTML(m) {
     const p = m.pending; const st = p.status; const wait = st === 'wait';
     let rows = '';

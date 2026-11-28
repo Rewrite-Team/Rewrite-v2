@@ -31,8 +31,9 @@
   };
   const rows = async (col, title, list) => {
     await sectionTitle(col, title);
-    const box = al('V', { name: `${title} 줄`, stroke: 'border', sides: ['top'] }); put(col, box, { fill: true });
+    const box = listBox(col, `${title} 줄`, [4, 20]);
     for (const r of list) put(box, r, { fill: true });
+    lastRow(box);
     gap(col, 40);
   };
 

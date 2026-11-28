@@ -2,7 +2,7 @@
    왼쪽에서 오른쪽으로 시간이 흐른다. 프로젝트는 시작한 달에서 가지를 내어 끝난 달(진행 중이면 지금)까지 뻗고,
    경험 카드는 그 가지에서 그 카드의 달에 잔가지로 갈라져 나온다. 프로젝트는 시작한 순서대로 위에서 아래로.
    들어오면 한 번, 가지가 시간 순서대로 자라 나온다 (다시 보기 버튼, 움직임 줄이기면 완성된 모습만).
-   역량을 고르면 그 역량이 담긴 카드만 형광펜으로 남는다 (내가 고른 것). 프로젝트마다 카드를 접었다 펼 수 있다 (계정마다 기억) */
+   역량을 고르면 그 역량이 담긴 카드만 연한 주황 알약으로 도드라진다. 프로젝트마다 카드를 접었다 펼 수 있다 (계정마다 기억) */
 (function (App) {
   const esc = (s) => App.ui.esc(s); const S = App.store; const I = App.icon;
   const G = { left: 28, right: 300, top: 52, head: 30, row: 30, gap: 30, minMW: 16, maxMW: 64 }; // right: 마지막 카드 이름이 들어갈 자리
@@ -48,7 +48,7 @@
       const cap = b.ongoing ? `<path class="tl-tail" d="M${xe} ${ly}h${MW}" style="--d:${at(xe).toFixed(2)}s"/>` : `<circle class="tl-end" cx="${xe}" cy="${ly}" r="3.5" style="--d:${at(xe).toFixed(2)}s"/>`;
       const shut = ui.fold.has(b.p.id) && b.cards.length; const name = S.projectName(b.p);
       // 접기 단추(프로젝트 이름 왼쪽)와 이름(프로젝트로 가는 링크)
-      const fold = b.cards.length ? `<g class="tl-fold" role="button" tabindex="0" data-fold="${esc(b.p.id)}" aria-expanded="${!shut}" aria-label="「${esc(name)}」 카드 ${b.cards.length}장 ${shut ? '펴기' : '접기'}" style="--d:${at(xs).toFixed(2)}s"><rect x="${xs - 8}" y="${ly - 28}" width="20" height="22" rx="4"/><path d="${shut ? `M${xs - 1} ${ly - 22}l5 5-5 5` : `M${xs - 3} ${ly - 19}l5 5 5-5`}"/></g>` : '';
+      const fold = b.cards.length ? `<g class="tl-fold" role="button" tabindex="0" data-fold="${esc(b.p.id)}" aria-expanded="${!shut}" aria-label="「${esc(name)}」 카드 ${b.cards.length}장 ${shut ? '펴기' : '접기'}" style="--d:${at(xs).toFixed(2)}s"><rect x="${xs - 8}" y="${ly - 28}" width="20" height="22" rx="8"/><path d="${shut ? `M${xs - 1} ${ly - 22}l5 5-5 5` : `M${xs - 3} ${ly - 19}l5 5 5-5`}"/></g>` : '';
       const head = `${fold}<a class="tl-proj" href="#/vault/p/${esc(b.p.id)}" style="--d:${at(xs).toFixed(2)}s"><circle class="tl-start" cx="${xs}" cy="${ly}" r="5"/><text x="${b.cards.length ? xs + 15 : xs - 5}" y="${ly - 12}">${esc(name)}</text></a>`;
       if (shut) { // 접으면 가지 위에 카드가 갈라지던 자리만 점으로 남기고, 끝에 카드 수
         const forks = b.cards.map((c) => `<circle class="tl-fork ${kw && c.e.keywords.includes(kw) ? 'is-hit' : ''}" cx="${x(c.m)}" cy="${ly}" r="${kw && c.e.keywords.includes(kw) ? 4.5 : 3}" style="--d:${at(x(c.m)).toFixed(2)}s"/>`).join('');
@@ -64,7 +64,7 @@
           <path class="tl-twig" d="M${cx} ${ly}V${cy - 9}Q${cx} ${cy} ${cx + 9} ${cy}H${cx + 14}" pathLength="1"/>
           <circle class="tl-fork" cx="${cx}" cy="${ly}" r="2.5"/>
           <a href="#/card/${esc(c.e.id)}" data-tl="${esc(c.e.id)}" aria-label="${esc(c.e.title)}, ${label(c.m)}${c.e.keywords.length ? `, 역량 ${esc(c.e.keywords.join(', '))}` : ''}">
-            <rect class="tl-hit" x="${cx + 10}" y="${cy - 12}" width="${Math.min(260, G.right - 30)}" height="24" rx="4"/>
+            <rect class="tl-hit" x="${cx + 10}" y="${cy - 12}" width="${Math.min(260, G.right - 30)}" height="24" rx="12"/>
             <circle class="tl-dot" cx="${cx + 19}" cy="${cy}" r="5"/>
             <text class="tl-name" x="${cx + 30}" y="${cy + 4.5}">${esc(shortTitle(c.e).length > 26 ? shortTitle(c.e).slice(0, 25) + '…' : shortTitle(c.e))}</text>
           </a></g>`;
@@ -118,7 +118,7 @@
         const svg = stage.querySelector('svg');
         svg.classList.add(grow && motionOK() ? 'is-grow' : 'is-still'); // 시간은 왼쪽부터. 스크롤은 사용자가 정한 자리 그대로
         if (grow && motionOK()) setTimeout(() => { if (svg.isConnected) svg.classList.replace('is-grow', 'is-still'); }, (GROW + 1) * 1000);
-        svg.querySelectorAll('.tl-card a').forEach((a) => { const t = a.querySelector('.tl-name'); a.querySelector('.tl-hit').setAttribute('width', Math.ceil(t.getComputedTextLength() + 30)); }); // 형광펜은 이름 길이만큼
+        svg.querySelectorAll('.tl-card a').forEach((a) => { const t = a.querySelector('.tl-name'); a.querySelector('.tl-hit').setAttribute('width', Math.ceil(t.getComputedTextLength() + 30)); }); // 강조 알약은 이름 길이만큼
       }
       // 카드에 올리면: 프로젝트, 달, 역량
       const show = (a) => {

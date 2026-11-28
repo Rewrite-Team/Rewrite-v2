@@ -12,7 +12,7 @@ async function main() {
   const lib = await buildLibrary(page); lib.x = found.width + 400; lib.y = 0; // 기초 오른쪽에 컴포넌트
   await buildShellComponents(lib);
   for (const x of EXTRA_COMPONENTS) { // 화면 파일이 더한 컴포넌트
-    const sec = al('V', { name: x.title, gap: 16 }); lib.appendChild(sec); await tput(sec, x.title, 'Title/17', 'text');
+    const sec = al('V', { name: x.title, gap: 16 }); lib.appendChild(sec); await tput(sec, x.title, 'Title/18', 'text');
     const row = al('H', { name: 'items', gap: 32, wrap: true, w: 1800, cross: 'start' }); row.counterAxisSpacing = 32; sec.appendChild(row); await x.build(row);
   }
 
@@ -22,7 +22,7 @@ async function main() {
   let y = Math.ceil(Math.max(found.height, lib.height)) + 800; // 화면은 그 아래 (그룹마다 한 줄)
   const top = await text('화면', 'Display/34', 'text'); page.appendChild(top); top.x = 0; top.y = y; y += 120;
   for (const g of groups) {
-    const label = await text(g, 'Heading/24', 'text'); page.appendChild(label); label.x = 0; label.y = y; y += 80;
+    const label = await text(g, 'Heading/26', 'text'); page.appendChild(label); label.x = 0; label.y = y; y += 80;
     let x = 0; let rowH = 0;
     for (const s of SCREENS.filter((x) => x.group === g)) {
       const f = figma.createFrame(); f.name = `${g} / ${s.title}`; f.resize(s.w || W, s.h || H); f.fills = fills('bg'); f.clipsContent = true;

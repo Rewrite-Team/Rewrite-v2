@@ -11,14 +11,14 @@
   /* ---------- 이 화면의 컴포넌트: 휴지통 한 줄 ---------- */
   EXTRA_COMPONENTS.push({ title: '휴지통', build: async (row) => {
     await makeOne(row, 'Trash/Row', async (c) => {
-      auto(c, 'H', { gap: 12, pad: [11, 8], w: 760, cross: 'center', stroke: 'border', sides: ['bottom'] }); c.minHeight = 56;
-      c.appendChild(named(icon('card', 20, 'text-3'), 'type-icon'));
+      auto(c, 'H', { gap: 12, pad: [14, 0], w: 760, cross: 'center', stroke: 'border', sides: ['bottom'] }); c.minHeight = 56;
+      const dot = al('H', { name: '아이콘 자리', w: 38, h: 38, main: 'center', cross: 'center', fill: 'surface-2', radius: 'radius/pill' }); c.appendChild(dot); dot.appendChild(named(icon('card', 20, 'text-3'), 'type-icon'));
       const m = al('V', { name: 'main', gap: 4 }); c.appendChild(m); m.layoutSizingHorizontal = 'FILL';
       await tput(m, '항목 이름', 'Body/15 Semibold', 'text', { wrap: true, name: 'tr-title' });
       const sub = al('H', { name: 'sub', gap: 12, cross: 'center', wrap: true }); sub.counterAxisSpacing = 4; put(m, sub, { fill: true });
       sub.appendChild(named(await text('경험 카드', 'Small/13.5', 'text-3'), 'tr-type'));
       const chip = al('H', { name: 'tr-chip', gap: 5, cross: 'center' }); sub.appendChild(chip);
-      chip.appendChild(icon('folder', 14, 'primary')); chip.appendChild(named(await text('프로젝트', 'Small/13.5 Semibold', 'primary'), 'tr-project'));
+      chip.appendChild(icon('folder', 14, 'primary-ink')); chip.appendChild(named(await text('프로젝트', 'Small/13.5 Semibold', 'primary-ink'), 'tr-project'));
       sub.appendChild(named(await text('경험 카드 1개 포함', 'Small/13.5', 'text-3'), 'tr-inside'));
       sub.appendChild(named(await text('29일 뒤 삭제', 'Small/13.5', 'text-3'), 'tr-days'));
       const acts = al('H', { name: 'actions', gap: 4, cross: 'center' }); c.appendChild(acts);
@@ -41,7 +41,7 @@
     const col = await page(main, items.length
       ? { narrow: true, title: '휴지통', sub: '30일이 지나면 완전히 삭제돼요.', actions: [btn('휴지통 비우기', 'Danger', 'Medium')] }
       : { narrow: true, title: '휴지통' });
-    if (items.length) { const list = al('V', { name: '휴지통 항목', stroke: 'border', sides: ['top'] }); put(col, list, { fill: true }); for (const t of items) put(list, rowOf(t), { fill: true }); }
+    if (items.length) { const list = listBox(col, '휴지통 항목', [4, 20]); for (const t of items) put(list, rowOf(t), { fill: true }); lastRow(list); }
     else await empty(col, '휴지통이 비어 있어요', '버린 항목은 30일 동안 여기에 있어요.');
     fit(frame, screen);
   }

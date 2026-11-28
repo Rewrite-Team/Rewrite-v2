@@ -59,13 +59,13 @@ const CD_KEYWORDS = ['문제 해결력', '분석적 사고', '창의력', '기�
 const CD_W = 760; // 좁은 페이지의 내용 폭
 
 /* ---------- 컴포넌트 ---------- */
-// 꺼진 저장 버튼 (.wr-foot .btn[disabled]: 회색 바탕, 테두리, text-3)
+// 꺼진 저장 버튼 (.wr-foot .btn[disabled]: 회색 알약, 테두리, text-3)
 async function cdSaveOff() {
-  const b = al('H', { name: '저장 (꺼짐)', pad: [3, 10], h: 32, main: 'center', cross: 'center', fill: 'surface-2', stroke: 'border', radius: 'radius/sm' });
+  const b = al('H', { name: '저장 (꺼짐)', pad: [3, 13], h: 32, main: 'center', cross: 'center', fill: 'surface-2', stroke: 'border', radius: 'radius/pill' });
   b.appendChild(await text('저장', 'Small/13.5 Semibold', 'text-3')); return b;
 }
 // 「AI 채팅에서 채우기」 같은 글 링크 (.link)
-const cdLink = (label, name) => text(label, 'Small/13.5 Medium', 'primary', { underline: true, name: name || label });
+const cdLink = (label, name) => text(label, 'Small/13.5 Medium', 'primary-ink', { underline: true, name: name || label });
 
 EXTRA_COMPONENTS.push({
   title: '경험 카드',
@@ -83,12 +83,13 @@ EXTRA_COMPONENTS.push({
     // STAR 한 줄: 칸 이름(72) + 테두리 없는 입력칸. 고칠 때만 테두리와 저장 줄
     await makeSet(row, 'Card/STAR row', ['Idle', 'Empty', 'Editing', 'Saved'].map((k) => ({ props: { State: k }, build: async (c) => {
       auto(c, 'H', { gap: 6, pad: [12, 0, 18, 0], w: CD_W, stroke: 'border', sides: ['bottom'] });
-      const dt = al('H', { name: '칸 이름', w: 72, pad: [8, 0, 0, 0] }); c.appendChild(dt);
-      dt.appendChild(named(await text('상황', 'Small/13.5 Semibold', 'text-3'), 'star-label'));
+      const dt = al('H', { name: '칸 이름', w: 72, pad: [7, 0, 0, 0] }); c.appendChild(dt);
+      const pill = al('H', { name: '알약', pad: [2, 12], fill: 'primary-soft', radius: 'radius/pill' }); dt.appendChild(pill);
+      pill.appendChild(named(await text('상황', 'Small/13.5 Semibold', 'primary-deep'), 'star-label'));
       const dd = al('V', { name: '칸', gap: 4 }); put(c, dd, { fill: true });
       const box = al('V', { name: '입력칸', pad: [5, 10], radius: 'radius/sm',
         fill: k === 'Editing' || k === 'Saved' ? 'surface' : null,
-        stroke: k === 'Editing' ? 'primary' : k === 'Saved' ? 'border-strong' : null, strokeW: k === 'Editing' ? 2 : 1 });
+        stroke: k === 'Editing' ? 'primary-strong' : k === 'Saved' ? 'border-strong' : null, strokeW: k === 'Editing' ? 2 : 1 });
       put(dd, box, { fill: true });
       await tput(box, k === 'Empty' ? CD_STAR_PH.situation : '칸에 쓴 글', 'Body/15', k === 'Empty' ? 'text-3' : 'text', { wrap: true, name: 'star-text' });
       if (k === 'Empty') { const f = al('H', { name: '저장 줄', cross: 'center', minH: 32 }); put(dd, f, { fill: true }); f.appendChild(await cdLink('AI 채팅에서 채우기')); }
@@ -123,12 +124,12 @@ async function cdHead(main, d) {
 
 // 이력서 한 줄 (회색 판 .panel): 머리(이름, N자), 한 줄 입력칸, 저장 줄
 async function cdLinePanel(col, d) {
-  const p = al('V', { name: '이력서 한 줄', pad: 20, fill: 'surface-2', radius: 'radius/md' }); put(col, p, { fill: true });
+  const p = al('V', { name: '이력서 한 줄', pad: [22, 24], fill: 'primary-soft', radius: 'radius/lg' }); put(col, p, { fill: true });
   const top = al('H', { name: '머리', gap: 10, cross: 'center' }); put(p, top, { fill: true });
-  top.appendChild(await text('이력서 한 줄', 'Title/17', 'text')); spacer(top);
+  top.appendChild(await text('이력서 한 줄', 'Title/18', 'text')); spacer(top);
   top.appendChild(await text(`${d.line.length}자`, 'Small/13.5', 'text-3', { name: '글자 수' }));
   gap(p, 8);
-  const box = al('V', { name: '입력칸', pad: [10, 12], fill: 'surface', stroke: 'field-border', radius: 'radius/sm' }); put(p, box, { fill: true });
+  const box = al('V', { name: '입력칸', pad: [12, 14], fill: 'surface', stroke: 'border-strong', radius: 'radius/sm' }); put(p, box, { fill: true });
   await tput(box, d.line || '이 경험을 이력서에 적을 한 문장', 'Body/15 Semibold', d.line ? 'text' : 'text-3', { wrap: true });
   gap(p, 8);
   put(p, inst('Card/Write footer', { State: 'Idle', 'Show hint': true, Hint: CD_LINE_HINT }), { fill: true });
@@ -137,13 +138,13 @@ async function cdLinePanel(col, d) {
 
 // STAR: 칸마다 Card/STAR row. states: { result: 'Editing', task: 'Saved' } (없으면 글이 있으면 Idle, 없으면 Empty)
 async function cdStar(col, d, states = {}) {
-  const s = al('V', { name: 'STAR', stroke: 'border', sides: ['top'] }); put(col, s, { fill: true });
+  const s = al('V', { name: 'STAR' }); put(col, s, { fill: true });
   for (const [key, label] of CD_STAR) {
     const v = (states[key] && states[key].text) || d.star[key];
     const state = (states[key] && states[key].state) || (v ? 'Idle' : 'Empty');
     const r = inst('Card/STAR row', { State: state, Label: label, Text: v || CD_STAR_PH[key] }); r.name = label; put(s, r, { fill: true });
   }
-  return s;
+  return lastRow(s);
 }
 
 // 회고: 직접 쓰는 칸
@@ -162,7 +163,7 @@ async function cdEvidence(col, ev, open) {
   const s = al('V', { name: open ? '근거 (펼침)' : '근거 (닫힘)' }); put(col, s, { fill: true });
   const sum = al('H', { name: '근거 머리', gap: 8, cross: 'center', minH: 44 }); put(s, sum, { fill: true });
   sum.appendChild(icon(open ? 'chevron-down' : 'chevron-right', 18, 'text-3'));
-  sum.appendChild(await text('근거', 'Title/17', 'text'));
+  sum.appendChild(await text('근거', 'Title/18', 'text'));
   const opts = { repo: ev.repo, sample: ev.sample, commits: ev.commits, prs: ev.prs, code: ev.files.map((f) => ({ path: cdRange(f), lines: f.code.map((src, i) => [f.start + i, src]), hl: f.hl })) };
   const counts = al('H', { name: '개수', gap: 14, cross: 'center', pad: [0, 0, 0, 4] }); sum.appendChild(counts);
   for (const c of evidenceCounts(opts)) counts.appendChild(await text(c, 'Small/13.5', 'text-3'));

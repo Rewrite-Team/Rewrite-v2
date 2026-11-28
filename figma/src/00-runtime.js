@@ -12,21 +12,25 @@ const EFFECTS = {};   // 'Menu' | 'Modal' → 그림자 스타일
 const V1 = { prefix: 'v1', collection: 'Rewrite v1', page: 'Rewrite v1', oldPages: ['v1 Foundations', 'v1 Components', 'v1 Screens'] };
 
 /* ---------- 색: 앱의 CSS 변수(prototype/css/styles.css)와 같은 값 ---------- */
-const COLORS = {
-  bg: '#ffffff', surface: '#ffffff', 'surface-2': '#f3f5f8', 'surface-3': '#e8ecf1',
-  border: '#e1e5eb', 'border-strong': '#c8cfd9', 'field-border': '#848e9d',
-  text: '#18202e', 'text-2': '#465164', 'text-3': '#5d6878', 'on-ink': '#ffffff', 'on-ink-2': '#d3d9e2',
-  primary: '#24426f', 'primary-hover': '#182f53', 'primary-soft': '#e9eef6', 'primary-ink': '#1d3760',
-  hl: '#ffeb66', 'hl-soft': '#fff8cf',
-  success: '#1c7349', 'success-soft': '#e5f3eb', danger: '#bd2f28', 'danger-soft': '#fcebe9', warn: '#855600', 'warn-soft': '#fdf1db',
-  'record-0': '#e8ecf1', 'record-1': '#c9d4e3', 'record-2': '#93a9c8', 'record-3': '#5a7aa6', 'record-4': '#24426f', // 잔디: 잉크색 한 가지, 연할수록 적게
+/* 색 단계: 앱의 --orange-* · --grey-* 와 같은 값. 색 값은 여기에만 쓴다 */
+const STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900];
+const SCALES = {
+  orange: ['#fff2e8', '#ffe1ca', '#ffd0ad', '#ffb882', '#ffa05b', '#ff8834', '#e56f1b', '#b4540f', '#8f430c', '#5c2b08'], // 500 이 메인 색
+  grey: ['#f7f7f8', '#efeff1', '#e6e6e9', '#dcdce0', '#b4b4ba', '#8e8e95', '#6a6a72', '#4a4a50', '#303034', '#1c1c1e'],
 };
-const NUMBERS = { 'radius/sm': 6, 'radius/md': 8, 'radius/lg': 14, 'radius/tag': 4, 'radius/pill': 999 };
+const PALETTE = { white: '#ffffff' };
+for (const [name, list] of Object.entries(SCALES)) list.forEach((hex, i) => { PALETTE[`${name}/${STEPS[i]}`] = hex; });
+/* 쓰임 토큰 → 단계. 앱의 CSS 변수(prototype/css/styles.css)와 같은 짝. Figma 에서는 단계 변수를 가리키는 별칭이 된다 */
+const ALIASES = {
+  bg: 'white', surface: 'white', 'surface-2': 'grey/50', 'surface-3': 'grey/100', border: 'grey/200', 'border-strong': 'grey/300', 'field-border': 'grey/500', text: 'grey/900', 'text-2': 'grey/700', 'text-3': 'grey/600', primary: 'orange/500', 'primary-hover': 'orange/600', 'primary-strong': 'orange/600', 'primary-ink': 'orange/700', 'primary-deep': 'orange/800', 'primary-light': 'orange/300', 'primary-tint': 'orange/100', 'primary-soft': 'orange/50', 'on-primary': 'white', success: 'orange/700', 'success-soft': 'orange/50', danger: 'orange/800', 'danger-soft': 'orange/50', warn: 'orange/800', 'warn-soft': 'orange/50', 'record-0': 'grey/100', 'record-1': 'orange/100', 'record-2': 'orange/300', 'record-3': 'orange/500', 'record-4': 'orange/700', // 잔디: 연할수록 적게
+};
+const COLORS = Object.fromEntries(Object.entries(ALIASES).map(([k, v]) => [k, PALETTE[v]]));
+const NUMBERS = { 'radius/sm': 10, 'radius/md': 16, 'radius/lg': 24, 'radius/pill': 999 };
 const rgb = (h) => ({ r: parseInt(h.slice(1, 3), 16) / 255, g: parseInt(h.slice(3, 5), 16) / 255, b: parseInt(h.slice(5, 7), 16) / 255 });
 
 // 변수에 묶인 단색 칠 (변수가 아직 없으면 같은 색의 칠)
 function paint(token, opacity) {
-  const hex = COLORS[token]; if (!hex) throw new Error(`없는 색 토큰: ${token}`);
+  const hex = COLORS[token] || PALETTE[token]; if (!hex) throw new Error(`없는 색 토큰: ${token}`);
   const p = Object.assign({ type: 'SOLID', color: rgb(hex) }, opacity != null ? { opacity } : {});
   return TOKENS[token] ? figma.variables.setBoundVariableForPaint(p, 'color', TOKENS[token]) : p;
 }
@@ -46,7 +50,7 @@ function radius(node, r) {
   if (TOKENS[r]) for (const f of ['topLeftRadius', 'topRightRadius', 'bottomLeftRadius', 'bottomRightRadius']) node.setBoundVariable(f, TOKENS[r]);
   return node;
 }
-const MARK_RADIUS = [2, 5, 3, 4]; // 형광펜 모서리 (--radius-mark)
+const MARK_RADIUS = 6; // 강조한 글자의 모서리 (styles.css 의 mark)
 // 그림자 스타일. Figma 는 비동기로만 붙일 수 있어서 기다릴 일을 PENDING 에 모으고, main 이 끝에서 한꺼번에 기다린다
 const PENDING = [];
 const shadow = (node, kind) => { PENDING.push(node.setEffectStyleIdAsync(EFFECTS[kind].id)); return node; };
@@ -161,7 +165,7 @@ function recolor(node, color) {
   return node;
 }
 // SVG 를 벡터로 (아이콘 컴포넌트를 만들 때만 쓴다)
-function svgNode(body, size, hex = '#465164', sw = 1.6) {
+function svgNode(body, size, hex = '#4a4a50', sw = 1.6) {
   const n = figma.createNodeFromSvg(`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${hex}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">${body.replace(/currentColor/g, hex)}</svg>`);
   n.resize(size, size); return n;
 }

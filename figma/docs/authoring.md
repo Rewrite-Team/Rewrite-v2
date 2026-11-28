@@ -6,8 +6,8 @@
 ## 규칙 (프론트 전문가가 만든 것처럼)
 
 1. **색은 토큰, 글자는 텍스트 스타일만.** hex, 글자 크기, 글꼴을 화면 파일에 직접 쓰지 않아요.
-   - 색 토큰: `src/00-runtime.js` 의 `COLORS` 키 (`text`, `text-2`, `text-3`, `primary`, `surface-2`, `border`, `hl`, `danger` …)
-   - 텍스트 스타일: `src/10-foundations.js` 의 `TYPE` 이름 (`Heading/24`, `Title/17`, `Body/15`, `Body/15 Semibold`, `Small/13.5`, `Small/13.5 Semibold`, `Caption/12`, `Mono/12` …)
+   - 색 토큰: `src/00-runtime.js` 의 `ALIASES` 키. 모두 색 단계(`orange/50`~`orange/900`, `grey/50`~`grey/900`, `white`) 중 하나를 가리킨다. 화면에서는 쓰임 토큰을 쓴다 (`text`, `text-2`, `text-3`, `primary`, `primary-ink`, `primary-soft`, `surface-2`, `border`, `danger` …). 흰 바탕의 주황 글자는 `primary-ink`, 채우기는 `primary`, 선과 테두리는 `primary-strong`
+   - 텍스트 스타일: `src/10-foundations.js` 의 `TYPE` 이름 (`Heading/26`, `Title/18`, `Body/15`, `Body/15 Semibold`, `Small/13.5`, `Small/13.5 Semibold`, `Caption/12`, `Mono/12` …)
 2. **있는 컴포넌트를 먼저 써요** (`inst('이름', {속성})`). 같은 모양을 두 번 손으로 그리지 않아요.
    한 화면 파일에서 여러 번 반복되는 새 모양이 필요하면 그 파일에서 `EXTRA_COMPONENTS.push({ title, build })` 로 컴포넌트를 만들어 써요 (`makeOne`, `makeSet` 사용).
    **두 화면 파일 이상에서 쓰는 모양은 공용(`30-components.js`, 조립은 `40-patterns.js`)으로 올려요.** 화면 파일에서 공용 컴포넌트의 색이나 글자를 덮어쓰지 않아요 (필요하면 변형을 더해요. 예: `Button` 의 `Ghost danger`).
@@ -15,7 +15,7 @@
 3. **오토 레이아웃으로 조립해요** (`al`, `put`). 좌표를 직접 정하는 건 겹쳐 띄우는 것(모달, 메뉴, 툴팁, 알림)뿐이에요.
 4. **내용은 앱과 똑같이.** 문구는 앱 코드(prototype/js)에서 그대로 가져와요. 예시 계정(김준호, 모여봄 …)의 데이터를 써요. 지어내지 않아요.
 5. **1차 범위만.** 마스터 이력서, 지원 기업과 관련된 것(메뉴, 홈의 마감 목록, 카드의 「쓰인 곳」, 휴지통의 지원 기업 항목)은 그리지 않아요. 목록은 `figma/docs/inventory.md`.
-6. 디자인 규칙은 `docs/design-guide.md` (형광펜은 「내가 고른 것」과 「AI가 더한 것」에만, 가운뎃점으로 정보 잇지 않기, 이모지·유니코드 기호 아이콘 금지 …).
+6. 디자인 규칙은 `docs/design-guide.md` (색은 흰색·회색·검정과 주황 하나만, 둥근 모서리, 가운뎃점으로 정보 잇지 않기, 이모지·유니코드 기호 아이콘 금지 …).
 
 ## 등록
 
@@ -45,7 +45,7 @@ SCREENS.push({
 | `spacer(parent)`, `gap(parent, h, w?)` | 늘어나는 빈 칸, 정해진 틈 |
 | `await text(글, 스타일, 색, { w, align, maxLines, underline, name })` | 글자 노드 (부모에 넣지 않음) |
 | `await tput(parent, 글, 스타일, 색, { wrap, align, maxLines, name })` | 글자를 넣고, `wrap` 이면 부모 폭에 맞춰 줄바꿈 |
-| `await marked(글, 스타일, 색)` | 형광펜 글자 (AI가 더한 것) |
+| `await marked(글, 스타일, 색)` | 연한 주황으로 강조한 글자 (AI가 더한 것) |
 | `inst('컴포넌트', { 속성 })` | 인스턴스. VARIANT 는 이름=값, TEXT/BOOLEAN 은 속성 이름, INSTANCE_SWAP 은 아이콘 이름 |
 | `setNested(인스턴스, '안쪽 레이어', { 속성 })` | 노출한 안쪽 인스턴스의 속성 바꾸기 (inst 와 같은 규칙) |
 | `icon('이름', 크기, 색)` | 아이콘 (prototype/js/icons.js 의 이름) |
@@ -58,7 +58,7 @@ SCREENS.push({
 | `shell(frame, Active, { name, email, trash })` → `{screen, main, side}` | 왼쪽 메뉴가 있는 화면 틀. `trash`: 휴지통 개수 (0 이면 숨김, 주지 않으면 1). 가운데는 내용 높이(최소 화면 높이)라 따로 맞출 필요 없어요 |
 | `await page(main, { narrow, crumb, above, title, titleExtra, meta, sub, below, actions, after })` → `col` | 폭 1200 페이지 (내용 1120, narrow 면 760). 머리: `above` 제목 위 줄, `titleExtra` 제목 옆, `meta` 제목 아래 정보 줄(사이 14), `sub` 설명(최대 600), `below` 그 아래 줄, `actions` 오른쪽 단추, `after` 머리 아래 틈(기본 28) |
 | `await titleBar(main, 제목)`, `await sectionTitle(col, 제목, 오른쪽링크?, 개수?)` | 상단바, 섹션 제목 |
-| `indexCard({ project, period, github, title, line, keywords, match })` | 경험 카드 한 장 (Card/Index). `match`: 거른 역량에 형광펜 |
+| `indexCard({ project, period, github, title, line, keywords, match })` | 경험 카드 한 장 (Card/Index). `match`: 거른 역량은 주황 |
 | `await githubAccount(parent, 'example', { sample, pad })` | 레포 고르기 위 GitHub 계정 줄 (+ 예시 태그, 계정 바꾸기) |
 | `await evidence(parent, { repo, sample, commits:[[sha, 글, 날짜]], prs:[[#번호, 글, 날짜]], code:[{ path, lines:[[번호, 코드]], hl:[번호] }] })`, `evidenceCounts(같은 옵션)` | GitHub 근거 묶음 (레포 줄 + 커밋 · PR · 코드), 근거 수 글 ['커밋 3개', …] |
 | `await openDraft(parent, { title, line, keywords, star:[[칸, 글]], evidence })` | 레포 분석에서 찾은 작업을 고르고 「자세히 보기」를 펼친 모습 |
@@ -66,8 +66,9 @@ SCREENS.push({
 | `menu(frame, [{label, icon, danger} │ '-'], [x, y], { w })`, `menuUnder(frame, 단추, items, { w, align:'end'│'start', up, gap, at })` | 메뉴. menuUnder 는 단추 아래(up 이면 위)에 띄우고, 자리를 잴 수 없으면 `at` ([x, y] 또는 (메뉴) => [x, y]) |
 | `boxIn(node, frame)` → `{x, y, w, h}` 또는 null | 프레임 안 노드 자리 (툴팁 놓기). 가짜 Figma 처럼 잴 수 없으면 null |
 | `toast(frame, 글, 동작?)`, `tooltip(frame, 글, [x, y])` | 띄우는 것 |
+| `listBox(parent, 이름, [세로, 가로])`, `lastRow(box)` | 둥근 면 하나로 묶은 목록, 마지막 줄의 아래 선 없애기 |
 | `fit(frame, node)` | 프레임 높이를 내용에 맞춤 (최소 1080) |
-| `stroke(node, 색, 굵기, sides)`, `radius(node, 숫자│'radius/md')`, `shadow(node, 'Menu'│'Modal')`, `paint(색, 투명도)`, `fills(색)`, `recolor(node, 색)` | 꾸미기 (recolor 는 아이콘에만) |
+| `stroke(node, 색, 굵기, sides)`, `radius(node, 숫자│'radius/md')`, `shadow(node, 'Card'│'Menu'│'Modal')`, `paint(색, 투명도)`, `fills(색)`, `recolor(node, 색)` | 꾸미기 (recolor 는 아이콘에만) |
 
 컴포넌트를 만들 때(`30-components.js`, `EXTRA_COMPONENTS`): `makeOne(parent, 이름, build, { desc, props })`, `makeSet(parent, 이름, [{ props, build }], { dir, desc, props })`, `auto(c, 'H'│'V', al 옵션)`, `named(node, 이름)`, `expose(parent, 안쪽 인스턴스)`.
 `props` 는 `[{ name, type: 'TEXT'│'BOOLEAN'│'INSTANCE_SWAP', default, node: 레이어 이름 }]`. 안쪽 인스턴스 속의 레이어에는 묶지 않아요 (Figma 가 막아요) → 노출해서 setNested.
@@ -77,7 +78,7 @@ SCREENS.push({
 공용 (`30-components.js`, `40-patterns.js`의 Shell/Sidebar):
 
 - 기본: `Button` (Variant: Primary, Secondary, Ghost, Danger, Ghost danger / Size: Small, Medium, Large / Label, Show icon, Icon) ·
-  `Icon button` (Size: Medium, Small / Icon) · `Tag` (Tone: Neutral(예시), Ink(진행중), Success(완료), Warn, Danger / Label) · `Avatar` (Initial) · `Logo` (On: Light, Ink) · `Divider` · `Spinner`
+  `Icon button` (Size: Medium, Small / Icon) · `Tag` (Tone: Neutral(예시), Ink(진행중, 주황), Success(완료, 회색), Warn, Danger / Label) · `Avatar` (Initial) · `Logo` · `Divider` · `Spinner`
 - 입력: `Input` (Content: Placeholder, Value / State: Default, Focus, Error, Disabled / Text, Show icon, Icon, Show trailing, Trailing) · `Textarea` (Content / Text) · `Select` (Text) ·
   `Checkbox` (Checked: Off, On) · `Radio` (Checked) · `Switch` (On: Off, On) · `Segment` (Selected / Label, Show icon, Icon)
 - 탐색: `Nav item` (State: Default, Active / Label, Icon, Count, Show count) · `Project chip` (Label) · `Keyword` (State: Default, Selected / Label) · `Keyword option` (Selected: Off, On / Label)

@@ -4,13 +4,14 @@
 .ob-head { display: flex; align-items: center; justify-content: space-between; height: var(--topbar-h); padding: 0 var(--gutter); }
 .ob-head .brand { padding: 0; margin: 0; }
 .ob-body { max-width: 560px; margin: 0 auto; padding: 48px 16px 64px; }
-.ob-body > .progress { width: 96px; margin-bottom: 28px; }
-.ob-body h1 { font-size: var(--fs-xl); letter-spacing: -0.025em; margin-bottom: 24px; }
+.ob-body > .progress { width: 120px; height: 10px; margin-bottom: 28px; }
+.ob-body h1 { font-size: var(--fs-xl); letter-spacing: -0.025em; margin-bottom: 28px; }
 .ob-body h1:focus-visible { outline: none; }
-.ob-pane { margin-top: 20px; min-height: 148px; }
+.ob-pane { margin-top: 24px; min-height: 148px; }
+.ob-body .field > .input { min-height: 48px; padding-left: 16px; padding-right: 16px; }
 .ob-foot { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; gap: 8px; margin-top: 16px; padding: 12px 0; background: var(--bg); } /* 레포 목록이 길어도 늘 보인다 */
 .ob-foot [data-act="prev"] { margin-right: auto; margin-left: -14px; }
-.ob-foot > .btn-primary:first-child { width: 100%; min-height: 46px; }
+.ob-foot > .btn-primary:first-child { width: 100%; min-height: 50px; }
 
 @media (max-width: 600px) {
   .ob-body { padding-top: 20px; }
