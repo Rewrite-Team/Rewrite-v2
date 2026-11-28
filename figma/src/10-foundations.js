@@ -1,4 +1,4 @@
-/* 기초: 글꼴, 색 변수, 텍스트 스타일, 그림자 스타일, 페이지. 그리고 「v1 Foundations」 페이지(색과 글자 견본)
+/* 기초: 글꼴, 색 변수, 텍스트 스타일, 그림자 스타일, 페이지. 그리고 기초 견본(색과 글자)(색과 글자 견본)
    다시 실행하면 v1 로 시작하는 스타일과 「Rewrite v1」 변수 모음, v1 페이지 세 개를 지우고 새로 만든다 */
 
 /* ---------- 글꼴: 이 컴퓨터에 Pretendard 가 있으면 Pretendard, 없으면 Noto Sans KR ---------- */
@@ -60,17 +60,26 @@ async function setupVariables() {
 }
 
 /* ---------- 페이지: 새 v1 페이지 세 개를 만들고 옛 v1 페이지를 지운다 ---------- */
+/* ---------- 페이지: 「Rewrite v1」 한 페이지에 기초, 컴포넌트, 화면을 모두 그린다 (Starter 플랜은 페이지가 3개까지) ----------
+   있으면 그 페이지 안만 비우고 다시 그린다. 없으면 새로 만든다. 다른 페이지는 건드리지 않는다 */
 async function resetPages() {
-  const old = figma.root.children.filter((p) => Object.values(V1.pages).includes(p.name));
-  const made = {};
-  for (const [k, name] of Object.entries(V1.pages)) { const p = figma.createPage(); p.name = `${name} (만드는 중)`; made[k] = p; }
-  await figma.setCurrentPageAsync(made.found); // 지우려는 페이지에 머물러 있지 않게
-  old.forEach((p) => p.remove());
-  for (const [k, name] of Object.entries(V1.pages)) made[k].name = name;
-  return made;
+  const isOld = (p) => V1.oldPages.some((n) => p.name === n || p.name === `${n} (만드는 중)`); // 예전 버전이 만든 페이지 (자리를 비운다)
+  let page = figma.root.children.find((p) => p.name === V1.page);
+  if (!page) {
+    const free = figma.root.children.find(isOld); // 예전 v1 페이지가 있으면 그 페이지를 이어 쓴다
+    if (free) { free.name = V1.page; page = free; }
+  }
+  if (!page) {
+    try { page = figma.createPage(); page.name = V1.page; }
+    catch (e) { throw new Error(`「${V1.page}」 페이지를 만들 수 없어요 (${e.message}). 빈 페이지 하나의 이름을 「${V1.page}」로 바꾸고 다시 실행해 주세요. 그 페이지 안의 내용은 지워져요.`); }
+  }
+  await figma.setCurrentPageAsync(page);
+  for (const p of figma.root.children.filter((p) => p !== page && isOld(p))) p.remove();
+  for (const n of page.children.slice()) n.remove();
+  return page;
 }
 
-/* ---------- 「v1 Foundations」: 색 견본과 글자 견본 ---------- */
+/* ---------- 기초 견본: 색과 글자 (페이지 왼쪽 위) ---------- */
 async function drawFoundations(pageNode) {
   const board = al('V', { name: 'Foundations', gap: 48, pad: 64, fill: 'surface' }); pageNode.appendChild(board);
   await tput(board, 'Rewrite v1 기초', 'Heading/24', 'text');

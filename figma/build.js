@@ -28,7 +28,7 @@ const ordered = files(SRC).sort((a, b) => /main\.js$/.test(a) - /main\.js$/.test
 const parts = ordered.map((f) => `/* ===== ${path.relative(SRC, f)} ===== */\n${fs.readFileSync(f, 'utf8').trim()}\n`);
 const head = `/* Rewrite v1 디자인 — 자동으로 만든 파일이에요. 고치려면 figma/src 를 고치고 \`node figma/build.js\` 를 다시 실행하세요.
    실행: Figma 데스크톱 앱에서 파일을 열고 Plugins → Scripter 에 이 파일 내용을 통째로 붙여 넣은 뒤 ▶.
-   만드는 것: 「v1 Foundations」(색·글자), 「v1 Components」(컴포넌트), 「v1 Screens」(화면) 페이지. 다시 실행하면 세 페이지를 지우고 새로 그려요.
+   만드는 것: 「Rewrite v1」 페이지 하나에 기초(색, 글자), 컴포넌트, 화면. 다시 실행하면 그 페이지 안만 지우고 새로 그려요 (Starter 플랜의 페이지 3개 제한 안에서).
    빌드: ${new Date().toISOString().slice(0, 16).replace('T', ' ')} */\n`;
 const body = `${head}\nconst ICON_PATHS = ${JSON.stringify(icons(), null, 0)};\n\n${parts.join('\n')}`;
 fs.mkdirSync(path.dirname(OUT), { recursive: true });

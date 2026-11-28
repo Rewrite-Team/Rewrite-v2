@@ -9,7 +9,7 @@ const LIB = {};       // 컴포넌트 이름 → COMPONENT | COMPONENT_SET (30-c
 const TOKENS = {};    // 'text' → 색 변수, 'radius/md' → 숫자 변수
 const STYLES = {};    // 'Body/15' → 텍스트 스타일
 const EFFECTS = {};   // 'Menu' | 'Modal' → 그림자 스타일
-const V1 = { prefix: 'v1', collection: 'Rewrite v1', pages: { found: 'v1 Foundations', comp: 'v1 Components', screens: 'v1 Screens' } };
+const V1 = { prefix: 'v1', collection: 'Rewrite v1', page: 'Rewrite v1', oldPages: ['v1 Foundations', 'v1 Components', 'v1 Screens'] };
 
 /* ---------- 색: 앱의 CSS 변수(prototype/css/styles.css)와 같은 값 ---------- */
 const COLORS = {
