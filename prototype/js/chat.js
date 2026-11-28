@@ -271,5 +271,37 @@
   }
   const SWITCH_LEAD = /^(다른|또 다른|새로운)\s?(이야기|얘기|경험)(인데요?|예요|이에요|입니다|할게요|할래요)?[,.\s]*/;
 
-  App.chat = { opening, respond, decide, wantsDelete, cardState, missingOf, githubMsg, wantsGithub, GH_TITLE, LABEL, STAGES, _internals: { polish, inferField, match, newStory, route } };
+  /* ---------- 오늘의 질문 ----------
+     프로젝트마다 고정된 방(chat.daily)에 날마다 질문 하나. 비어 있는 칸이 있는 카드가 있으면 그 칸을 묻고(답은 그 카드로 간다),
+     없으면 있었던 일을 떠올리게 하는 질문. 같은 날에는 같은 질문 (날짜로 고른다) */
+  const PROMPTS = [
+    '오늘 이 프로젝트에서 한 일 중 가장 기억에 남는 건 뭐였나요?',
+    '최근에 가장 오래 고민한 문제는 뭐였나요? 어떻게 풀었는지도 들려주세요.',
+    '최근에 팀원에게 설명하거나 설득한 일이 있었나요?',
+    '처음 계획과 다르게 바뀐 게 있었다면 무엇이었고, 왜 바뀌었나요?',
+    '숫자로 말할 수 있는 변화가 있었나요? 시간, 횟수, 비율 같은 것도 좋아요.',
+    '새로 배워서 바로 써먹은 게 있나요?',
+    '실수했던 일과, 그다음에 어떻게 했는지 들려주세요.',
+    '누군가에게 도움을 받거나 준 일이 있었나요?',
+  ];
+  const seedOf = (t) => [...String(t)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+  function dailyQuestion(projectId, day) {
+    const open = S.cardsOf(projectId).filter((e) => missingOf(e).length);
+    if (open.length) {
+      const e = open[seedOf(day) % open.length]; const f = missingOf(e)[0];
+      return { card: e.id, stage: f, text: `「${e.title}」 카드의 ${josa(LABEL[f], '이', '가')} 아직 비어 있어요. ${window.SEED.followups[f][0]}` };
+    }
+    return { card: null, stage: null, text: PROMPTS[seedOf(day + projectId) % PROMPTS.length] };
+  }
+  // 오늘 질문이 아직 없으면 남긴다 → 남겼으면 true
+  function askToday(chat) {
+    const day = S.localDay(); if (!chat || !chat.daily || chat.msgs.some((m) => m.daily === day)) return false;
+    const q = dailyQuestion(chat.projectId, day);
+    S.addMsg(chat.id, Object.assign({ who: 'ai', daily: day }, q)); if (q.card) S.setFocus(chat.id, q.card);
+    return true;
+  }
+  // 오늘의 질문에 답했는가 (오늘 그 방에 말을 남겼는가)
+  const answeredToday = (chat) => !!chat && chat.msgs.some((m) => m.who === 'me' && String(m.at || '').startsWith(S.localDay()));
+
+  App.chat = { opening, respond, decide, askToday, answeredToday, cardState, missingOf, githubMsg, wantsGithub, GH_TITLE, LABEL, STAGES };
 })(window.App);

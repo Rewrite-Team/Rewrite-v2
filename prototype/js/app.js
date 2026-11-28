@@ -5,7 +5,6 @@
     { href: '#/home', name: 'home', icon: 'home', label: '홈' },
     { href: '#/chat', name: 'chat', icon: 'chat', label: 'AI 채팅' },
     { href: '#/vault', name: 'vault', icon: 'wiki', label: '경험 위키' },
-    { href: '#/graph', name: 'graph', icon: 'graph', label: '경험 그래프' },
     { href: '#/timeline', name: 'timeline', icon: 'timeline', label: '경험 타임라인' },
     { href: '#/resume', name: 'resume', icon: 'resume', label: '마스터 이력서' },
     { href: '#/apply', name: 'apply', icon: 'building', label: '지원 기업', apps: true },
@@ -29,7 +28,7 @@
     const u = App.store.state.user; const me = App.auth.current();
     return `<div class="menu ${compact ? '' : 'menu-up'}">
       <button type="button" class="account" aria-haspopup="menu" aria-expanded="false" aria-label="계정 메뉴"><span class="avatar">${esc((u.name || '나').slice(0, 1))}</span><span class="account-text"><span class="account-name">${esc(u.name)}</span><span class="account-email">${esc(me ? me.email : '')}</span></span>${App.icon('more', 18)}</button>
-      <div class="menu-list"><a href="#/settings">${App.icon('settings', 16)}설정</a>${compact ? `<a href="#/graph">${App.icon('graph', 16)}경험 그래프</a><a href="#/timeline">${App.icon('timeline', 16)}경험 타임라인</a><a href="#/trash">${App.icon('trash', 16)}휴지통</a>` : ''}<button type="button" data-logout>${App.icon('logout', 16)}로그아웃</button></div>
+      <div class="menu-list"><a href="#/settings">${App.icon('settings', 16)}설정</a>${compact ? `<a href="#/timeline">${App.icon('timeline', 16)}경험 타임라인</a><a href="#/trash">${App.icon('trash', 16)}휴지통</a>` : ''}<button type="button" data-logout>${App.icon('logout', 16)}로그아웃</button></div>
     </div>`;
   }
   function sidebar(active, params) {

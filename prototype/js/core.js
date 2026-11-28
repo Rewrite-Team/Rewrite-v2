@@ -33,10 +33,9 @@ window.App = window.App || {};
     });
   }
   function EMPTY_RESUME() { return { profile: { name: '', headline: '', email: '', phone: '', github: '', blog: '', intro: '' }, skills: [], entries: [], versions: [] }; }
-  const listeners = new Set();
   function persist() { const me = App.auth.current(); if (!me || me.id !== owner) return; try { localStorage.setItem(dataKey(me.id), JSON.stringify(state)); } catch (e) { /* ignore */ } }
   let dryRun = false; // S.dry() 안: 바꾼 것을 저장하지도 알리지도 않는다
-  function emit() { if (dryRun) return; persist(); listeners.forEach((fn) => fn(state)); }
+  function emit() { if (dryRun) return; persist(); }
   // 날짜는 로컬 기준
   const pad2 = (n) => String(n).padStart(2, '0');
   const fmtDay = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
@@ -55,15 +54,13 @@ window.App = window.App || {};
     get state() { return state; },
     projectName(p) { return (p && p.title) || ''; },
     // 로컬 날짜 도우미
-    localDay, fmtDay, parseDay, nowAt,
-    subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+    localDay, fmtDay, parseDay,
     touch() { emit(); },
     dataKey,
     // 로그인·로그아웃한 뒤 그 계정의 데이터로 바꾼다
-    switchAccount() { state = load(); this._dropRefs(); if (App.auth.current()) emit(); else listeners.forEach((fn) => fn(state)); },
+    switchAccount() { state = load(); this._dropRefs(); if (App.auth.current()) emit(); },
     // 다른 탭에서 저장한 내용을 다시 읽는다 (저장하지 않음)
     reload() { state = load(); this._dropRefs(); },
-    reset() { const me = App.auth.current(); if (me) { try { localStorage.removeItem(dataKey(me.id)); } catch (e) {} } state = load(); if (me && !me.demo) state.user.onboarded = true; emit(); },
 
     // ---------------- 경험 카드 (projectId 필수) ----------------
     // 대화방(feed), GitHub 레포 분석(addGithubCards), 직접 만들기(createManual)로 생긴다. 사용자는 카드에서 제목·STAR·역량(edit), 이력서 한 줄(setResumeLine), 회고(setRetrospect)를 직접 고친다
@@ -180,20 +177,34 @@ window.App = window.App || {};
     // focus: 오른쪽에서 펼쳐 보는 카드 (사용자가 고르거나, AI 가 방금 고친 카드). 그 프로젝트의 카드는 모두 오른쪽에 보인다
     // msg.card: 그 말이 담긴(me) / 그 말이 묻는(ai) 경험 카드 · ai.touch: { card, created, fields:[...] } 이 답에서 바꾼 카드와 칸
     // me 메시지: done 카드에 담은 말 · command 카드에 담지 않는 말
-    rename(chatId, title) { const c = this.getChat(chatId); if (!c) return; c.title = title; c.named = true; emit(); },
+    rename(chatId, title) { const c = this.getChat(chatId); if (!c || c.daily) return; c.title = title; c.named = true; emit(); },
     chats() { return state.chats.slice().reverse().sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')); },
-    chatsOf(projectId) { return this.chats().filter((c) => c.projectId === projectId); },
+    // 프로젝트의 대화방. 「오늘의 질문」 방(daily)이 늘 맨 위
+    chatsOf(projectId) { const l = this.chats().filter((c) => c.projectId === projectId); return l.filter((c) => c.daily).concat(l.filter((c) => !c.daily)); },
+    /* 오늘의 질문: 프로젝트마다 고정된 대화방 하나 (이름을 바꾸거나 지울 수 없다). 날마다 AI 가 질문을 하나 남긴다 (App.chat.askToday) */
+    dailyOf(projectId) { return state.chats.find((c) => c.daily && c.projectId === projectId) || null; },
+    ensureDaily() {
+      const miss = state.projects.filter((p) => !this.dailyOf(p.id)); if (!miss.length) return;
+      miss.forEach((p) => state.chats.push({ id: uid('c'), projectId: p.id, title: '오늘의 질문', daily: true, focus: null, msgs: [], createdAt: nowAt(), updatedAt: '' }));
+      emit();
+    },
+    // 그날 사용자가 남긴 기록 수: 보낸 말 + 만든 카드 → { 'YYYY-MM-DD': n }
+    activity() {
+      const out = {}; const add = (day) => { if (day) out[day] = (out[day] || 0) + 1; };
+      state.chats.forEach((c) => c.msgs.forEach((m) => { if (m.who === 'me') add(String(m.at || '').slice(0, 10)); }));
+      state.experiences.forEach((e) => { if (e.source !== 'chat') add(String(e.createdAt || '').slice(0, 10)); }); // 대화로 만든 카드는 말이 이미 셌다
+      return out;
+    },
     getChat(id) { return state.chats.find((c) => c.id === id) || null; },
     createChat(partial = {}) {
       const c = Object.assign({ id: uid('c'), projectId: null, title: '새 채팅', focus: null, msgs: [], createdAt: nowAt(), updatedAt: nowAt() }, clone(partial));
       state.chats.push(c); emit(); return c;
     },
-    updateChat(id, patch) { const c = this.getChat(id); if (!c) return null; Object.assign(c, clone(patch)); emit(); return c; },
     // 오른쪽에서 펼칠 카드 (null 이면 모든 카드)
     setFocus(chatId, cardId) { const c = this.getChat(chatId); if (!c) return; const e = cardId && this.get(cardId); c.focus = e && e.projectId === c.projectId ? cardId : null; emit(); },
-    dropChat(id) { state.chats = state.chats.filter((x) => x.id !== id); emit(); }, // 담은 이야기가 없는 빈 방
     removeChat(id) {
-      const c = this.getChat(id); if (!c) return null; state.chats = state.chats.filter((x) => x.id !== id);
+      const c = this.getChat(id); if (!c || c.daily) return null; // 오늘의 질문 방은 지우지 않는다
+      state.chats = state.chats.filter((x) => x.id !== id);
       return this._toTrash('chat', c.title, c.projectId, { chats: [c] });
     },
     addMsg(chatId, msg) {
@@ -427,7 +438,6 @@ window.App = window.App || {};
     has(name) { return window.SEED.keywords.some((k) => k.name === name); },
     clean: cleanKw,
     get(name) { return window.SEED.keywords.find((k) => k.name === name) || { name, tone: 'gray', desc: '', hints: [] }; },
-    tone(name) { return this.get(name).tone; },
   };
 
   /* ---------------- Mock AI ---------------- */
@@ -535,7 +545,6 @@ window.App = window.App || {};
     esc,
     keywordChip(name, matched) { return `<span class="kw${matched ? ' is-match' : ''}" data-kw="${esc(name)}">${esc(name)}</span>`; },
     statusTag(status) { return status === 'done' ? '<span class="tag tag-done">완료</span>' : '<span class="tag tag-ongoing">진행중</span>'; },
-    progress(pct) { return `<div class="progress"><span style="width:${pct}%"></span></div>`; },
     period(p) { if (!p || !p.start) return '기간 미입력'; if (p.end === p.start) return p.start.replace('-', '.'); return `${p.start.replace('-', '.')} ~ ${p.end ? p.end.replace('-', '.') : '진행중'}`; },
     date(s) { const d = parseDay(String(s || '').slice(0, 10)); return s ? `${d.getMonth() + 1}월 ${d.getDate()}일` : ''; },
     // 어느 프로젝트의 카드인지 — 경험 카드가 보이는 모든 곳에 붙인다. opts.link 면 프로젝트로 가는 링크
@@ -639,7 +648,7 @@ window.App = window.App || {};
     // AI 채팅: 프로젝트마다 여러 채팅방. #/chat/new?project=&card=&kw=&text=&github=1 은 새 채팅 (card: 오른쪽에서 먼저 펼칠 카드 · github=1: GitHub 에서 이야깃거리 찾기부터)
     ['#/chat/:room', 'chat'], ['#/chat', 'chat'],
     // 프로젝트는 경험 위키 안의 묶음 페이지. /github 는 연결한 레포를 분석해 이 프로젝트의 경험 카드를 만드는 화면
-    ['#/vault/p/:id/github', 'projectGithub'], ['#/vault/p/:id', 'projects'], ['#/vault', 'vault'], ['#/graph', 'graph'], ['#/timeline', 'timeline'], ['#/card/:id', 'card'],
+    ['#/vault/p/:id/github', 'projectGithub'], ['#/vault/p/:id', 'projects'], ['#/vault', 'vault'], ['#/timeline', 'timeline'], ['#/card/:id', 'card'],
     ['#/apply/:id/:tab', 'apply'], ['#/apply/:id', 'apply'], ['#/apply', 'apply'],
     ['#/settings', 'settings'], ['#/resume', 'resume'], ['#/trash', 'trash'],
   ];

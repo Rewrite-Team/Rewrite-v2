@@ -55,6 +55,11 @@
   const chatMenu = (c) => menu(`「${c.title}」 대화방 메뉴`, `${act('rename', c.id, 'edit', '이름 바꾸기')}<hr>${act('del-chat', c.id, 'trash', '휴지통으로 옮기기', true)}`);
   const projectMenu = (p) => menu(`「${p.title}」 프로젝트 메뉴`, `<a href="#/vault/p/${p.id}">${I('folder', 16)}프로젝트 열기</a>${hasRepos(p) ? act('find', p.id, 'github', 'GitHub에서 찾기') : act('connect', p.id, 'github', 'GitHub 연결')}<hr>${act('del-project', p.id, 'trash', '휴지통으로 옮기기', true)}`);
 
+  // 오늘의 질문 방: 프로젝트 맨 위에 고정. 진행 중인 프로젝트에서 오늘 아직 답하지 않았으면 점. 이름 바꾸기·지우기 메뉴는 없다
+  function dailyRow(c, cur) {
+    const on = c.id === cur.chatId; const p = S.getProject(c.projectId); const todo = p && p.status === 'ongoing' && !C.answeredToday(c); // 점은 진행 중인 프로젝트만
+    return `<div class="chat-row is-daily ${on ? 'is-on' : ''}"><a class="chat-row-link" href="#/chat/${c.id}" ${on ? 'aria-current="page"' : ''}>${I('calendar', 15)}<span class="chat-row-title">오늘의 질문</span>${todo ? '<span class="chat-daily-dot" title="오늘 아직 답하지 않았어요"><span class="sr-only">오늘 아직 답하지 않았어요</span></span>' : ''}</a></div>`;
+  }
   function treeHTML(cur) {
     const u = U(); const list = projectsForList();
     return `<div class="chat-tree-head">${list.length ? `<button type="button" class="btn btn-primary" data-do="new-chat">${I('plus', 16)}새 채팅</button><button type="button" class="btn" data-do="new-project">새 프로젝트</button>` : `<button type="button" class="btn btn-primary" data-do="new-project">${I('plus', 16)}새 프로젝트</button>`}</div>
@@ -66,7 +71,7 @@
             <button type="button" class="chat-proj-btn" data-do="fold" data-id="${p.id}" aria-expanded="${!closed}">${I(closed ? 'chevron-right' : 'chevron-down', 16)}<span class="chat-proj-name">${esc(p.title)}</span>${hasRepos(p) ? `<span class="chat-proj-gh" title="GitHub 연결됨">${I('github', 14)}<span class="sr-only">GitHub 연결됨</span></span>` : ''}</button>
             <div class="chat-row-acts"><button type="button" class="icon-btn" data-do="new-chat" data-id="${p.id}" aria-label="「${esc(p.title)}」에서 새 채팅">${I('plus')}</button>${projectMenu(p)}</div>
           </div>
-          ${closed ? '' : `<div class="chat-rows">${isNew ? `<div class="chat-row is-on"><span class="chat-row-link" aria-current="page"><span class="chat-row-title">새 채팅</span></span></div>` : ''}${shown.map((c) => `<div class="chat-row ${c.id === cur.chatId ? 'is-on' : ''}"><a class="chat-row-link" href="#/chat/${c.id}" ${c.id === cur.chatId ? 'aria-current="page"' : ''}><span class="chat-row-title" title="${esc(c.title)}">${esc(c.title)}</span><span class="chat-row-when">${whenLabel(c.updatedAt)}</span></a><div class="chat-row-acts">${chatMenu(c)}</div></div>`).join('')}
+          ${closed ? '' : `<div class="chat-rows">${isNew ? `<div class="chat-row is-on"><span class="chat-row-link" aria-current="page"><span class="chat-row-title">새 채팅</span></span></div>` : ''}${shown.map((c) => (c.daily ? dailyRow(c, cur) : `<div class="chat-row ${c.id === cur.chatId ? 'is-on' : ''}"><a class="chat-row-link" href="#/chat/${c.id}" ${c.id === cur.chatId ? 'aria-current="page"' : ''}><span class="chat-row-title" title="${esc(c.title)}">${esc(c.title)}</span><span class="chat-row-when">${whenLabel(c.updatedAt)}</span></a><div class="chat-row-acts">${chatMenu(c)}</div></div>`)).join('')}
             ${!chats.length && !isNew ? '<p class="chat-none">아직 대화방이 없어요</p>' : ''}
             ${chats.length > shown.length ? `<button type="button" class="chat-more" data-do="more" data-id="${p.id}">${chats.length - shown.length}개 더 보기</button>` : ''}</div>`}
         </div>`;
@@ -227,7 +232,13 @@
 
   /* ---------------- 가운데: 대화 ---------------- */
   const aiHTML = (inner, id) => `<div class="chat-m is-ai" ${id ? `data-m-id="${id}"` : ''}><span class="ai-dot" aria-hidden="true">R</span><div class="chat-ai"><span class="sr-only">AI</span>${inner}</div></div>`;
+  // 오늘의 질문 방: 날마다 질문 앞에 날짜 줄
+  function dayHTML(day) {
+    const d = S.parseDay(day); const label = day === S.localDay() ? '오늘' : `${d.getMonth() + 1}월 ${d.getDate()}일`;
+    return `<div class="chat-day" role="separator"><span>${label}</span></div>`;
+  }
   function msgHTML(chat, m) {
+    if (m.daily) return dayHTML(m.daily) + aiHTML(`<p class="chat-t">${esc(m.text)}</p>`, m.id);
     if (m.who === 'me') return `<div class="chat-m is-me" data-m-id="${m.id}"><div class="chat-b"><span class="sr-only">나</span>${esc(m.text)}</div></div>`;
     return aiHTML(`${m.touch ? touchHTML(m.touch) : ''}<p class="chat-t">${esc(m.kind === 'github' ? ghText(m) : m.text)}</p>${m.kind === 'link' ? linkHTML(chat, m) : m.kind === 'github' ? ghHTML(chat, m) : m.kind === 'confirm' ? confirmHTML(m) : ''}`, m.id);
   }
@@ -268,14 +279,14 @@
     return `<form class="chat-form" data-form>${quick ? `<div class="chat-quick">${quick}</div>` : ''}<div class="chat-input"><textarea class="textarea" rows="1" data-text placeholder="${ph}" aria-label="메시지"></textarea><button type="submit" class="icon-btn chat-send" aria-label="보내기">${I('send', 20)}</button></div></form>`;
   }
   const ghQuick = (p, off = '') => (hasRepos(p) ? `<button type="button" class="btn btn-ghost btn-sm" data-do="find-here" ${off}>${I('github', 16)}GitHub에서 찾기</button>` : `<button type="button" class="btn btn-ghost btn-sm" data-do="connect-here" ${off}>${I('github', 16)}GitHub 연결</button>`);
-  const footHTML = (chat) => composer('이야기를 이어서 적어 주세요', ghQuick(S.getProject(chat.projectId)) + permHTML());
+  const footHTML = (chat) => composer(chat.daily ? '오늘의 질문에 답해 주세요. 한 줄이어도 괜찮아요' : '이야기를 이어서 적어 주세요', ghQuick(S.getProject(chat.projectId)) + permHTML());
   function headHTML(o) {
     return `<header class="chat-head"><a class="icon-btn chat-back" href="#/chat" aria-label="채팅 목록">${I('chevron-left', 22)}</a>
       <div class="chat-head-main">${o.projectId ? App.ui.projChip(o.projectId, { link: true }) : ''}<h1>${esc(o.title)}</h1></div>${o.right || ''}</header>`;
   }
   const panelBtn = () => `<button type="button" class="btn btn-sm chat-head-card" data-do="panel" aria-label="경험 카드 보기">${I('card', 16)}<span>경험 카드</span></button>`;
   function roomHTML(chat) {
-    return `${headHTML({ projectId: chat.projectId, title: chat.title, right: `${panelBtn()}${chatMenu(chat)}` })}
+    return `${headHTML({ projectId: chat.projectId, title: chat.title, right: `${panelBtn()}${chat.daily ? '' : chatMenu(chat)}` })}
       <div class="chat-body" data-body tabindex="0" aria-label="대화"><div class="chat-col" data-col>${bodyHTML(chat)}</div></div>
       <button type="button" class="btn btn-sm chat-jump" data-do="jump" hidden>${I('chevron-down', 16)}새 답변</button>
       <p class="sr-only" role="status" data-live></p>
@@ -318,6 +329,7 @@
   App.screens.chat = {
     title: 'AI 채팅',
     render(params) {
+      S.ensureDaily(); S.state.chats.filter((c) => c.daily && S.getProject(c.projectId)).forEach((c) => C.askToday(c)); // 프로젝트마다 오늘의 질문 방과 오늘 질문
       const cur = current(params);
       if (cur.projectId && U().fold[cur.projectId]) { delete U().fold[cur.projectId]; saveFold(); } // 연 채팅의 프로젝트는 펼쳐 둔다
       const p = S.getProject(cur.projectId); const has = cur.chat ? !!p : cur.isNew && p && !(params.github && !hasRepos(p)); // 오른쪽 카드가 있는 화면인가

@@ -743,5 +743,5 @@
     }
   }
 
-  App.github = { parseUrl, parseAccount, fetchAccount, analyzeRepo, sampleAccount, STEPS, ACCOUNT_STEPS, keyOf, _internals: { RULES, buildDrafts, runRules, sections, kindOf, cleanTitle } };
+  App.github = { fetchAccount, analyzeRepo, sampleAccount, STEPS, ACCOUNT_STEPS, keyOf };
 })(window.App);

@@ -146,7 +146,7 @@ function writeEssay({ question, keywords, limit, cards, company, job }) {
   const future = /입사 후|포부|이루고 싶은|목표/.test(q);
 
   // 단위 = 문장. pr 이 작을수록 먼저 남긴다. req = 함께 있어야 하는 앞 문장
-  const units = []; const paraOf = []; let para = 0;
+  const units = []; let para = 0;
   const add = (text, pr, req) => { if (!text) return null; const u = { id: units.length, text: text.trim(), pr, req: req ? req.id : null, para }; units.push(u); return u; };
 
   if (motive) {
@@ -217,7 +217,7 @@ function resumeLineOf(card, max = 80) {
   while (s.length > max && /,\s/.test(s)) s = s.replace(/^[^,]*,\s*/, ''); // 넘치면 앞의 배경 절부터 뺀다
   return s;
 }
-  App.essay = { polite, writeEssay };
+  App.essay = { writeEssay };
   // 새 카드의 이력서 한 줄 (카드에 resumeLine 이 없을 때)
   App.ai.resumeLine = (card) => resumeLineOf(card) || card.title;
 })(window.App);
